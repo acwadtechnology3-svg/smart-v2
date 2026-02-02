@@ -5,7 +5,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowLeft, Send, Phone } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
+import { realtimeClient } from '../../services/realtimeClient';
 
 type ChatScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
 type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
@@ -15,7 +16,6 @@ interface Message {
     text: string;
     senderId: string;
     time: string;
-    isUser: boolean;
 }
 
 export default function ChatScreen() {
@@ -26,41 +26,31 @@ export default function ChatScreen() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [userId, setUserId] = useState<string | null>(null);
-    const [tripDetails, setTripDetails] = useState<any>(null);
+    const [participants, setParticipants] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const flatListRef = useRef<FlatList>(null);
 
     // 1. Fetch Trip Data & Establish Identity
     useEffect(() => {
         const setupChat = async () => {
-            // A. Fetch Trip to know participants
-            const { data: trip } = await supabase
-                .from('trips')
-                .select('customer_id, driver_id')
-                .eq('id', tripId)
-                .single();
+            try {
+                const me = await apiRequest<{ user: any }>('/users/me');
+                setUserId(me.user?.id || null);
+            } catch (err) {
+                console.error('[Chat] Failed to load user:', err);
+            }
 
-            if (trip) {
-                setTripDetails(trip);
-
-                // B. Try Auth Session first
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                    setUserId(session.user.id);
-                } else {
-                    // C. Fallback: Use ID based on ROLE (Dev friendly)
-                    // If we are 'customer', assume we are the customer_id
-                    // If we are 'driver', assume we are the driver_id
-                    const fallbackId = role === 'customer' ? trip.customer_id : trip.driver_id;
-                    if (fallbackId) {
-                        console.log(`[Chat] Using ${role} fallback ID:`, fallbackId);
-                        setUserId(fallbackId);
-                    }
-                }
+            try {
+                const tripParticipants = await apiRequest<{ participants: any }>(`/trips/${tripId}/participants`);
+                setParticipants(tripParticipants.participants || null);
+            } catch (err) {
+                console.error('[Chat] Failed to load participants:', err);
             }
         };
 
-        setupChat();
+        if (tripId) {
+            setupChat();
+        }
     }, [tripId, role]);
 
     // 2. Fetch Initial Messages
@@ -68,31 +58,21 @@ export default function ChatScreen() {
         if (!tripId) return;
 
         const fetchMessages = async () => {
-            const { data, error } = await supabase
-                .from('messages')
-                .select('*')
-                .eq('trip_id', tripId)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error fetching messages:', error);
-                setLoading(false);
-                return;
-            }
-
-            if (data) {
+            try {
+                const data = await apiRequest<{ messages: any[] }>(`/messages?tripId=${tripId}`);
                 // Formatting
-                const formattedMessages = data.map((msg: any) => ({
+                const formattedMessages = (data.messages || []).map((msg: any) => ({
                     id: msg.id,
                     text: msg.content,
                     senderId: msg.sender_id,
-                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    // isUser will be calculated in render or effect update
-                    isUser: false // Placeholder
+                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }));
                 setMessages(formattedMessages);
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         fetchMessages();
@@ -102,13 +82,14 @@ export default function ChatScreen() {
     useEffect(() => {
         if (!tripId) return;
 
-        const channel = supabase
-            .channel(`chat:${tripId}`)
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'messages', filter: `trip_id=eq.${tripId}` },
+        let unsubscribe: (() => void) | null = null;
+
+        (async () => {
+            unsubscribe = await realtimeClient.subscribe(
+                { channel: 'trip:messages', tripId },
                 (payload) => {
-                    const newMsg = payload.new;
+                    const newMsg = payload?.new;
+                    if (!newMsg?.id) return;
                     setMessages((prev) => {
                         if (prev.find(m => m.id === newMsg.id)) return prev;
                         return [
@@ -117,76 +98,41 @@ export default function ChatScreen() {
                                 text: newMsg.content,
                                 senderId: newMsg.sender_id,
                                 time: new Date(newMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                isUser: false // Placeholder
                             },
                             ...prev
                         ];
                     });
                 }
-            )
-            .subscribe();
+            );
+        })();
 
         return () => {
-            supabase.removeChannel(channel);
+            if (unsubscribe) unsubscribe();
         };
     }, [tripId]);
 
-    // 4. Update "isUser" flag whenever messages, userId, or tripDetails change
-    useEffect(() => {
-        if (!tripDetails) return;
-
-        // Calculate who "Me" is based on Role or Auth
-        // Priority: Auth ID -> Role-based ID from Trip
-        let myId = userId;
-        if (!myId) {
-            myId = role === 'customer' ? tripDetails.customer_id : tripDetails.driver_id;
-        }
-
-        if (myId) {
-            setMessages(prev => prev.map(msg => ({
-                ...msg,
-                isUser: msg.senderId === myId
-            })));
-        }
-
-    }, [userId, tripDetails, role, messages.length]); // Re-run when length changes (new message)
-
     const handleSend = async () => {
         if (inputText.trim().length === 0 || !tripId) return;
-
-        // Ensure we have a sender ID
-        let senderId = userId;
-        if (!senderId && tripDetails) {
-            senderId = role === 'customer' ? tripDetails.customer_id : tripDetails.driver_id;
-        }
-
-        if (!senderId) {
-            Alert.alert("Error", "Could not verify identity.");
-            return;
-        }
 
         const textToSend = inputText.trim();
         setInputText('');
 
         try {
-            const { error } = await supabase
-                .from('messages')
-                .insert({
-                    trip_id: tripId,
-                    sender_id: senderId,
+            await apiRequest('/messages', {
+                method: 'POST',
+                body: JSON.stringify({
+                    tripId,
                     content: textToSend
-                });
-
-            if (error) {
-                console.error('[Chat] Insert Error:', error);
-                Alert.alert('Error', "Failed to send.");
-                setInputText(textToSend);
-            }
+                })
+            });
         } catch (err) {
             console.error('[Chat] Unexpected Error:', err);
+            Alert.alert('Error', "Failed to send.");
             setInputText(textToSend);
         }
     };
+
+    const effectiveUserId = userId || (role === 'customer' ? participants?.customer_id : participants?.driver_id);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -214,16 +160,19 @@ export default function ChatScreen() {
                     inverted
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.messagesList}
-                    renderItem={({ item }) => (
-                        <View style={[styles.messageBubble, item.isUser ? styles.userBubble : styles.driverBubble]}>
-                            <Text style={[styles.messageText, item.isUser ? styles.userText : styles.driverText]}>
-                                {item.text}
-                            </Text>
-                            <Text style={[styles.timeText, item.isUser ? { color: '#BFDBFE' } : { color: '#9CA3AF' }]}>
-                                {item.time}
-                            </Text>
-                        </View>
-                    )}
+                    renderItem={({ item }) => {
+                        const isUser = !!effectiveUserId && item.senderId === effectiveUserId;
+                        return (
+                            <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.driverBubble]}>
+                                <Text style={[styles.messageText, isUser ? styles.userText : styles.driverText]}>
+                                    {item.text}
+                                </Text>
+                                <Text style={[styles.timeText, isUser ? { color: '#BFDBFE' } : { color: '#9CA3AF' }]}>
+                                    {item.time}
+                                </Text>
+                            </View>
+                        );
+                    }}
                 />
             )}
 

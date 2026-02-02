@@ -42,16 +42,10 @@ export default function DriverProfilePhotoScreen() {
     const uploadProfilePhoto = async (uri: string) => {
         try {
             // Get user ID first
-            let userId: string | undefined = (await supabase.auth.getUser()).data.user?.id;
-
-            if (!userId) {
-                const sessionStr = await AsyncStorage.getItem('userSession');
-                if (sessionStr) {
-                    const { user } = JSON.parse(sessionStr);
-                    userId = user?.id;
-                }
-            }
-
+            const sessionStr = await AsyncStorage.getItem('userSession');
+            if (!sessionStr) throw new Error('No user found');
+            const { user } = JSON.parse(sessionStr);
+            const userId: string | undefined = user?.id;
             if (!userId) throw new Error('No user found');
 
             // Read file as Base64

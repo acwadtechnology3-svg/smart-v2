@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-start',
         paddingHorizontal: 16,
-        paddingTop: 16,
+        paddingTop: 50, // 👽 02-02-2026: Increased top padding (was 16)
         paddingBottom: 8,
     },
     backButton: {

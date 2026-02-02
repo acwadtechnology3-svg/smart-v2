@@ -5,7 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Check, Star } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
 
 type TripCompleteScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripComplete'>;
 type TripCompleteScreenRouteProp = RouteProp<RootStackParamList, 'TripComplete'>;
@@ -22,13 +22,8 @@ export default function TripCompleteScreen() {
     useEffect(() => {
         const fetchReceipt = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('trips')
-                    .select('*')
-                    .eq('id', tripId)
-                    .single();
-
-                if (data) setTrip(data);
+                const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                if (data.trip) setTrip(data.trip);
             } catch (err) {
                 console.log("Error fetching receipt:", err);
             } finally {

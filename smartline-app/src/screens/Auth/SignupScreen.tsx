@@ -5,7 +5,6 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
 import { ArrowLeft } from 'lucide-react-native';
 import axios from 'axios';
 import { API_URL } from '../../config/api';

@@ -1,4 +1,5 @@
-import { supabase } from '../lib/supabase';
+import { apiRequest } from './backend';
+import { realtimeClient } from './realtimeClient';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { Alert } from 'react-native';
 
@@ -11,8 +12,7 @@ class TripStatusService {
     private static instance: TripStatusService;
     private navigationRef: NavigationContainerRef<any> | null = null;
     private activeTripId: string | null = null;
-    private channel: any = null;
-    private pollInterval: any = null;
+    private unsubscribe: (() => void) | null = null;
     private lastStatus: string = '';
 
     private constructor() { }
@@ -43,45 +43,34 @@ class TripStatusService {
         console.log(`[TripService] 🚀 Starting monitoring for trip: ${tripId}`);
         console.log('========================================');
 
-        // Setup Realtime listener
-        this.channel = supabase
-            .channel(`trip-service-${tripId}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'trips', filter: `id=eq.${tripId}` },
-                (payload) => {
-                    const newStatus = payload.new.status;
-                    console.log(`[TripService] 📡 Realtime: ${this.lastStatus} → ${newStatus}`);
-
-                    if (newStatus !== this.lastStatus) {
-                        this.lastStatus = newStatus;
-                        this.handleStatusChange(newStatus);
-                    }
-                }
-            )
-            .subscribe((status, err) => {
-                console.log(`[TripService] 🔌 Subscription: ${status}`);
-                if (err) console.error(`[TripService] ❌ Error:`, err);
-            });
-
-        // Setup polling fallback (every 2 seconds)
-        this.pollInterval = setInterval(async () => {
+        (async () => {
             try {
-                const { data } = await supabase
-                    .from('trips')
-                    .select('status')
-                    .eq('id', tripId)
-                    .single();
-
-                if (data && data.status !== this.lastStatus) {
-                    console.log(`[TripService] 🔄 Poll: ${this.lastStatus} → ${data.status}`);
-                    this.lastStatus = data.status;
-                    this.handleStatusChange(data.status);
+                const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                if (data.trip?.status) {
+                    this.lastStatus = data.trip.status;
                 }
-            } catch (err) {
-                console.error('[TripService] Poll error:', err);
+            } catch {
+                // ignore initial fetch errors
             }
-        }, 2000);
+
+            try {
+                this.unsubscribe = await realtimeClient.subscribe(
+                    { channel: 'trip:status', tripId },
+                    (payload) => {
+                        const newStatus = payload?.new?.status;
+                        if (!newStatus) return;
+
+                        console.log(`[TripService] 📡 Realtime: ${this.lastStatus} → ${newStatus}`);
+                        if (newStatus !== this.lastStatus) {
+                            this.lastStatus = newStatus;
+                            this.handleStatusChange(newStatus);
+                        }
+                    }
+                );
+            } catch (err) {
+                console.error('[TripService] Realtime error:', err);
+            }
+        })();
     }
 
     private handleStatusChange(status: string) {
@@ -126,14 +115,9 @@ class TripStatusService {
     stopMonitoring() {
         console.log('[TripService] 🧹 Stopping monitoring');
 
-        if (this.channel) {
-            supabase.removeChannel(this.channel);
-            this.channel = null;
-        }
-
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-            this.pollInterval = null;
+        if (this.unsubscribe) {
+            this.unsubscribe();
+            this.unsubscribe = null;
         }
 
         this.activeTripId = null;

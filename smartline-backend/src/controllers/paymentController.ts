@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import crypto from 'crypto';
+import { config } from '../config/env';
 
-// KASHIER CONFIG (Move to .env in production)
+// Kashier configuration loaded from environment variables
 const KASHIER = {
-    MERCHANT_ID: 'MID-36316-436',
-    API_KEY: 'd5d3dd58-50b2-4203-b397-3f83b3a93f24',
-    SECRET_KEY: '59fcb1458a25070cfab354f3d1b3e62f$e2a9eda8e49f8dccda2e7c550cf5889a8ec99df5cafcbc05ea83e386f92f95984308afd707dc2433f75e064baeae395a',
-    CURRENCY: 'EGP',
-    MODE: 'live' // 'test' or 'live'
+    MERCHANT_ID: config.KASHIER_MERCHANT_ID,
+    API_KEY: config.KASHIER_API_KEY,
+    SECRET_KEY: config.KASHIER_WEBHOOK_SECRET,
+    CURRENCY: config.KASHIER_CURRENCY,
+    MODE: config.KASHIER_MODE
 };
 
 // --- HELPER: Generate Hash ---
@@ -176,6 +177,7 @@ export const manageWithdrawal = async (req: Request, res: Response) => {
 
             // Transaction Record
             await supabase.from('wallet_transactions').insert({
+                user_id: request.driver_id,
                 wallet_id: wallet.id,
                 amount: -request.amount,
                 type: 'withdrawal',

@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } fr
 import { Colors } from '../../constants/Colors';
 import { ArrowLeft, Wallet, CreditCard, TrendingUp, Calendar } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { supabase } from '../../lib/supabase';
 // import { LineChart } from 'react-native-chart-kit';
 import { Dimensions } from "react-native";
 

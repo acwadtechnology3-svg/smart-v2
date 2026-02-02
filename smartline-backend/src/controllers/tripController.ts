@@ -1,6 +1,29 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 
+async function getTripById(tripId: string) {
+    const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .eq('id', tripId)
+        .single();
+    if (error || !data) throw new Error('Trip not found');
+    return data;
+}
+
+async function assertTripParticipant(tripId: string, userId: string) {
+    const { data, error } = await supabase
+        .from('trips')
+        .select('customer_id, driver_id')
+        .eq('id', tripId)
+        .single();
+    if (error || !data) throw new Error('Trip not found');
+    if (data.customer_id !== userId && data.driver_id !== userId) {
+        throw new Error('Not authorized');
+    }
+    return data;
+}
+
 export const createTrip = async (req: Request, res: Response) => {
     try {
         const {
@@ -16,14 +39,15 @@ export const createTrip = async (req: Request, res: Response) => {
         } = req.body;
 
         // Validation
-        if (!customer_id || !pickup_lat || !dest_lat || !price) {
+        const customerId = req.user?.id || customer_id;
+        if (!customerId || !pickup_lat || !dest_lat || !price) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
         const { data, error } = await supabase
             .from('trips')
             .insert({
-                customer_id,
+                customer_id: customerId,
                 pickup_lat,
                 pickup_lng,
                 dest_lat,
@@ -57,6 +81,8 @@ export const getTripStatus = async (req: Request, res: Response) => {
     try {
         const { tripId } = req.params;
 
+        await assertTripParticipant(tripId, req.user!.id);
+
         const { data, error } = await supabase
             .from('trips')
             .select('*')
@@ -76,6 +102,11 @@ export const getTripStatus = async (req: Request, res: Response) => {
 export const acceptTripOffer = async (req: Request, res: Response) => {
     try {
         const { tripId, offerId, driverId, finalPrice } = req.body;
+
+        const trip = await getTripById(tripId);
+        if (trip.customer_id !== req.user!.id) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
 
         // 1. Update the Trip
         const { data: trip, error: tripError } = await supabase
@@ -240,6 +271,106 @@ export const updateTripStatus = async (req: Request, res: Response) => {
         res.json({ success: true, trip: data });
     } catch (err: any) {
         console.error('Update Trip Status Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const getTripDetail = async (req: Request, res: Response) => {
+    try {
+        const { tripId } = req.params;
+        await assertTripParticipant(tripId, req.user!.id);
+
+        const { data, error } = await supabase
+            .from('trips')
+            .select('*, customer:customer_id(full_name, phone)')
+            .eq('id', tripId)
+            .single();
+
+        if (error || !data) {
+            return res.status(404).json({ error: 'Trip not found' });
+        }
+
+        res.json({ trip: data });
+    } catch (err: any) {
+        const status = err.message === 'Not authorized' ? 403 : 500;
+        res.status(status).json({ error: err.message });
+    }
+};
+
+export const cancelTrip = async (req: Request, res: Response) => {
+    try {
+        const { tripId } = req.params;
+        const trip = await getTripById(tripId);
+
+        if (trip.customer_id !== req.user!.id) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (trip.status === 'completed') {
+            return res.status(400).json({ error: 'Trip already completed' });
+        }
+
+        const { data, error } = await supabase
+            .from('trips')
+            .update({ status: 'cancelled' })
+            .eq('id', tripId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, trip: data });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const getTripParticipants = async (req: Request, res: Response) => {
+    try {
+        const { tripId } = req.params;
+        const participants = await assertTripParticipant(tripId, req.user!.id);
+        res.json({ participants });
+    } catch (err: any) {
+        const status = err.message === 'Not authorized' ? 403 : 500;
+        res.status(status).json({ error: err.message });
+    }
+};
+
+export const getDriverTripHistory = async (req: Request, res: Response) => {
+    try {
+        const driverId = req.user!.id;
+        const { data, error } = await supabase
+            .from('trips')
+            .select('*')
+            .eq('driver_id', driverId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({ trips: data || [] });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const getActiveTrip = async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+        const { data, error } = await supabase
+            .from('trips')
+            .select('*')
+            .or(`customer_id.eq.${userId},driver_id.eq.${userId}`)
+            .in('status', ['requested', 'accepted', 'arrived', 'started'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error || !data) {
+            return res.status(404).json({ error: 'No active trip found' });
+        }
+
+        res.json({ trip: data });
+    } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
 };

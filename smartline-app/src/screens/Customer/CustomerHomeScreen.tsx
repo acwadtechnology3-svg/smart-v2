@@ -28,6 +28,7 @@ export default function CustomerHomeScreen() {
     const navigation = useNavigation<CustomerHomeScreenNavigationProp>();
     const [isSideMenuVisible, setSideMenuVisible] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
+    const [currentAddress, setCurrentAddress] = useState<{ title: string, subtitle: string } | null>(null); // 👽 02-02-2026: Added state for real address
 
     useEffect(() => {
         (async () => {
@@ -38,22 +39,41 @@ export default function CustomerHomeScreen() {
 
             let location = await Location.getCurrentPositionAsync({});
             setLocation(location);
+
+            // 👽 02-02-2026: Added Reverse Geocoding to get real address
+            try {
+                const reverseGeocode = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+
+                if (reverseGeocode.length > 0) {
+                    const addr = reverseGeocode[0];
+                    setCurrentAddress({
+                        title: addr.street || addr.name || addr.district || "Current Location",
+                        subtitle: `${addr.city || ''} ${addr.region || ''}`.trim() || "Locating..."
+                    });
+                }
+            } catch (error) {
+                console.log("Error fetching address:", error);
+            }
         })();
     }, []);
 
     // Animation for pulse effect
-    const pulseAnim = useRef(new Animated.Value(1)).current;
+    // 👽 02-02-2026: Commented out unused animation to improve performance
+    // const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    useEffect(() => {
-        const anim = Animated.loop(
-            Animated.sequence([
-                Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
-                Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
-            ])
-        );
-        anim.start();
-        return () => anim.stop();
-    }, []);
+    // useEffect(() => {
+    //     const anim = Animated.loop(
+    //         Animated.sequence([
+    //             Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
+    //             Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
+    //         ])
+    //     );
+    //     anim.start();
+    //     return () => anim.stop();
+    // }, []);
 
     return (
         <View style={styles.container}>
@@ -105,14 +125,17 @@ export default function CustomerHomeScreen() {
                     </TouchableOpacity>
 
                     <View style={styles.locationHeader}>
-                        <Text style={styles.locationHeaderTitle}>Nasr City</Text>
-                        <Text style={styles.locationHeaderSubtitle}>Cairo, Egypt</Text>
+                        <Text style={styles.locationHeaderTitle}>{currentAddress?.title || "Locating..."}</Text>
+                        <Text style={styles.locationHeaderSubtitle}>{currentAddress?.subtitle || "Please wait"}</Text>
                     </View>
 
                     <TouchableOpacity style={styles.circleButton}>
                         <Scan color="#1e1e1e" size={24} strokeWidth={2.5} />
                     </TouchableOpacity>
                 </View>
+
+                {/* 👽 02-02-2026: Added Spacer for responsive layout, pushing bottom content down */}
+                <View style={{ flex: 1 }} pointerEvents="none" />
 
                 {/* Safety Shield - Floating */}
                 <View style={styles.floatingUI} pointerEvents="box-none">
@@ -143,7 +166,9 @@ export default function CustomerHomeScreen() {
                         {/* Location Pin Row */}
                         <View style={styles.addressRow}>
                             <View style={styles.pinDot} />
-                            <Text style={styles.addressText}>Current Location • 2Q44+9QV</Text>
+                            <Text style={styles.addressText} numberOfLines={1}>
+                                {currentAddress ? `${currentAddress.title}, ${currentAddress.subtitle}` : "Fetching location..."}
+                            </Text>
                         </View>
 
                         {/* Cards Grid */}
@@ -271,7 +296,10 @@ const styles = StyleSheet.create({
     // --- UI OVERLAY STYLES ---
     overlayContainer: { flex: 1 },
 
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 10 },
+    header: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+        paddingHorizontal: 20, paddingTop: 40 // 👽 02-02-2026: Lowered header buttons as requested (was 10)
+    },
     circleButton: {
         width: 44, height: 44,
         backgroundColor: '#fff', borderRadius: 22,
@@ -282,7 +310,12 @@ const styles = StyleSheet.create({
     locationHeaderTitle: { fontSize: 16, fontWeight: '700', color: '#1e1e1e' },
     locationHeaderSubtitle: { fontSize: 10, color: '#6B7280' },
 
-    floatingUI: { position: 'absolute', bottom: 350, width: '100%', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, alignItems: 'center' },
+    floatingUI: {
+        // position: 'absolute', bottom: 350,
+        marginBottom: -35,                       // 👽 02-02-2026: Lowered Safety Center further (was -15)
+        width: '100%', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, alignItems: 'center',
+        zIndex: 10 // Ensure it stays on top if it overlaps
+    },
     safetyPill: {
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: '#fff', paddingRight: 12, paddingLeft: 4, paddingVertical: 4,
@@ -298,7 +331,10 @@ const styles = StyleSheet.create({
         shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6, elevation: 5
     },
 
-    bottomSheetContainer: { flex: 1, justifyContent: 'flex-end', marginBottom: -20 }, // Extend below safe area slightly
+    bottomSheetContainer: {
+        // flex: 1, justifyContent: 'flex-end', // 👽 02-02-2026: Removed flex: 1 as Spacer handles the positioning now
+        marginBottom: -20
+    }, // Extend below safe area slightly
     bottomSheet: {
         backgroundColor: '#fff',
         borderTopLeftRadius: 28, borderTopRightRadius: 28,

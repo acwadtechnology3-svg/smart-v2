@@ -5,7 +5,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Clock, CheckCircle2, XCircle, RefreshCw, LogOut, MessageCircle } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiRequest } from '../../services/backend';
 
 type DriverWaitingScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DriverWaiting'>;
 
@@ -61,18 +62,8 @@ export default function DriverWaitingScreen() {
         ).start();
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            console.log("Checking driver status for:", user.id);
-
-            const { data, error } = await supabase
-                .from('drivers')
-                .select('status')
-                .eq('id', user.id)
-                .single();
-
-            if (data) {
+            const data = await apiRequest<{ status: 'pending' | 'approved' | 'rejected' }>('/drivers/status');
+            if (data?.status) {
                 console.log("Driver Status:", data.status);
                 setStatus(data.status);
 
@@ -85,8 +76,6 @@ export default function DriverWaitingScreen() {
                 } else if (isManual && data.status === 'pending') {
                     alert("Your application is still under review. We appreciate your patience.");
                 }
-            } else if (error) {
-                console.error("Error fetching status:", error);
             }
         } catch (error) {
             console.error('Error checking status:', error);
@@ -97,7 +86,7 @@ export default function DriverWaitingScreen() {
     };
 
     const handleSignOut = async () => {
-        await supabase.auth.signOut();
+        await AsyncStorage.removeItem('userSession');
         navigation.reset({
             index: 0,
             routes: [{ name: 'RoleSelection' }],

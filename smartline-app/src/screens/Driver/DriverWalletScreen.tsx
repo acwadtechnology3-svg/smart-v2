@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, TextInput, Linking, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Wallet, CreditCard, ArrowDownLeft, ArrowUpRight, Banknote, X } from 'lucide-react-native';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
@@ -44,29 +44,9 @@ export default function DriverWalletScreen() {
             const { user } = JSON.parse(session);
             setUserId(user.id);
 
-            // Get user balance directly
-            const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('balance')
-                .eq('id', user.id)
-                .single();
-
-            if (userError) {
-                console.error("User Error:", userError);
-                setBalance(0);
-            } else {
-                setBalance(userData.balance || 0);
-
-                // Get Transactions
-                const { data: txs, error: txError } = await supabase
-                    .from('wallet_transactions')
-                    .select('*, trips(pickup_address)')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false })
-                    .limit(20);
-
-                if (txs) setTransactions(txs);
-            }
+            const data = await apiRequest<{ balance: number; transactions: any[] }>('/wallet/summary');
+            setBalance(data.balance || 0);
+            setTransactions(data.transactions || []);
 
         } catch (error) {
             console.error(error);

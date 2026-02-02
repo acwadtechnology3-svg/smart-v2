@@ -1,26 +1,149 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import helmet from 'helmet';
+import { config, isProduction } from './config/env';
 import authRoutes from './routes/authRoutes';
 import tripRoutes from './routes/tripRoutes';
 import paymentRoutes from './routes/paymentRoutes';
-
-dotenv.config();
+import locationRoutes from './routes/locationRoutes';
+import userRoutes from './routes/userRoutes';
+import driverRoutes from './routes/driverRoutes';
+import tripOfferRoutes from './routes/tripOfferRoutes';
+import messageRoutes from './routes/messageRoutes';
+import pricingRoutes from './routes/pricingRoutes';
+import sosRoutes from './routes/sosRoutes';
+import walletRoutes from './routes/walletRoutes';
+import { checkDatabaseConnection } from './config/database';
+import { checkRedisConnection } from './config/redis';
+import { startLocationSync } from './workers/locationSyncWorker';
+import { startRealtimeServer } from './realtime/realtimeServer';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.PORT;
 
-app.use(cors());
-app.use(express.json());
+// ===== Security Middleware =====
 
+// Helmet - Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+}));
+
+// CORS - Configure based on environment
+const corsOptions = {
+  origin: config.CORS_ORIGIN === '*' ? '*' : config.CORS_ORIGIN.split(','),
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
+
+// Body parser
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Disable X-Powered-By header
+app.disable('x-powered-by');
+
+// ===== Routes =====
 app.use('/api/auth', authRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/location', locationRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/drivers', driverRoutes);
+app.use('/api/trip-offers', tripOfferRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/sos', sosRoutes);
+app.use('/api/wallet', walletRoutes);
 
-app.get('/', (req, res) => {
-    res.send('SmartLine Backend is Running!');
+// ===== Health Check =====
+app.get('/health', async (req, res) => {
+  const dbHealthy = await checkDatabaseConnection();
+  const redisHealthy = await checkRedisConnection();
+
+  const status = dbHealthy && redisHealthy ? 'ok' : 'degraded';
+  const statusCode = status === 'ok' ? 200 : 503;
+
+  res.status(statusCode).json({
+    status,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: config.NODE_ENV,
+    services: {
+      database: dbHealthy ? 'healthy' : 'unhealthy',
+      redis: redisHealthy ? 'healthy' : 'unhealthy',
+    },
+  });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.get('/', (req, res) => {
+  res.json({
+    message: 'SmartLine Backend API',
+    version: '1.0.0',
+    environment: config.NODE_ENV,
+  });
+});
+
+// ===== 404 Handler =====
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'NOT_FOUND',
+      message: 'Endpoint not found',
+    },
+  });
+});
+
+// ===== Global Error Handler =====
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+
+  // Don't expose error details in production
+  const message = isProduction ? 'Internal server error' : err.message;
+
+  res.status(err.status || 500).json({
+    success: false,
+    error: {
+      code: err.code || 'INTERNAL_ERROR',
+      message,
+      ...(isProduction ? {} : { stack: err.stack }),
+    },
+  });
+});
+
+// ===== Start Server =====
+const server = http.createServer(app);
+startRealtimeServer(server);
+
+server.listen(PORT, async () => {
+  console.log(`
+🚀 SmartLine Backend Server Started
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Port:        ${PORT}
+  Environment: ${config.NODE_ENV}
+  Timestamp:   ${new Date().toISOString()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  `);
+
+  // Initialize background workers
+  try {
+    await startLocationSync();
+    console.log('✅ Background workers initialized\n');
+  } catch (error) {
+    console.error('❌ Failed to initialize background workers:', error);
+  }
 });

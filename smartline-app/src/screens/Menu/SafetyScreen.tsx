@@ -5,8 +5,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { supabase } from '../../lib/supabase';
 import { RootStackParamList } from '../../types/navigation';
+import { apiRequest } from '../../services/backend';
 
 type SafetyScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Safety'>;
 type SafetyScreenRouteProp = RouteProp<RootStackParamList, 'Safety'>;
@@ -48,76 +48,45 @@ export default function SafetyScreen() {
     };
 
     const confirmSOS = async () => {
-        if (!location) {
+        let currentLocation = location;
+        if (!currentLocation) {
             Alert.alert("Error", "We cannot detect your location yet. Please wait a moment.");
             const loc = await Location.getCurrentPositionAsync({});
             setLocation(loc);
-            if (!loc) return;
+            currentLocation = loc;
+            if (!currentLocation) return;
         }
 
         setSending(true);
 
         try {
-            // 1. Get Authentication (Robust)
-            const { data: { session } } = await supabase.auth.getSession();
-            let userId = session?.user?.id;
-
-            // DEMO FALLBACK: If no user logged in, use secure RPC to get a test user
-            if (!userId) {
-                const { data: demoId, error } = await supabase.rpc('get_demo_customer');
-                if (demoId) {
-                    console.log("[SOS] Using Demo User (RPC):", demoId);
-                    userId = demoId;
-                } else {
-                    console.log("[SOS] Failed to get demo user:", error);
-                }
-            }
-
-            // 2. Find Trip ID if missing
+            // 1. Find Trip ID if missing
             let activeTripId = tripId;
             let tripSnapshot: any = null;
 
             if (activeTripId) {
-                // Fetch details for snapshot
-                const { data: t } = await supabase.from('trips').select('*').eq('id', activeTripId).single();
-                if (t) {
-                    tripSnapshot = t;
-                    // If we forced a demo user but the trip has a different customer, prefer the trip customer
-                    if (!session?.user?.id && t.customer_id) {
-                        userId = t.customer_id;
-                    }
+                try {
+                    const data = await apiRequest<{ trip: any }>(`/trips/${activeTripId}`);
+                    tripSnapshot = data.trip;
+                } catch {
+                    // ignore
                 }
-            } else if (userId) {
-                // Try to find an active trip for this user
-                const { data: activeTrip } = await supabase
-                    .from('trips')
-                    .select('*')
-                    .or(`customer_id.eq.${userId},driver_id.eq.${userId}`)
-                    .in('status', ['driver_found', 'driver_arriving', 'in_progress'])
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (activeTrip) {
-                    activeTripId = activeTrip.id;
-                    tripSnapshot = activeTrip;
+            } else {
+                try {
+                    const data = await apiRequest<{ trip: any }>('/trips/active');
+                    activeTripId = data.trip?.id;
+                    tripSnapshot = data.trip;
+                } catch {
+                    // ignore
                 }
             }
 
-            // SUPER DEMO MODE: If no real trip, generate a realistic mock trip so Dashboard looks good
-            if (!tripSnapshot && !activeTripId) {
-                console.log("[SOS] Generating Mock Trip Data for Demo...");
-                tripSnapshot = {
-                    id: 'demo-trip-simulated',
-                    pickup_address: 'Cairo Festival City, New Cairo',
-                    dest_address: 'Mall of Egypt, 6th of October',
-                    status: 'in_progress',
-                    customer_id: userId,
-                    // We let server logic handle fetching user details
-                };
+            if (!activeTripId) {
+                Alert.alert("No Active Trip", "We couldn't find an active trip to attach this SOS alert.");
+                return;
             }
 
-            console.log("[SOS] Sending Alert. Trip:", activeTripId, "User:", userId);
+            console.log("[SOS] Sending Alert. Trip:", activeTripId);
 
             // 3. Prepare Metadata Snapshot
             const metadata = {
@@ -130,20 +99,15 @@ export default function SafetyScreen() {
                 }
             };
 
-            const insertPayload = {
-                trip_id: activeTripId || null,
-                reporter_id: userId || null,
-                latitude: location!.coords.latitude,
-                longitude: location!.coords.longitude,
-                status: 'pending',
-                metadata: metadata
-            };
-
-            const { error } = await supabase
-                .from('sos_alerts')
-                .insert(insertPayload);
-
-            if (error) throw error;
+            await apiRequest('/sos', {
+                method: 'POST',
+                body: JSON.stringify({
+                    tripId: activeTripId,
+                    latitude: currentLocation.coords.latitude,
+                    longitude: currentLocation.coords.longitude,
+                    metadata
+                })
+            });
 
             Alert.alert(
                 "SOS Alert Sent",
@@ -233,7 +197,7 @@ export default function SafetyScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 20 },
+    header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 60 }, // 👽 02-02-2026: Increased top padding for header
     backBtn: { marginRight: 16 },
     headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
     content: { padding: 20 },

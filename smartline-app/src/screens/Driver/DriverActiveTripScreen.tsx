@@ -6,9 +6,8 @@ import { Colors } from '../../constants/Colors';
 import { Phone, MessageSquare, MapPin, Navigation, ArrowRight, CheckCircle2, XCircle } from 'lucide-react-native';
 import MapView, { UrlTile, Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { supabase } from '../../lib/supabase';
-import axios from 'axios';
-import { API_URL } from '../../config/api';
+import { apiRequest } from '../../services/backend';
+import { realtimeClient } from '../../services/realtimeClient';
 import { getDirections } from '../../services/mapService';
 
 const { width, height } = Dimensions.get('window');
@@ -39,14 +38,19 @@ export default function DriverActiveTripScreen() {
             }
         });
 
-        // Realtime listener
-        const channel = supabase.channel(`trip-active-${tripId}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips', filter: `id=eq.${tripId}` }, (payload) => {
-                const newTrip = payload.new;
-                console.log("Realtime update:", newTrip.status);
-                setTrip(newTrip);
-            })
-            .subscribe();
+        let unsubscribe: (() => void) | null = null;
+        (async () => {
+            unsubscribe = await realtimeClient.subscribe(
+                { channel: 'trip:status', tripId },
+                (payload) => {
+                    const newTrip = payload.new;
+                    if (newTrip) {
+                        console.log("Realtime update:", newTrip.status);
+                        setTrip(newTrip);
+                    }
+                }
+            );
+        })();
 
         // Aggressive Polling (Every 1000ms)
         const interval = setInterval(() => {
@@ -54,7 +58,7 @@ export default function DriverActiveTripScreen() {
         }, 1000);
 
         return () => {
-            supabase.removeChannel(channel);
+            if (unsubscribe) unsubscribe();
             clearInterval(interval);
             appStateSub.remove();
         };
@@ -80,18 +84,13 @@ export default function DriverActiveTripScreen() {
 
     const handleCheckStatus = async () => {
         try {
-            const { data, error } = await supabase
-                .from('trips')
-                .select('status')
-                .eq('id', tripId)
-                .single();
-
-            if (data) {
+            const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+            if (data.trip) {
                 // Only update if status changed to avoid re-renders
                 setTrip((prev: any) => {
-                    if (prev && prev.status !== data.status) {
-                        console.log("Polling updated status to:", data.status);
-                        return { ...prev, status: data.status };
+                    if (prev && prev.status !== data.trip.status) {
+                        console.log("Polling updated status to:", data.trip.status);
+                        return { ...prev, status: data.trip.status };
                     }
                     return prev;
                 });
@@ -103,14 +102,8 @@ export default function DriverActiveTripScreen() {
 
     const fetchTrip = async () => {
         try {
-            const { data, error } = await supabase
-                .from('trips')
-                .select('*, customer:customer_id(full_name, phone)')
-                .eq('id', tripId)
-                .single();
-
-            if (error) throw error;
-            setTrip(data);
+            const data = await apiRequest<{ trip: any }>(`/trips/${tripId}/detail`);
+            setTrip(data.trip);
             setLoading(false);
         } catch (error: any) {
             console.error("Fetch Trip Error", error);
@@ -164,16 +157,10 @@ export default function DriverActiveTripScreen() {
     const handleUpdateStatus = async (newStatus: string) => {
         try {
             // 1. Double-Check Server State
-            const { data: latestTrip, error: checkError } = await supabase
-                .from('trips')
-                .select('status')
-                .eq('id', tripId)
-                .single();
-
-            if (checkError) throw checkError;
+            const latestTrip = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
 
             // 2. Reject if Cancelled
-            if (latestTrip.status === 'cancelled') {
+            if (latestTrip.trip?.status === 'cancelled') {
                 Alert.alert("Trip Cancelled", "This trip was cancelled by the passenger.");
                 if (navigation.canGoBack()) {
                     navigation.popToTop();
@@ -184,16 +171,16 @@ export default function DriverActiveTripScreen() {
             }
 
             // 3. Proceed if Active
-            const response = await axios.post(`${API_URL}/trips/update-status`, {
-                tripId,
-                status: newStatus
+            const response = await apiRequest<{ success: boolean; trip: any }>('/trips/update-status', {
+                method: 'POST',
+                body: JSON.stringify({ tripId, status: newStatus })
             });
 
-            if (response.data.success) {
+            if (response.success) {
                 if (newStatus === 'completed') {
                     Alert.alert("Success", "Trip completed!", [{ text: "OK", onPress: () => navigation.navigate('DriverHome') }]);
                 } else {
-                    setTrip(response.data.trip);
+                    setTrip(response.trip);
                 }
             }
         } catch (error: any) {

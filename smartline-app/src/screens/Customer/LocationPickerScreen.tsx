@@ -15,17 +15,23 @@ type LocationPickerRouteProp = RouteProp<RootStackParamList, 'LocationPicker'>;
 const { width, height } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
 
+// 👽 02-02-2026: Extracted UrlTile to a component or memoize it to prevent re-creation on every render
+const MapTiles = React.memo(() => (
+    <UrlTile
+        urlTemplate={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_ACCESS_TOKEN}`}
+        maximumZ={19}
+        flipY={false}
+        tileSize={256}
+    />
+));
+
 export default function LocationPickerScreen() {
     const navigation = useNavigation<LocationPickerNavigationProp>();
     const route = useRoute<LocationPickerRouteProp>();
     const { field } = route.params;
 
-    const [region, setRegion] = useState<Region>({
-        latitude: 30.0444, // Cairo default
-        longitude: 31.2357,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-    });
+    const [region, setRegion] = useState<Region | undefined>(undefined); // 👽 02-02-2026: Changed to undefined initially to wait for location
+    // const [region, setRegion] = useState<Region>({ ... });
     const [address, setAddress] = useState<string>('Loading...');
     const [isDragging, setIsDragging] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -43,16 +49,29 @@ export default function LocationPickerScreen() {
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
             });
+            // 👽 02-02-2026: Fetch initial address
+            fetchAddress(location.coords.latitude, location.coords.longitude);
         })();
     }, []);
 
-    // Reverse Geocoding when region changes (debounced?)
-    // Actually, onRegionChangeComplete is better.
-    const onRegionChangeComplete = async (newRegion: Region) => {
-        setRegion(newRegion);
+    // 👽 02-02-2026: Memoize handlers to keep props stable
+    const onRegionChange = React.useCallback(() => {
+        setIsDragging(true);
+    }, []);
+
+    const onRegionChangeComplete = React.useCallback(async (newRegion: Region) => {
+        // regionRef.current = newRegion; // Keep track via ref
+        // 👽 Update ref directly? Yes.
+        // But we need to update the ref variable derived from state? No, regionRef is a ref.
+        // We can't access regionRef inside useCallback unless it's in deps or we use a ref for the ref? 
+        // Actually, just using a module-level var or maintaining the ref pattern is fine.
+        // To be safe and clean, let's just do the fetching here.
+
         setIsDragging(false);
         fetchAddress(newRegion.latitude, newRegion.longitude);
-    };
+    }, []);
+
+    const regionRef = React.useRef<Region | undefined>(undefined); // 👽 02-02-2026: Restored regionRef
 
     const fetchAddress = async (lat: number, lng: number) => {
         setLoading(true);
@@ -73,33 +92,32 @@ export default function LocationPickerScreen() {
     };
 
     const handleConfirm = () => {
-        // Navigate back to SearchLocation with params
-        // We use 'navigate' to merge params into existing screen in stack if it exists, or push new if not. 
-        // Ideally we used navigation.goBack() but we need to pass data.
-        // React Navigation 6: navigate({ name: 'SearchLocation', params: { ... }, merge: true })
+        const currentRegion = regionRef.current || region;
+        if (!currentRegion) return;
+
         navigation.navigate('SearchLocation', {
             selectedAddress: address,
-            selectedCoordinates: { latitude: region.latitude, longitude: region.longitude },
+            selectedCoordinates: { latitude: currentRegion.latitude, longitude: currentRegion.longitude },
             field: field
         });
     };
 
     return (
         <View style={styles.container}>
-            <MapView
-                style={styles.map}
-                region={region}
-                onRegionChange={() => setIsDragging(true)}
-                onRegionChangeComplete={onRegionChangeComplete}
-                userInterfaceStyle="light"
-            >
-                <UrlTile
-                    urlTemplate={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_ACCESS_TOKEN}`}
-                    maximumZ={19}
-                    flipY={false}
-                    tileSize={256}
-                />
-            </MapView>
+            {region && (
+                <MapView
+                    style={styles.map}
+                    initialRegion={region}
+                    onRegionChange={onRegionChange}
+                    onRegionChangeComplete={(r) => {
+                        regionRef.current = r; // Update ref
+                        onRegionChangeComplete(r);
+                    }}
+                    userInterfaceStyle="light"
+                >
+                    <MapTiles />
+                </MapView>
+            )}
 
             <View style={styles.centerMarkerContainer} pointerEvents="none">
                 <MapPin size={40} color={Colors.primary} fill={Colors.primary} />
@@ -140,7 +158,7 @@ export default function LocationPickerScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
     map: { flex: 1 },
-    header: { position: 'absolute', top: 0, left: 0, right: 0, padding: 16 },
+    header: { position: 'absolute', top: 40, left: 0, right: 0, padding: 16 }, // 👽 02-02-2026: Increased top (was 0)
     backButton: {
         width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff',
         alignItems: 'center', justifyContent: 'center',

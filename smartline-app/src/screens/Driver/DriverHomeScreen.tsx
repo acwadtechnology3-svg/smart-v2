@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { UrlTile, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
+import { realtimeClient } from '../../services/realtimeClient';
 import { Menu, Shield, CircleDollarSign, Navigation, Siren } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Constants from 'expo-constants';
@@ -56,40 +57,15 @@ export default function DriverHomeScreen() {
             const sessionData = await AsyncStorage.getItem('userSession');
             if (sessionData) {
                 const { user } = JSON.parse(sessionData);
+                if (!user?.id) return;
 
-                // Fetch Profile
-                const { data: driver } = await supabase
-                    .from('drivers')
-                    .select('id, profile_photo_url, users!inner(full_name)')
-                    .eq('id', user.id)
-                    .single();
-
-                if (driver) {
-                    if (driver.profile_photo_url) driver.profile_photo_url = `${driver.profile_photo_url}?t=${new Date().getTime()}`;
-                    setDriverProfile(driver);
+                const summary = await apiRequest<{ driver: any; balance: number; dailyEarnings: number }>('/drivers/summary');
+                if (summary.driver?.profile_photo_url) {
+                    summary.driver.profile_photo_url = `${summary.driver.profile_photo_url}?t=${new Date().getTime()}`;
                 }
-
-                // Fetch Wallet Balance
-                const { data: userData } = await supabase.from('users').select('balance').eq('id', user.id).single();
-                if (userData) setWalletBalance(userData.balance || 0);
-
-                // Fetch Today's Earnings
-                // Sum of final_price or driver net? "Money I get it today" usually means Gross Cash + Net Wallet.
-                // Let's sum 'final_price' for completed trips today as a proxy for "Sales".
-                const todayStart = new Date();
-                todayStart.setHours(0, 0, 0, 0);
-
-                const { data: trips } = await supabase
-                    .from('trips')
-                    .select('final_price')
-                    .eq('driver_id', user.id)
-                    .eq('status', 'completed')
-                    .gte('created_at', todayStart.toISOString());
-
-                if (trips) {
-                    const total = trips.reduce((sum, t) => sum + (t.final_price || 0), 0);
-                    setDailyEarnings(total);
-                }
+                setDriverProfile(summary.driver);
+                setWalletBalance(summary.balance || 0);
+                setDailyEarnings(summary.dailyEarnings || 0);
             }
         })();
     }, []);
@@ -138,12 +114,14 @@ export default function DriverHomeScreen() {
 
             setIsOnline(newStatus);
 
-            await supabase.from('drivers').update({
-                is_online: newStatus,
-                current_lat: currentLoc?.coords.latitude || null,
-                current_lng: currentLoc?.coords.longitude || null,
-                last_location_update: new Date().toISOString()
-            }).eq('id', user.id);
+            await apiRequest('/location/status', {
+                method: 'POST',
+                body: JSON.stringify({
+                    isOnline: newStatus,
+                    lat: currentLoc?.coords.latitude,
+                    lng: currentLoc?.coords.longitude
+                })
+            });
 
             if (newStatus) {
                 const sub = await Location.watchPositionAsync(
@@ -166,114 +144,97 @@ export default function DriverHomeScreen() {
 
     // Separate Effect for Trip Listening to handle reloads/status changes reliably
     useEffect(() => {
-        let channel: any = null;
+        let cleanup: (() => void) | null = null;
+        let cancelled = false;
 
-        if (isOnline && driverProfile) {
-            console.log("Starting Realtime Trip Listener (Stable)...");
-            console.log("✅ Polling DISABLED - Only showing NEW trips via Realtime");
-            // Pass location once for initial context, but don't restart on location change
-            channel = listenForTrips(driverProfile.id, location);
-        }
+        (async () => {
+            if (isOnline && driverProfile) {
+                console.log("Starting Realtime Trip Listener (Stable)...");
+                console.log("✅ Polling DISABLED - Only showing NEW trips via Realtime");
+                cleanup = await listenForTrips(driverProfile.id, location);
+                if (cancelled && cleanup) cleanup();
+            }
+        })();
 
         return () => {
-            if (channel) {
+            cancelled = true;
+            if (cleanup) {
                 console.log("Cleaning up Trip Listener...");
-                supabase.removeChannel(channel);
+                cleanup();
             }
         };
     }, [isOnline, driverProfile]); // REMOVED 'location' from here
 
     const updateDriverLocation = async (userId: string, loc: Location.LocationObject) => {
-        const { error } = await supabase.from('drivers').update({
-            current_lat: loc.coords.latitude,
-            current_lng: loc.coords.longitude,
-            last_location_update: new Date().toISOString()
-        }).eq('id', userId);
-
-        if (error) console.error("Loc Update Error:", error);
+        try {
+            await apiRequest('/location/update', {
+                method: 'POST',
+                body: JSON.stringify({
+                    lat: loc.coords.latitude,
+                    lng: loc.coords.longitude,
+                    heading: loc.coords.heading,
+                    speed: loc.coords.speed,
+                    accuracy: loc.coords.accuracy,
+                    timestamp: new Date().toISOString()
+                })
+            });
+        } catch (error: any) {
+            console.error("Loc Update Error:", error.message);
+        }
     };
 
-    const listenForTrips = (driverId: string, currentLocation: any) => {
+    const listenForTrips = async (driverId: string, currentLocation: any) => {
         console.log(`========================================`);
         console.log(`[Realtime] 🚀 Starting Inbox for Driver: ${driverId}`);
         console.log(`[Realtime] Driver Location:`, location?.coords);
         console.log(`========================================`);
 
-        const channel = supabase.channel('driver-trip-inbox')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'trips' },
-                (payload) => {
-                    const newTrip = payload.new;
-                    console.log(`========================================`);
-                    console.log(`[Realtime] 🆕 NEW TRIP ARRIVED!`);
-                    console.log(`[Realtime] Trip ID:`, newTrip.id);
-                    console.log(`[Realtime] Status:`, newTrip.status);
-                    console.log(`[Realtime] Pickup:`, newTrip.pickup_lat, newTrip.pickup_lng);
-                    console.log(`[Realtime] Full Data:`, JSON.stringify(newTrip));
-                    console.log(`========================================`);
+        const unsubTripRequests = await realtimeClient.subscribe(
+            { channel: 'driver:trip-requests' },
+            (payload) => {
+                const newTrip = payload.new;
+                console.log(`========================================`);
+                console.log(`[Realtime] 🆕 NEW TRIP ARRIVED!`);
+                console.log(`[Realtime] Trip ID:`, newTrip.id);
+                console.log(`[Realtime] Status:`, newTrip.status);
+                console.log(`[Realtime] Pickup:`, newTrip.pickup_lat, newTrip.pickup_lng);
+                console.log(`========================================`);
 
-                    if (newTrip.status !== 'requested') {
-                        console.log(`[Realtime] ⚠️ Ignoring: status is ${newTrip.status}`);
-                        return;
-                    }
+                if (newTrip.status !== 'requested') {
+                    console.log(`[Realtime] ⚠️ Ignoring: status is ${newTrip.status}`);
+                    return;
+                }
 
-                    // Check distance
-                    const loc = location || currentLocation;
-                    if (loc && newTrip.pickup_lat) {
-                        const dist = getDistanceFromLatLonInKm(
-                            loc.coords.latitude, loc.coords.longitude,
-                            newTrip.pickup_lat, newTrip.pickup_lng
-                        );
-                        console.log(`[Realtime] 📍 Driver is ${dist.toFixed(2)}km from pickup.`);
-
-                        // Show all trips within 1000km for testing, but log it
-                        if (dist < 1000) {
-                            console.log(`[Realtime] ✅ Showing trip to driver!`);
-                            setIncomingTrip(newTrip);
-                        } else {
-                            console.log("[Realtime] ❌ Trip too far (>1000km)");
-                        }
-                    } else {
-                        console.log("[Realtime] ⚠️ No location, showing anyway");
+                const loc = location || currentLocation;
+                if (loc && newTrip.pickup_lat) {
+                    const dist = getDistanceFromLatLonInKm(
+                        loc.coords.latitude, loc.coords.longitude,
+                        newTrip.pickup_lat, newTrip.pickup_lng
+                    );
+                    if (dist < 1000) {
                         setIncomingTrip(newTrip);
                     }
+                } else {
+                    setIncomingTrip(newTrip);
                 }
-            )
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'trip_offers' },
-                (payload) => {
-                    console.log(`[Realtime] 📬 Offer Update:`, payload.new.status);
-                    if (payload.new.driver_id === driverId && payload.new.status === 'accepted') {
-                        console.log(`[Realtime] ✅ Offer ACCEPTED!`);
-                        Alert.alert("Success", "Customer accepted your offer!", [
-                            { text: "OK", onPress: () => navigation.navigate('DriverActiveTrip', { tripId: payload.new.trip_id }) }
-                        ]);
-                    }
-                }
-            )
-            .subscribe((status, err) => {
-                console.log(`[Realtime] 🔌 Subscription Status:`, status);
-                if (err) {
-                    console.error(`[Realtime] ❌ Subscription Error:`, err.message);
-                }
+            }
+        );
 
-                if (status === 'SUBSCRIBED') {
-                    console.log(`[Realtime] ✅ Successfully subscribed to trip inbox!`);
+        const unsubOfferUpdates = await realtimeClient.subscribe(
+            { channel: 'driver:offer-updates' },
+            (payload) => {
+                if (payload.new?.driver_id === driverId && payload.new?.status === 'accepted') {
+                    Alert.alert("Success", "Customer accepted your offer!", [
+                        { text: "OK", onPress: () => navigation.navigate('DriverActiveTrip', { tripId: payload.new.trip_id }) }
+                    ]);
                 }
+            }
+        );
 
-                if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-                    console.log(`[Realtime] ⚠️ Connection failed. Retrying in 3 seconds...`);
-                    setTimeout(() => {
-                        if (isOnline) {
-                            console.log("[Realtime] Attempting reconnect...");
-                        }
-                    }, 3000);
-                }
-            });
-
-        return channel;
+        return () => {
+            unsubTripRequests();
+            unsubOfferUpdates();
+        };
     };
 
     const handleAcceptTrip = async (tripId: string) => {
@@ -287,16 +248,10 @@ export default function DriverHomeScreen() {
 
     const submitOffer = async (tripId: string, amount: number) => {
         try {
-            const { error } = await supabase
-                .from('trip_offers')
-                .insert({
-                    trip_id: tripId,
-                    driver_id: driverProfile.id,
-                    offer_price: amount,
-                    status: 'pending'
-                });
-
-            if (error) throw error;
+            await apiRequest('/trip-offers', {
+                method: 'POST',
+                body: JSON.stringify({ tripId, offerPrice: amount })
+            });
 
             console.log("Offer Inserted Successfully:", tripId, amount);
             Alert.alert("Offer Sent", "Waiting for customer to accept...");

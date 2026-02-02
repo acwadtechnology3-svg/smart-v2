@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Dimen
 import { Colors } from '../../constants/Colors';
 import { ArrowLeft, MapPin, Calendar, CircleDollarSign } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
 // Date formatting helper
 const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -28,19 +28,15 @@ export default function DriverHistoryScreen() {
     }, []);
 
     const fetchTrips = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { data } = await supabase
-                .from('trips')
-                .select('*')
-                .eq('driver_id', user.id)
-                .order('created_at', { ascending: false });
-
-            if (data && data.length > 0) {
-                setTrips(data);
+        try {
+            const data = await apiRequest<{ trips: any[] }>('/trips/driver/history');
+            if (data.trips && data.trips.length > 0) {
+                setTrips(data.trips);
             } else {
-                setTrips(MOCK_TRIPS); // Fallback to mock for demo
+                setTrips(MOCK_TRIPS);
             }
+        } catch {
+            setTrips(MOCK_TRIPS);
         }
     };
 

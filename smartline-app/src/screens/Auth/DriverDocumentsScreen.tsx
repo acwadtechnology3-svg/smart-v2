@@ -8,6 +8,7 @@ import { ArrowLeft, Camera, X } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
 // @ts-ignore
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
@@ -89,16 +90,10 @@ export default function DriverDocumentsScreen() {
 
         // ... (inside component)
         try {
-            let userId: string | undefined = (await supabase.auth.getUser()).data.user?.id;
-
-            if (!userId) {
-                const sessionStr = await AsyncStorage.getItem('userSession');
-                if (sessionStr) {
-                    const { user } = JSON.parse(sessionStr);
-                    userId = user?.id;
-                }
-            }
-
+            const sessionStr = await AsyncStorage.getItem('userSession');
+            if (!sessionStr) throw new Error('No user found');
+            const { user } = JSON.parse(sessionStr);
+            const userId: string | undefined = user?.id;
             if (!userId) throw new Error('No user found');
 
 
@@ -127,19 +122,15 @@ export default function DriverDocumentsScreen() {
 
             // 3. Insert into Drivers Table
             // Ensure snake_case matching DB
-            const { error } = await supabase
-                .from('drivers')
-                .insert({
-                    id: userId,
+            await apiRequest('/drivers/register', {
+                method: 'POST',
+                body: JSON.stringify({
                     national_id: nationalId,
                     city: city,
                     vehicle_type: vehicleType,
                     vehicle_model: vehicleModel,
                     vehicle_plate: vehiclePlate,
-                    status: 'pending',
-
                     profile_photo_url: profilePhotoUrl,
-
                     id_front_url: uploadedDocs.idFront_url,
                     id_back_url: uploadedDocs.idBack_url,
                     license_front_url: uploadedDocs.licenseFront_url,
@@ -148,9 +139,8 @@ export default function DriverDocumentsScreen() {
                     vehicle_back_url: uploadedDocs.vehicleBack_url,
                     vehicle_right_url: uploadedDocs.vehicleRight_url,
                     vehicle_left_url: uploadedDocs.vehicleLeft_url,
-                });
-
-            if (error) throw error;
+                })
+            });
 
             setLoading(false);
             navigation.navigate('DriverWaiting'); // Success!

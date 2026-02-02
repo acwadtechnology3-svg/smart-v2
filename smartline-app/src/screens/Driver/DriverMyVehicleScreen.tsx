@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, ScrollVi
 import { Colors } from '../../constants/Colors';
 import { ArrowLeft, Car, PenTool, AlertCircle } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
 
 export default function DriverMyVehicleScreen() {
     const navigation = useNavigation<any>();
@@ -15,20 +15,9 @@ export default function DriverMyVehicleScreen() {
 
     const fetchVehicleData = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data, error } = await supabase
-                    .from('drivers')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
-
-                if (data) {
-                    setVehicle(data);
-                } else {
-                    console.log("No driver data found, using fallback.");
-                    setFallbackData();
-                }
+            const data = await apiRequest<{ driver: any }>('/drivers/me');
+            if (data.driver) {
+                setVehicle(data.driver);
             } else {
                 setFallbackData();
             }

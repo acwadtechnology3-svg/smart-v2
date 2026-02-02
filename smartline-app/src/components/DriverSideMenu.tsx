@@ -10,7 +10,7 @@ import {
 import { RootStackParamList } from '../types/navigation';
 import { Colors } from '../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
+import { apiRequest } from '../services/backend';
 
 const { width, height } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
@@ -88,39 +88,12 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
 
     const fetchDriverData = async () => {
         try {
-            const sessionData = await AsyncStorage.getItem('userSession');
-            if (!sessionData) {
-                console.log("No user found in SideMenu");
-                return;
+            const summary = await apiRequest<{ driver: any }>('/drivers/summary');
+            if (summary.driver?.users?.full_name) {
+                setDriverName(summary.driver.users.full_name);
             }
-            const { user } = JSON.parse(sessionData);
-
-            console.log("Fetching driver data for:", user.id);
-
-            // Fetch name from users table
-            const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('full_name')
-                .eq('id', user.id)
-                .maybeSingle();
-
-            if (userData?.full_name) {
-                setDriverName(userData.full_name);
-            } else if (userError) {
-                console.log("Error fetching user name:", userError);
-            }
-
-            // Fetch photo from drivers table
-            const { data: driverData, error: driverError } = await supabase
-                .from('drivers')
-                .select('profile_photo_url')
-                .eq('id', user.id)
-                .maybeSingle();
-
-            if (driverData?.profile_photo_url) {
-                setProfileUrl(driverData.profile_photo_url);
-            } else {
-                console.log("No profile photo found or error:", driverError);
+            if (summary.driver?.profile_photo_url) {
+                setProfileUrl(summary.driver.profile_photo_url);
             }
         } catch (e) {
             console.error("fetchDriverData exception:", e);
@@ -140,7 +113,6 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
 
     const handleSignOut = async () => {
         onClose();
-        const { error } = await supabase.auth.signOut();
         await AsyncStorage.removeItem('userSession');
         navigation.reset({
             index: 0,

@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { UrlTile, Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { getDirections } from '../../services/mapService';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
 
 const { width, height } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -132,15 +132,14 @@ export default function TripOptionsScreen() {
 
             const fetchPricing = async () => {
                 console.log("Fetching pricing settings...");
-                const { data, error } = await supabase
-                    .from('pricing_settings')
-                    .select('*');
-
-                if (error) {
+                try {
+                    const data = await apiRequest<{ pricing: any[] }>('/pricing/settings', { auth: false });
+                    if (data.pricing && isActive) {
+                        console.log("Pricing loaded:", data.pricing);
+                        setPricingConfig(data.pricing);
+                    }
+                } catch (error) {
                     console.error("Error fetching pricing:", error);
-                } else if (data && isActive) {
-                    console.log("Pricing loaded:", data);
-                    setPricingConfig(data);
                 }
             };
 
@@ -229,40 +228,15 @@ export default function TripOptionsScreen() {
         const code = promoInput.trim().toUpperCase();
 
         try {
-            const { data, error } = await supabase
-                .from('promo_codes')
-                .select('*')
-                .eq('code', code)
-                .single();
-
-            if (error || !data) {
-                Alert.alert('Invalid Code', 'This promo code does not exist.');
-                return;
-            }
-
-            // Validations
-            if (!data.is_active) {
-                Alert.alert('Expired', 'This promo code is no longer active.');
-                return;
-            }
-
-            if (new Date(data.valid_until) < new Date()) {
-                Alert.alert('Expired', 'This promo code has expired.');
-                return;
-            }
-
-            if (data.max_uses && data.current_uses >= data.max_uses) {
-                Alert.alert('Limit Reached', 'This promo code has reached its usage limit.');
-                return;
-            }
+            const data = await apiRequest<{ promo: any }>(`/pricing/promo?code=${encodeURIComponent(code)}`, { auth: false });
 
             // Success
             // Success
             setAppliedPromo(code);
-            setPromoDiscount(data.discount_percent);
-            setPromoMaxDiscount(data.discount_max);
+            setPromoDiscount(data.promo.discount_percent);
+            setPromoMaxDiscount(data.promo.discount_max);
             setShowPromoModal(false);
-            Alert.alert('Success', `Promo applied! You get ${data.discount_percent}% off.`);
+            Alert.alert('Success', `Promo applied! You get ${data.promo.discount_percent}% off.`);
 
         } catch (err) {
             console.error(err);
@@ -597,7 +571,7 @@ const styles = StyleSheet.create({
     mapLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: height * 0.5, backgroundColor: '#EFF6FF' },
     mapBackground: { flex: 1, backgroundColor: '#EEF2FF' },
     street: { position: 'absolute', backgroundColor: '#fff', opacity: 0.5 },
-    backButton: { position: 'absolute', top: 50, left: 20, backgroundColor: '#fff', padding: 10, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.1, elevation: 5 },
+    backButton: { position: 'absolute', top: 60, left: 20, backgroundColor: '#fff', padding: 10, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.1, elevation: 5 }, // 👽 02-02-2026: Increased top to 60 for better status bar clearance
 
     // Fake Route Line
     routeLineContainer: { position: 'absolute', top: '30%', left: '20%', width: '60%', height: 100 },

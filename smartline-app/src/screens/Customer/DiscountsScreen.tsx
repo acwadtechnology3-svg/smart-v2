@@ -64,7 +64,7 @@ export default function DiscountsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 60 }, // 👽 02-02-2026: Increased top padding for header
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
     content: { flex: 1, padding: 16 },
     inputContainer: { flexDirection: 'row', marginBottom: 24 },

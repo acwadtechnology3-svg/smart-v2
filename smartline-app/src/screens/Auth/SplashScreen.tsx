@@ -5,7 +5,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MapPin, Car } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiRequest } from '../../services/backend';
 
 type SplashScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SplashScreen'>;
 
@@ -53,37 +54,22 @@ export default function SplashScreen() {
                 // Wait for animation a bit
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
-                const { data: { session } } = await supabase.auth.getSession();
+                const sessionStr = await AsyncStorage.getItem('userSession');
+                if (!sessionStr) {
+                    navigation.replace('RoleSelection');
+                    return;
+                }
 
-                if (session) {
-                    const { user } = session;
-
-                    // Check user role from metadata or db? 
-                    // Let's assume we can fetch it or trust the session user metadata if available.
-                    // But easier to just query the tables or look at AsyncStorage if we stored role there.
-                    // In PasswordScreen, we stored: AsyncStorage.setItem('userSession', JSON.stringify({ token, user }));
-                    // The 'user' object from axios login response likely has the role.
-
-                    // Let's check AsyncStorage first for role hint, or just query Supabase.
-                    // We'll query Supabase 'drivers' table to see if this ID exists there.
-
-                    const { data: driverData, error } = await supabase
-                        .from('drivers')
-                        .select('status')
-                        .eq('id', user.id)
-                        .single();
-
-                    if (driverData) {
-                        // It's a driver
-                        if (driverData.status === 'approved') {
-                            navigation.reset({ index: 0, routes: [{ name: 'DriverHome' }] });
-                        } else {
-                            navigation.reset({ index: 0, routes: [{ name: 'DriverWaiting' }] });
-                        }
+                const { user } = JSON.parse(sessionStr);
+                if (user?.role === 'driver') {
+                    const data = await apiRequest<{ status: 'pending' | 'approved' | 'rejected' }>('/drivers/status');
+                    if (data.status === 'approved') {
+                        navigation.reset({ index: 0, routes: [{ name: 'DriverHome' }] });
                     } else {
-                        // Assume customer if not in drivers table (or check customers table)
-                        navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
+                        navigation.reset({ index: 0, routes: [{ name: 'DriverWaiting' }] });
                     }
+                } else if (user?.role === 'customer') {
+                    navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
                 } else {
                     navigation.replace('RoleSelection');
                 }

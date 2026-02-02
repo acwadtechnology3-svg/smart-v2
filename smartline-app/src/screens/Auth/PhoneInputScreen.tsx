@@ -5,7 +5,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowLeft } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
 import axios from 'axios';
 import { API_URL } from '../../config/api';
 
@@ -55,7 +54,8 @@ export default function PhoneInputScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                behavior={Platform.OS === "ios" ? "padding" : undefined} // 👽 02-02-2026: Fixed jumping on Android by removing 'height' behavior
+                // behavior={Platform.OS === "ios" ? "padding" : "height"}
                 style={styles.keyboardAvoidingView}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
     keyboardAvoidingView: { flex: 1 },
     inner: { flex: 1 },
-    header: { padding: 16 },
+    header: { padding: 16, paddingTop: 40 }, // 👽 02-02-2026: Increased top padding for status bar
     content: { flex: 1, padding: 24, justifyContent: 'flex-start' }, // Changed to flex-start + spacer
     title: { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
     subtitle: { fontSize: 16, color: Colors.textSecondary, marginBottom: 32 },

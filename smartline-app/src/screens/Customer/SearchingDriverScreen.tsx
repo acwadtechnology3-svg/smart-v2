@@ -6,7 +6,8 @@ import { X, MapPin, Navigation as NavigationIcon } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
+import { realtimeClient } from '../../services/realtimeClient';
 import { tripStatusService } from '../../services/tripStatusService';
 
 const { width, height } = Dimensions.get('window');
@@ -75,14 +76,11 @@ export default function SearchingDriverScreen() {
 
     useEffect(() => {
         const fetchTrip = async () => {
-            const { data } = await supabase
-                .from('trips')
-                .select('*')
-                .eq('id', tripId)
-                .single();
-
-            if (data) {
-                setTrip(data);
+            try {
+                const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                if (data.trip) setTrip(data.trip);
+            } catch {
+                // ignore
             }
         };
         fetchTrip();
@@ -92,21 +90,15 @@ export default function SearchingDriverScreen() {
     useEffect(() => {
         console.log('[SearchingDriver] Listening for offers on trip:', tripId);
 
-        const channel = supabase
-            .channel(`trip-offers-${tripId}`)
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'trip_offers', filter: `trip_id=eq.${tripId}` },
-                async (payload) => {
+        let unsubOffers: (() => void) | null = null;
+        let unsubStatus: (() => void) | null = null;
+
+        (async () => {
+            unsubOffers = await realtimeClient.subscribe(
+                { channel: 'trip:offers', tripId },
+                (payload) => {
                     console.log('[SearchingDriver] New offer received:', payload.new);
-
-                    // Fetch driver details for this offer
-                    const { data: driverData } = await supabase
-                        .from('drivers')
-                        .select('*, users(full_name, phone)')
-                        .eq('id', payload.new.driver_id)
-                        .single();
-
+                    const driverData = payload.new?.driver;
                     if (driverData) {
                         const offerWithDriver = {
                             ...payload.new,
@@ -114,7 +106,7 @@ export default function SearchingDriverScreen() {
                                 id: driverData.id,
                                 name: driverData.users?.full_name || 'Driver',
                                 phone: driverData.users?.phone,
-                                rating: '5.0',
+                                rating: driverData.rating || '5.0',
                                 image: driverData.profile_photo_url,
                                 car: driverData.vehicle_model,
                                 plate: driverData.vehicle_plate,
@@ -122,50 +114,51 @@ export default function SearchingDriverScreen() {
                             }
                         };
                         setOffers((prev) => [...prev, offerWithDriver]);
+                    } else {
+                        setOffers((prev) => [...prev, payload.new]);
                     }
                 }
-            )
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'trips', filter: `id=eq.${tripId}` },
+            );
+
+            unsubStatus = await realtimeClient.subscribe(
+                { channel: 'trip:status', tripId },
                 async (payload) => {
                     console.log('[SearchingDriver] Trip status updated:', payload.new.status);
 
                     if (payload.new.status === 'accepted') {
                         console.log('[SearchingDriver] Trip accepted! Fetching driver details...');
-
-                        // Fetch driver details
-                        const { data: driverData } = await supabase
-                            .from('drivers')
-                            .select('*, users(full_name, phone)')
-                            .eq('id', payload.new.driver_id)
-                            .single();
-
-                        if (driverData) {
-                            navigation.replace('DriverFound', {
-                                tripId,
-                                driver: {
-                                    id: driverData.id,
-                                    name: driverData.users?.full_name || 'Driver',
-                                    phone: driverData.users?.phone,
-                                    rating: '5.0',
-                                    image: driverData.profile_photo_url,
-                                    car: driverData.vehicle_model,
-                                    plate: driverData.vehicle_plate,
-                                    color: driverData.vehicle_color,
-                                    lat: driverData.current_lat,
-                                    lng: driverData.current_lng,
-                                    eta: '5 min',
-                                },
-                            });
+                        try {
+                            const response = await apiRequest<{ driver: any }>(`/drivers/public/${payload.new.driver_id}?tripId=${tripId}`);
+                            const driverData = response.driver;
+                            if (driverData) {
+                                navigation.replace('DriverFound', {
+                                    tripId,
+                                    driver: {
+                                        id: driverData.id,
+                                        name: driverData.users?.full_name || 'Driver',
+                                        phone: driverData.users?.phone,
+                                        rating: driverData.rating || '5.0',
+                                        image: driverData.profile_photo_url,
+                                        car: driverData.vehicle_model,
+                                        plate: driverData.vehicle_plate,
+                                        color: driverData.vehicle_color,
+                                        lat: driverData.current_lat,
+                                        lng: driverData.current_lng,
+                                        eta: '5 min',
+                                    },
+                                });
+                            }
+                        } catch (e) {
+                            console.error('[SearchingDriver] Failed to fetch driver details', e);
                         }
                     }
                 }
-            )
-            .subscribe();
+            );
+        })();
 
         return () => {
-            supabase.removeChannel(channel);
+            if (unsubOffers) unsubOffers();
+            if (unsubStatus) unsubStatus();
         };
     }, [tripId]);
 
@@ -173,27 +166,15 @@ export default function SearchingDriverScreen() {
         try {
             console.log('[SearchingDriver] Accepting offer:', offer.id);
 
-            // Update trip status to accepted and set driver
-            const { error } = await supabase
-                .from('trips')
-                .update({
-                    status: 'accepted',
-                    driver_id: offer.driver_id,
-                    offered_price: offer.offered_price
+            await apiRequest('/trips/accept-offer', {
+                method: 'POST',
+                body: JSON.stringify({
+                    tripId,
+                    offerId: offer.id,
+                    driverId: offer.driver_id,
+                    finalPrice: offer.offer_price || offer.offered_price || offer.price
                 })
-                .eq('id', tripId);
-
-            if (error) {
-                console.error('[SearchingDriver] Error accepting offer:', error);
-                Alert.alert('Error', 'Failed to accept offer');
-                return;
-            }
-
-            // Update offer status
-            await supabase
-                .from('trip_offers')
-                .update({ status: 'accepted' })
-                .eq('id', offer.id);
+            });
 
             console.log('[SearchingDriver] Offer accepted successfully');
             // Navigation will happen automatically via the status listener
@@ -207,16 +188,7 @@ export default function SearchingDriverScreen() {
         try {
             console.log('[SearchingDriver] Rejecting offer:', offer.id);
 
-            // Update offer status to rejected
-            const { error } = await supabase
-                .from('trip_offers')
-                .update({ status: 'rejected' })
-                .eq('id', offer.id);
-
-            if (error) {
-                console.error('[SearchingDriver] Error rejecting offer:', error);
-                return;
-            }
+            await apiRequest(`/trip-offers/${offer.id}/reject`, { method: 'POST' });
 
             // Remove from local state
             setOffers((prev) => prev.filter((o) => o.id !== offer.id));
@@ -237,28 +209,16 @@ export default function SearchingDriverScreen() {
                     text: 'Yes, Cancel',
                     style: 'destructive',
                     onPress: async () => {
-                        // 1. Cancel the trip
-                        await supabase
-                            .from('trips')
-                            .update({ status: 'cancelled' })
-                            .eq('id', tripId);
+                        await apiRequest(`/trips/${tripId}/cancel`, { method: 'POST' });
 
-                        // 2. Fetch trip details to repopulate TripOptions screen
-                        const { data: trip } = await supabase
-                            .from('trips')
-                            .select('pickup_address, dest_address, dest_lat, dest_lng')
-                            .eq('id', tripId)
-                            .single();
-
-                        if (trip) {
-                            // 3. Navigate back to TripOptions with the locations
+                        const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                        if (data.trip) {
                             navigation.navigate('TripOptions', {
-                                pickup: trip.pickup_address,
-                                destination: trip.dest_address,
-                                destinationCoordinates: [trip.dest_lng, trip.dest_lat] // [lng, lat] for Mapbox/TripOptions
+                                pickup: data.trip.pickup_address,
+                                destination: data.trip.dest_address,
+                                destinationCoordinates: [data.trip.dest_lng, data.trip.dest_lat]
                             });
                         } else {
-                            // Fallback if fetch fails
                             navigation.goBack();
                         }
                     },

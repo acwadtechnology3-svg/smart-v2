@@ -6,7 +6,7 @@ import { Phone, MessageSquare, ShieldCheck } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
 
 const { width } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -28,23 +28,14 @@ export default function OnTripScreen() {
         const fetchTrip = async () => {
             try {
                 console.log("[OnTrip] Fetching trip:", tripId);
-                const { data, error } = await supabase
-                    .from('trips')
-                    .select('*')
-                    .eq('id', tripId)
-                    .single();
-
-                if (error) {
-                    console.error("[OnTrip] Error:", error);
-                    Alert.alert("Error", "Failed to load trip");
-                    return;
-                }
+                const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
 
                 console.log("[OnTrip] Trip loaded successfully");
-                setTrip(data);
+                setTrip(data.trip);
                 setLoading(false);
             } catch (err) {
                 console.error("[OnTrip] Fetch error:", err);
+                Alert.alert("Error", "Failed to load trip");
                 setLoading(false);
             }
         };
@@ -63,12 +54,7 @@ export default function OnTripScreen() {
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            const { error } = await supabase
-                                .from('trips')
-                                .update({ status: 'cancelled' })
-                                .eq('id', tripId);
-
-                            if (error) throw error;
+                            await apiRequest(`/trips/${tripId}/cancel`, { method: 'POST' });
 
                             Alert.alert("Trip Cancelled");
                             navigation.popToTop(); // Go back to map

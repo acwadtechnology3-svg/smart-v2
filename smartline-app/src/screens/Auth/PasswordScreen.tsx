@@ -6,9 +6,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { supabase } from '../../lib/supabase';
 import axios from 'axios';
 import { API_URL } from '../../config/api';
+import { apiRequest } from '../../services/backend';
 
 type PasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Password'>;
 type PasswordScreenRouteProp = RouteProp<RootStackParamList, 'Password'>;
@@ -41,14 +41,15 @@ export default function PasswordScreen() {
 
             if (user.role === 'driver') {
                 // Check if driver profile is complete
-                const { data: driverData, error } = await supabase
-                    .from('drivers')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
+                let driverData: any = null;
+                try {
+                    const response = await apiRequest<{ driver: any }>('/drivers/me');
+                    driverData = response.driver;
+                } catch {
+                    driverData = null;
+                }
 
-                // If checking fails (e.g. no connection) or no record found (error.code PGRST116 usually for no rows)
-                if (error || !driverData) {
+                if (!driverData) {
                     // Assume incomplete profile -> Redirect to Signup flow continuation
                     setLoading(false);
                     navigation.replace('DriverSignup', { phone: phone });
@@ -88,7 +89,8 @@ export default function PasswordScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined} // 👽 02-02-2026: Fixed jumping on Android
+                // behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -163,7 +165,7 @@ const styles = StyleSheet.create({
     keyboardView: { flex: 1 },
     inner: { flex: 1, justifyContent: 'space-between' },
 
-    header: { paddingHorizontal: 24, paddingTop: 20 },
+    header: { paddingHorizontal: 24, paddingTop: 60 }, // 👽 02-02-2026: Increased top padding (was 20)
     backButton: { marginBottom: 24, alignSelf: 'flex-start', padding: 4, marginLeft: -4 },
     title: { fontSize: 32, fontWeight: '800', color: '#111827', marginBottom: 12, letterSpacing: -0.5 },
     subtitle: { fontSize: 16, color: '#6B7280', lineHeight: 24 },

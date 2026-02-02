@@ -6,7 +6,8 @@ import { Phone, MessageSquare, Star, CarFront, ShieldCheck, Navigation } from 'l
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
-import { supabase } from '../../lib/supabase';
+import { apiRequest } from '../../services/backend';
+import { realtimeClient } from '../../services/realtimeClient';
 
 const { width } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -19,43 +20,92 @@ export default function DriverFoundScreen() {
     const route = useRoute<DriverFoundScreenRouteProp>();
     const { tripId, driver } = route.params;
 
+    const [driverInfo, setDriverInfo] = useState<any>(driver || null);
     const [driverLoc, setDriverLoc] = useState({
         latitude: driver?.lat || 31.2357,
         longitude: driver?.lng || 29.9511
     });
     const [isArrived, setIsArrived] = useState(false);
+    const arrivedRef = useRef(false);
     const mapRef = useRef<MapView>(null);
+
+    useEffect(() => {
+        arrivedRef.current = isArrived;
+    }, [isArrived]);
+
+    useEffect(() => {
+        if (!driver?.id || !tripId) return;
+
+        let active = true;
+        (async () => {
+            try {
+                const response = await apiRequest<{ driver: any }>(`/drivers/public/${driver.id}?tripId=${tripId}`);
+                if (!active || !response.driver) return;
+                const data = response.driver;
+
+                setDriverInfo({
+                    id: data.id,
+                    name: data.users?.full_name || driver?.name || 'Driver',
+                    phone: data.users?.phone || driver?.phone,
+                    rating: data.rating || driver?.rating,
+                    image: data.profile_photo_url || driver?.image,
+                    car: data.vehicle_model || driver?.car,
+                    plate: data.vehicle_plate || driver?.plate,
+                    color: data.vehicle_color || driver?.color,
+                    lat: data.current_lat || driver?.lat,
+                    lng: data.current_lng || driver?.lng,
+                    eta: driver?.eta,
+                });
+
+                if (typeof data.current_lat === 'number' && typeof data.current_lng === 'number') {
+                    const newPos = { latitude: data.current_lat, longitude: data.current_lng };
+                    setDriverLoc(newPos);
+                }
+            } catch (err) {
+                console.error('[DriverFound] Failed to fetch driver info:', err);
+            }
+        })();
+
+        return () => {
+            active = false;
+        };
+    }, [driver?.id, tripId]);
+
+    const displayDriver = driverInfo || driver;
 
     // Listen for driver location and "arrived" status only
     // Global service handles all navigation
     useEffect(() => {
-        if (!driver?.id) return;
+        if (!driver?.id || !tripId) return;
 
         console.log("[DriverFound] Setting up listeners");
 
-        const channel = supabase.channel(`driverfound-${tripId}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${driver.id}` },
+        let unsubLocation: (() => void) | null = null;
+        let unsubStatus: (() => void) | null = null;
+
+        (async () => {
+            unsubLocation = await realtimeClient.subscribe(
+                { channel: 'driver:location', tripId, driverId: driver.id },
                 (payload) => {
-                    if (payload.new.current_lat && payload.new.current_lng) {
-                        const newPos = {
-                            latitude: payload.new.current_lat,
-                            longitude: payload.new.current_lng
-                        };
+                    const lat = payload?.new?.current_lat;
+                    const lng = payload?.new?.current_lng;
+                    if (typeof lat === 'number' && typeof lng === 'number') {
+                        const newPos = { latitude: lat, longitude: lng };
                         setDriverLoc(newPos);
                         mapRef.current?.animateToRegion({ ...newPos, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 1000);
                     }
                 }
-            )
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'trips', filter: `id=eq.${tripId}` },
+            );
+
+            unsubStatus = await realtimeClient.subscribe(
+                { channel: 'trip:status', tripId },
                 (payload) => {
-                    console.log("[DriverFound] Status:", payload.new.status);
+                    const status = payload?.new?.status;
+                    console.log("[DriverFound] Status:", status);
 
                     // Only handle "arrived" alert - global service handles navigation
-                    if (payload.new.status === 'arrived' && !isArrived) {
+                    if (status === 'arrived' && !arrivedRef.current) {
+                        arrivedRef.current = true;
                         setIsArrived(true);
                         Alert.alert(
                             "Driver Arrived!",
@@ -64,13 +114,14 @@ export default function DriverFoundScreen() {
                         );
                     }
                 }
-            )
-            .subscribe();
+            );
+        })();
 
         return () => {
-            supabase.removeChannel(channel);
+            if (unsubLocation) unsubLocation();
+            if (unsubStatus) unsubStatus();
         };
-    }, [driver?.id, tripId, isArrived]);
+    }, [driver?.id, tripId]);
 
     return (
         <View style={styles.container}>
@@ -100,24 +151,24 @@ export default function DriverFoundScreen() {
             <View style={styles.bottomSheet}>
                 <View style={styles.statusHeader}>
                     <Text style={[styles.etaText, isArrived && { color: Colors.success }]}>
-                        {isArrived ? 'Driver is here!' : `Arriving in ${driver?.eta || '2 min'}`}
+                        {isArrived ? 'Driver is here!' : `Arriving in ${displayDriver?.eta || '2 min'}`}
                     </Text>
-                    <Text style={styles.plateText}>{driver?.plate || 'ABC 123'}</Text>
+                    <Text style={styles.plateText}>{displayDriver?.plate || 'ABC 123'}</Text>
                 </View>
 
                 <View style={styles.infoCard}>
                     <View style={styles.driverSection}>
                         <View style={styles.avatarPlaceholder}>
                             <Image
-                                source={{ uri: driver?.image || 'https://ui-avatars.com/api/?name=' + (driver?.name || 'Driver') }}
+                                source={{ uri: displayDriver?.image || 'https://ui-avatars.com/api/?name=' + (displayDriver?.name || 'Driver') }}
                                 style={styles.avatar}
                             />
                         </View>
                         <View style={styles.driverTexts}>
-                            <Text style={styles.driverName}>{driver?.name || 'Captain'}</Text>
+                            <Text style={styles.driverName}>{displayDriver?.name || 'Captain'}</Text>
                             <View style={styles.ratingRow}>
                                 <Star size={12} color="#F59E0B" fill="#F59E0B" />
-                                <Text style={styles.ratingText}>{driver?.rating || '5.0'}</Text>
+                                <Text style={styles.ratingText}>{displayDriver?.rating || '5.0'}</Text>
                                 <Text style={styles.tripCount}>(1,240 trips)</Text>
                             </View>
                         </View>
@@ -125,8 +176,8 @@ export default function DriverFoundScreen() {
 
                     <View style={styles.carSection}>
                         <CarFront size={28} color={Colors.primary} />
-                        <Text style={styles.carModel}>{driver?.car || 'Sedan'}</Text>
-                        <Text style={styles.carColor}>{driver?.color || 'Silver'}</Text>
+                        <Text style={styles.carModel}>{displayDriver?.car || 'Sedan'}</Text>
+                        <Text style={styles.carColor}>{displayDriver?.color || 'Silver'}</Text>
                     </View>
                 </View>
 
@@ -134,7 +185,7 @@ export default function DriverFoundScreen() {
                     <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => {
-                            const phoneNumber = driver?.phone || driver?.phone_number || '';
+                            const phoneNumber = displayDriver?.phone || displayDriver?.phone_number || '';
                             if (phoneNumber) {
                                 Linking.openURL(`tel:${phoneNumber}`);
                             } else {
@@ -148,14 +199,14 @@ export default function DriverFoundScreen() {
                         <Text style={styles.actionLabel}>Call</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Chat', { driverName: driver?.name || 'Captain', tripId })}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Chat', { driverName: displayDriver?.name || 'Captain', tripId })}>
                         <View style={styles.iconCircle}>
                             <MessageSquare size={24} color={Colors.primary} />
                         </View>
                         <Text style={styles.actionLabel}>Chat</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Safety')}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Safety', { tripId })}>
                         <View style={styles.iconCircle}>
                             <ShieldCheck size={24} color={Colors.primary} />
                         </View>
@@ -174,16 +225,7 @@ export default function DriverFoundScreen() {
                                     style: 'destructive',
                                     onPress: async () => {
                                         try {
-                                            // 1. Update DB Status
-                                            const { error } = await supabase
-                                                .from('trips')
-                                                .update({ status: 'cancelled' })
-                                                .eq('id', tripId);
-
-                                            if (error) {
-                                                Alert.alert("Error", "Failed to cancel trip.");
-                                                return;
-                                            }
+                                            await apiRequest(`/trips/${tripId}/cancel`, { method: 'POST' });
 
                                             // 2. Navigate Back
                                             navigation.popToTop();

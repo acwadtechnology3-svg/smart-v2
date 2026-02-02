@@ -57,7 +57,8 @@ export default function SignupScreen() {
         } catch (err: any) {
             console.error('Signup logic error:', err);
             setLoading(false);
-            const errorMessage = err.response?.data?.error || 'Signup Failed. Please try again.';
+            const serverMsg = err.response?.data?.error || err.message || 'Signup Failed. Please try again.';
+            const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
             Alert.alert('Error', errorMessage);
         }
     };

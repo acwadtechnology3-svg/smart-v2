@@ -120,7 +120,7 @@ export class MatchingService {
     const maxDistance = this.MAX_SEARCH_RADIUS_KM * 1000; // meters
     const distanceScore = Math.max(
       0,
-      1 - nearbyDriver.distance / maxDistance
+      1 - (nearbyDriver.distance || 0) / maxDistance
     );
 
     // 2. Rating Score (0-1, normalized from 1-5)
@@ -156,7 +156,7 @@ export class MatchingService {
     return {
       driverId: nearbyDriver.driverId,
       score: totalScore,
-      distance: nearbyDriver.distance,
+      distance: nearbyDriver.distance || 0,
       lat: nearbyDriver.lat,
       lng: nearbyDriver.lng,
       rating: driverData.rating,

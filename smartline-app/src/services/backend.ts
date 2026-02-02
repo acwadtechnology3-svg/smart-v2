@@ -36,7 +36,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = data?.error || 'Request failed';
-    throw new Error(message);
+    const errorMsgString = typeof message === 'object' ? JSON.stringify(message) : String(message);
+    throw new Error(errorMsgString);
   }
 
   return data as T;

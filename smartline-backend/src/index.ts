@@ -1,3 +1,6 @@
+// MUST BE FIRST: Patch Redis version check for Windows compatibility
+import './config/redis-patch';
+
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -140,10 +143,12 @@ server.listen(PORT, async () => {
   `);
 
   // Initialize background workers
-  try {
-    await startLocationSync();
-    console.log('✅ Background workers initialized\n');
-  } catch (error) {
-    console.error('❌ Failed to initialize background workers:', error);
-  }
+  // Temporarily disabled due to Redis version incompatibility
+  // TODO: Upgrade Redis to 5.0+ to enable background workers
+  // try {
+  //   await startLocationSync();
+  //   console.log('✅ Background workers initialized\n');
+  // } catch (error) {
+  //   console.error('❌ Failed to initialize background workers:', error);
+  // }
 });

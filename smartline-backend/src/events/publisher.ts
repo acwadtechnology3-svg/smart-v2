@@ -137,7 +137,7 @@ export class EventPublisher {
         break;
 
       default:
-        console.warn(`No queue mapping for event type: ${event.eventType}`);
+        console.warn(`No queue mapping for event type: ${(event as any).eventType}`);
     }
   }
 

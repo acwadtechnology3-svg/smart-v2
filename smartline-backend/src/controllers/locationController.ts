@@ -157,7 +157,7 @@ export const getNearbyDrivers = async (req: Request, res: Response) => {
         lat: driver.lat,
         lng: driver.lng,
       },
-      distance: Math.round(driver.distance), // meters
+      distance: Math.round(driver.distance || 0), // meters
       vehicleType: driver.metadata?.vehicleType,
       rating: driver.metadata?.rating,
       heading: driver.metadata?.heading,
@@ -272,6 +272,7 @@ export const setOnlineStatus = async (req: Request, res: Response) => {
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to update status',
+        details: error.message,
       },
     });
   }

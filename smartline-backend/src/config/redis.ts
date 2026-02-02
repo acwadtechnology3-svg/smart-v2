@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import { config } from './env';
+import { Worker, Queue } from 'bullmq';
 
 // Redis connection configuration
 const redisConfig = {
@@ -23,7 +24,7 @@ const redisConfig = {
 };
 
 // Create Redis client instance
-export const redis = new Redis(config.REDIS_URL || redisConfig);
+export const redis = config.REDIS_URL ? new Redis(config.REDIS_URL) : new Redis(redisConfig);
 
 // Redis event handlers
 redis.on('connect', () => {

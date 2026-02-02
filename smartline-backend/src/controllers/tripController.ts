@@ -79,8 +79,7 @@ export const createTrip = async (req: Request, res: Response) => {
 
 export const getTripStatus = async (req: Request, res: Response) => {
     try {
-        const { tripId } = req.params;
-
+        const tripId = req.params.tripId as string;
         await assertTripParticipant(tripId, req.user!.id);
 
         const { data, error } = await supabase
@@ -103,13 +102,13 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
     try {
         const { tripId, offerId, driverId, finalPrice } = req.body;
 
-        const trip = await getTripById(tripId);
+        const trip = await getTripById(tripId as string);
         if (trip.customer_id !== req.user!.id) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
         // 1. Update the Trip
-        const { data: trip, error: tripError } = await supabase
+        const { data: updatedTrip, error: tripError } = await supabase
             .from('trips')
             .update({
                 driver_id: driverId,
@@ -135,7 +134,7 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
             .eq('trip_id', tripId)
             .neq('id', offerId);
 
-        res.json({ success: true, trip });
+        res.json({ success: true, trip: updatedTrip });
 
     } catch (err: any) {
         console.error('Accept Offer Error:', err);
@@ -277,7 +276,7 @@ export const updateTripStatus = async (req: Request, res: Response) => {
 
 export const getTripDetail = async (req: Request, res: Response) => {
     try {
-        const { tripId } = req.params;
+        const tripId = req.params.tripId as string;
         await assertTripParticipant(tripId, req.user!.id);
 
         const { data, error } = await supabase
@@ -299,7 +298,7 @@ export const getTripDetail = async (req: Request, res: Response) => {
 
 export const cancelTrip = async (req: Request, res: Response) => {
     try {
-        const { tripId } = req.params;
+        const tripId = req.params.tripId as string;
         const trip = await getTripById(tripId);
 
         if (trip.customer_id !== req.user!.id) {
@@ -327,7 +326,7 @@ export const cancelTrip = async (req: Request, res: Response) => {
 
 export const getTripParticipants = async (req: Request, res: Response) => {
     try {
-        const { tripId } = req.params;
+        const tripId = req.params.tripId as string;
         const participants = await assertTripParticipant(tripId, req.user!.id);
         res.json({ participants });
     } catch (err: any) {

@@ -15,7 +15,8 @@ export function validateBody(schema: z.ZodSchema) {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const errors = error.errors.map((err) => ({
+        const issues = error.issues;
+        const errors = issues.map((err) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -43,11 +44,12 @@ export function validateQuery(schema: z.ZodSchema) {
     try {
       // Convert query params to appropriate types
       const sanitizedQuery = sanitizeObject(req.query);
-      req.query = await schema.parseAsync(sanitizedQuery);
+      req.query = (await schema.parseAsync(sanitizedQuery)) as any;
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const errors = error.errors.map((err) => ({
+        const issues = error.issues;
+        const errors = issues.map((err) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -73,11 +75,12 @@ export function validateQuery(schema: z.ZodSchema) {
 export function validateParams(schema: z.ZodSchema) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.params = await schema.parseAsync(req.params);
+      req.params = (await schema.parseAsync(req.params)) as any;
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        const errors = error.errors.map((err) => ({
+        const issues = error.issues;
+        const errors = issues.map((err) => ({
           field: err.path.join('.'),
           message: err.message,
         }));

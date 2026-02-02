@@ -47,7 +47,9 @@ export default function PhoneInputScreen() {
         } catch (err) {
             console.error(err);
             setLoading(false);
-            Alert.alert('Error', 'Could not verify phone number. Please try again.');
+            const serverMsg = (err as any).response?.data?.error || (err as any).message || 'Could not verify phone number.';
+            const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
+            Alert.alert('Error', errorMessage);
         }
     };
 

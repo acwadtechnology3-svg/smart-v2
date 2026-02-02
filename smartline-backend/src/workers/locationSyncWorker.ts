@@ -1,4 +1,4 @@
-import { Worker, Queue, QueueScheduler } from 'bullmq';
+import { Worker, Queue } from 'bullmq';
 import redis from '../config/redis';
 import { locationCache } from '../services/locationCache';
 import { DriverRepository } from '../repositories/DriverRepository';
@@ -17,8 +17,13 @@ const connection = {
 // Create queue
 export const locationSyncQueue = new Queue(queueName, { connection });
 
+// QueueScheduler removed (deprecated/integrated)
+
 // Create scheduler for delayed/repeatable jobs
-const scheduler = new QueueScheduler(queueName, { connection });
+// The QueueScheduler is often not explicitly needed when using repeatable jobs with a Worker,
+// as the Worker itself can handle the scheduling aspect.
+// However, if you need a dedicated scheduler process, you would uncomment and run this.
+// Scheduler removed
 
 /**
  * Location Sync Worker
@@ -140,7 +145,7 @@ export async function stopLocationSync() {
   try {
     await locationSyncWorker.close();
     await locationSyncQueue.close();
-    await scheduler.close();
+    // await scheduler.close();
     console.log('✅ Location sync worker stopped');
   } catch (error) {
     console.error('❌ Failed to stop location sync worker:', error);

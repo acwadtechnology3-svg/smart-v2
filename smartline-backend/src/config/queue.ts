@@ -1,17 +1,19 @@
 import { Queue, QueueOptions, ConnectionOptions } from 'bullmq';
 import { config } from './env';
 
-// Redis connection for BullMQ
+// Note: Redis version patch is applied in redis-patch.ts (imported in index.ts)
+
 const connection: ConnectionOptions = {
   host: config.REDIS_HOST,
   port: config.REDIS_PORT,
   password: config.REDIS_PASSWORD || undefined,
-  maxRetriesPerRequest: null, // BullMQ handles retries
+  maxRetriesPerRequest: null,
 };
+
 
 // Default queue options
 const defaultOptions: QueueOptions = {
-  connection,
+  connection, // Use connection options, let BullMQ create instances (which will be patched)
   defaultJobOptions: {
     attempts: 3, // Retry up to 3 times
     backoff: {
@@ -65,7 +67,7 @@ export const queues = {
     defaultJobOptions: {
       ...defaultOptions.defaultJobOptions,
       attempts: 5, // Critical - more retries
-      timeout: 30000, // 30 second timeout
+      // timeout: 30000,
     },
   }),
   analytics: new Queue(QUEUE_NAMES.ANALYTICS, {
@@ -111,7 +113,7 @@ export async function addJob<T = any>(
     priority: options?.priority || JobPriority.NORMAL,
     delay: options?.delay,
     attempts: options?.attempts,
-    timeout: options?.timeout,
+    // timeout: options?.timeout,
   });
 }
 

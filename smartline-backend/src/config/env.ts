@@ -8,7 +8,7 @@ dotenv.config();
 const envSchema = z.object({
   // Server
   NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
-  PORT: z.string().transform(Number).default('3000'),
+  PORT: z.string().default('3000').transform((val) => parseInt(val, 10)),
 
   // Database
   SUPABASE_URL: z.string().url().min(1, 'SUPABASE_URL is required'),
@@ -30,7 +30,7 @@ const envSchema = z.object({
   // Redis
   REDIS_URL: z.string().url().optional(),
   REDIS_HOST: z.string().default('localhost'),
-  REDIS_PORT: z.string().transform(Number).default('6379'),
+  REDIS_PORT: z.string().default('6379').transform((val) => parseInt(val, 10)),
   REDIS_PASSWORD: z.string().optional(),
 
   // CORS
@@ -51,9 +51,15 @@ function validateEnv() {
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('❌ Invalid environment variables:');
-      error.errors.forEach((err) => {
-        console.error(`  - ${err.path.join('.')}: ${err.message}`);
-      });
+      // Zod v3 uses .issues
+      const issues = error.issues || (error as any).errors;
+      if (issues) {
+        issues.forEach((err: any) => {
+          console.error(`  - ${err.path.join('.')}: ${err.message}`);
+        });
+      } else {
+        console.error(JSON.stringify(error, null, 2));
+      }
       process.exit(1);
     }
     throw error;
@@ -66,7 +72,7 @@ export const config = validateEnv();
 // Helper to check if running in production
 export const isProduction = config.NODE_ENV === 'production';
 export const isDevelopment = config.NODE_ENV === 'development';
-export const isTest = config.NODE_ENV === 'test';
+export const isTest = process.env.NODE_ENV === 'test';
 
 // Prevent sensitive data exposure
 export function getSafeConfig() {

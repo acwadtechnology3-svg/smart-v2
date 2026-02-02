@@ -81,7 +81,8 @@ export default function PasswordScreen() {
         } catch (err: any) {
             setLoading(false);
             console.error(err);
-            const errorMessage = err.response?.data?.error || 'Login Failed';
+            const serverMsg = (err as any).response?.data?.error || (err as any).message || 'Login Failed';
+            const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
             Alert.alert('Error', errorMessage);
         }
     };

@@ -3,7 +3,7 @@ import { config } from './env';
 
 // Connection pool configuration
 const poolConfig: PoolConfig = {
-  connectionString: config.DATABASE_URL || config.SUPABASE_URL.replace('https://', 'postgresql://postgres:'),
+  connectionString: config.DATABASE_URL,
   max: 20, // Maximum number of clients in the pool
   min: 5, // Minimum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds

@@ -70,7 +70,7 @@ export default function Drivers() {
           is_online,
           last_location_update,
           rating,
-          users:id (
+          users!drivers_id_fkey (
             full_name,
             phone,
             email

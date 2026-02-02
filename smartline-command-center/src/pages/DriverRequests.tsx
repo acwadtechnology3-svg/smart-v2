@@ -68,7 +68,7 @@ const DriverRequests = () => {
                 .from('drivers')
                 .select(`
           *,
-          users:id (
+          users!drivers_id_fkey (
             full_name,
             phone
           )

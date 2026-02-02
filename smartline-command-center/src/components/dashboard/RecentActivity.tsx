@@ -15,7 +15,7 @@ export function RecentActivity() {
     // Fetch recent pending drivers as "activity"
     const { data } = await supabase
       .from('drivers')
-      .select('*, users(full_name)')
+      .select('*, users!drivers_id_fkey(full_name)')
       .order('created_at', { ascending: false })
       .limit(5);
 

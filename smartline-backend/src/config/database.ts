@@ -2,7 +2,7 @@ import { Pool, PoolConfig } from 'pg';
 import { config } from './env';
 
 // Connection pool configuration
-const poolConfig: PoolConfig = {
+const poolConfig: PoolConfig | null = config.DATABASE_URL ? {
   connectionString: config.DATABASE_URL,
   max: 20, // Maximum number of clients in the pool
   min: 5, // Minimum number of clients in the pool
@@ -13,18 +13,25 @@ const poolConfig: PoolConfig = {
   ssl: config.NODE_ENV === 'production' ? {
     rejectUnauthorized: false
   } : false,
-};
+} : null;
 
-// Create connection pool
-export const pool = new Pool(poolConfig);
+// Create connection pool (only if DATABASE_URL is set)
+export const pool = poolConfig ? new Pool(poolConfig) : null;
+
+if (!pool) {
+  console.warn('⚠️  DATABASE_URL not set - Direct database queries will fail. Using Supabase REST API only.');
+}
 
 // Handle pool errors
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle database client', err);
-});
+if (pool) {
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle database client', err);
+  });
+}
 
 // Connection health check
 export async function checkDatabaseConnection(): Promise<boolean> {
+  if (!pool) return false;
   try {
     const client = await pool.connect();
     await client.query('SELECT 1');
@@ -38,6 +45,7 @@ export async function checkDatabaseConnection(): Promise<boolean> {
 
 // Get pool statistics
 export function getPoolStats() {
+  if (!pool) return { total: 0, idle: 0, waiting: 0 };
   return {
     total: pool.totalCount,
     idle: pool.idleCount,
@@ -47,12 +55,18 @@ export function getPoolStats() {
 
 // Graceful shutdown
 export async function closePool(): Promise<void> {
-  await pool.end();
-  console.log('Database pool closed');
+  if (pool) {
+    await pool.end();
+    console.log('Database pool closed');
+  }
 }
 
 // Query helper with timeout
 export async function query(text: string, params?: any[], timeout: number = 10000) {
+  if (!pool) {
+    throw new Error('Database pool not initialized. Set DATABASE_URL in environment variables.');
+  }
+
   const start = Date.now();
 
   try {
@@ -85,6 +99,10 @@ export async function query(text: string, params?: any[], timeout: number = 1000
 export async function transaction<T>(
   callback: (client: any) => Promise<T>
 ): Promise<T> {
+  if (!pool) {
+    throw new Error('Database pool not initialized. Set DATABASE_URL in environment variables.');
+  }
+
   const client = await pool.connect();
 
   try {

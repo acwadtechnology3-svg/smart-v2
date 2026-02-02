@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env';
 import { supabase } from '../config/supabase';
+import { registerDriver, unregisterDriver } from './broadcaster';
 
 type Role = 'customer' | 'driver' | 'admin';
 
@@ -119,6 +120,10 @@ export function startRealtimeServer(server: Server) {
         if (sub) {
           supabase.removeChannel(sub.channel);
           ctx.subscriptions.delete(message.subscriptionId);
+          // Unregister from broadcaster
+          if (ctx.role === 'driver') {
+            unregisterDriver(ctx.userId, message.subscriptionId);
+          }
         }
         send(ws, { type: 'unsubscribed', subscriptionId: message.subscriptionId });
         return;
@@ -143,12 +148,19 @@ export function startRealtimeServer(server: Server) {
         switch (channel) {
           case 'driver:trip-requests': {
             if (ctx.role !== 'driver') throw new Error('Drivers only');
+            console.log(`[Realtime] Driver ${ctx.userId} subscribing to trip-requests`);
+
+            // Register driver for direct broadcasts
+            registerDriver(ctx.userId, ws, subscriptionId);
+
+            // Also keep Supabase realtime as fallback
             supaChannel = supabase
               .channel(`driver-inbox-${ctx.userId}-${subscriptionId}`)
               .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'trips', filter: 'status=eq.requested' },
                 (payload) => {
+                  console.log(`[Realtime] New trip created via Supabase, notifying driver ${ctx.userId}:`, payload.new);
                   send(ws, { type: 'event', subscriptionId, payload });
                 }
               );

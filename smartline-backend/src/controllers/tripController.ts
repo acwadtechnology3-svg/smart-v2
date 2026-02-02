@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
+import { broadcastToDrivers } from '../realtime/broadcaster';
 
 async function getTripById(tripId: string) {
     const { data, error } = await supabase
@@ -68,6 +69,13 @@ export const createTrip = async (req: Request, res: Response) => {
             console.error('Supabase Error:', error);
             return res.status(500).json({ error: error.message });
         }
+
+        console.log(`[Trip Created] Trip ${data.id} created with status: ${data.status}`);
+        console.log(`[Trip Created] Pickup: ${pickup_address}, Dest: ${dest_address}`);
+        console.log(`[Trip Created] Car type: ${car_type}, Price: ${price}`);
+
+        // Broadcast to all connected drivers
+        broadcastToDrivers('INSERT', data);
 
         res.status(201).json({ trip: data });
 

@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(tree:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(wsl --version:*)",
+      "Bash(wsl -- cat:*)",
+      "Bash(timeout 3 cmd /c \"type C:\\\\Users\\\\eslam\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--new-smart-line-new-app\\\\tasks\\\\b908eba.output 2>nul || echo Reading...\":*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout:*)",
+      "Bash(exit 0)",
+      "Bash(curl:*)",
+      "Bash(ping:*)"
     ]
   }
 }

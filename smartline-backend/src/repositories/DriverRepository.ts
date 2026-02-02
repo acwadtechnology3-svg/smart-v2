@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository';
 import { query } from '../config/database';
+import { supabase } from '../config/supabase';
 
 export interface Driver {
   id: string;
@@ -58,26 +59,54 @@ export class DriverRepository extends BaseRepository<Driver> {
     lat: number,
     lng: number
   ): Promise<boolean> {
-    const result = await query(
-      `UPDATE drivers
-       SET current_lat = $2,
-           current_lng = $3,
-           last_location_update = NOW()
-       WHERE id = $1`,
-      [driverId, lat, lng]
-    );
-    return (result.rowCount || 0) > 0;
+    try {
+      const result = await query(
+        `UPDATE drivers
+         SET current_lat = $2,
+             current_lng = $3,
+             last_location_update = NOW()
+         WHERE id = $1`,
+        [driverId, lat, lng]
+      );
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      // Fallback to Supabase if direct query fails
+      console.warn('Direct query failed, using Supabase:', error);
+      const { error: supabaseError } = await supabase
+        .from('drivers')
+        .update({
+          current_lat: lat,
+          current_lng: lng,
+          last_location_update: new Date().toISOString(),
+        })
+        .eq('id', driverId);
+
+      if (supabaseError) throw supabaseError;
+      return true;
+    }
   }
 
   /**
    * Set driver online status
    */
   async setOnlineStatus(driverId: string, isOnline: boolean): Promise<boolean> {
-    const result = await query(
-      `UPDATE drivers SET is_online = $2 WHERE id = $1`,
-      [driverId, isOnline]
-    );
-    return (result.rowCount || 0) > 0;
+    try {
+      const result = await query(
+        `UPDATE drivers SET is_online = $2 WHERE id = $1`,
+        [driverId, isOnline]
+      );
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      // Fallback to Supabase if direct query fails
+      console.warn('Direct query failed, using Supabase:', error);
+      const { error: supabaseError } = await supabase
+        .from('drivers')
+        .update({ is_online: isOnline })
+        .eq('id', driverId);
+
+      if (supabaseError) throw supabaseError;
+      return true;
+    }
   }
 
   /**

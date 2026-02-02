@@ -41,6 +41,7 @@ import DriverMyVehicleScreen from '../screens/Driver/DriverMyVehicleScreen';
 import DriverSupportScreen from '../screens/Driver/DriverSupportScreen';
 import DriverActiveTripScreen from '../screens/Driver/DriverActiveTripScreen';
 import DriverWalletScreen from '../screens/Driver/DriverWalletScreen';
+import PersonalInformationScreen from '../screens/Menu/PersonalInformationScreen';
 import { tripStatusService } from '../services/tripStatusService';
 
 
@@ -102,6 +103,7 @@ export default function AppNavigator() {
                 <Stack.Screen name="Messages" component={MessagesScreen} />
                 <Stack.Screen name="Safety" component={SafetyScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />
+                <Stack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
                 <Stack.Screen name="InviteFriends" component={InviteFriendsScreen} />
                 <Stack.Screen name="Scan" component={ScanScreen} />
                 <Stack.Screen name="Chat" component={ChatScreen} />

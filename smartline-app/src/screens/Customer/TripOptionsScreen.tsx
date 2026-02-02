@@ -23,7 +23,7 @@ type TripOptionsScreenRouteProp = RouteProp<RootStackParamList, 'TripOptions'>;
 const BASE_RIDES = [
     { id: 'saver', name: 'Saver', ratePerKm: 5, baseFooter: 10, etaMultiplier: 1.2, icon: Car, color: '#10B981', promo: 'Best Value' },
     { id: 'comfort', name: 'Comfort', ratePerKm: 7, baseFooter: 15, etaMultiplier: 1.0, icon: Car, color: Colors.primary, promo: 'Recommended' },
-    { id: 'lux', name: 'Luxury', ratePerKm: 12, baseFooter: 25, etaMultiplier: 0.9, icon: Star, color: '#1e1e1e', promo: null },
+    { id: 'vip', name: 'VIP', ratePerKm: 12, baseFooter: 25, etaMultiplier: 0.9, icon: Star, color: '#1e1e1e', promo: 'Premium Service' },
 ];
 
 export default function TripOptionsScreen() {
@@ -289,10 +289,13 @@ export default function TripOptionsScreen() {
                 payment_method: paymentMethod.toLowerCase()
             };
 
-            const response = await axios.post(`${API_URL}/trips/create`, payload);
+            const response = await apiRequest<{ trip: any }>('/trips/create', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
 
-            if (response.data.trip) {
-                navigation.navigate('SearchingDriver', { tripId: response.data.trip.id });
+            if (response.trip) {
+                navigation.navigate('SearchingDriver', { tripId: response.trip.id });
             }
 
         } catch (error: any) {

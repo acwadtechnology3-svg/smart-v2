@@ -37,7 +37,7 @@ export const tripStatusSchema = z.enum([
 
 export const paymentMethodSchema = z.enum(['cash', 'wallet', 'card']);
 
-export const vehicleTypeSchema = z.enum(['economy', 'comfort', 'premium', 'xl']);
+export const vehicleTypeSchema = z.enum(['saver', 'comfort', 'vip', 'scooter', 'taxi']);
 
 // ===== Authentication Schemas =====
 

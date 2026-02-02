@@ -31,6 +31,7 @@ export type RootStackParamList = {
     Chat: { driverName: string; tripId?: string; role?: 'customer' | 'driver' };
     Safety: { tripId?: string };
     Settings: undefined;
+    PersonalInformation: undefined;
     InviteFriends: undefined;
     Scan: undefined;
 

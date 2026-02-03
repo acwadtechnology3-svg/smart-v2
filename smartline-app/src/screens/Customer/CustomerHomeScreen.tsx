@@ -11,6 +11,8 @@ import { Colors } from '../../constants/Colors';
 import SideMenu from '../../components/SideMenu';
 import { apiRequest } from '../../services/backend';
 
+import { useLanguage } from '../../context/LanguageContext';
+
 type CustomerHomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CustomerHome'>;
 
 const { width, height } = Dimensions.get('window');
@@ -27,6 +29,7 @@ const DUMMY_CARS = [
 
 export default function CustomerHomeScreen() {
     const navigation = useNavigation<CustomerHomeScreenNavigationProp>();
+    const { t, isRTL } = useLanguage();
     const [isSideMenuVisible, setSideMenuVisible] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [currentAddress, setCurrentAddress] = useState<{ title: string, subtitle: string } | null>(null);
@@ -100,6 +103,10 @@ export default function CustomerHomeScreen() {
     //     return () => anim.stop();
     // }, []);
 
+    const handleWhereToPress = () => {
+        navigation.navigate('SearchLocation');
+    };
+
     return (
         <View style={styles.container}>
             {/* --- MAP BACKGROUND LAYER --- */}
@@ -150,8 +157,8 @@ export default function CustomerHomeScreen() {
                     </TouchableOpacity>
 
                     <View style={styles.locationHeader}>
-                        <Text style={styles.locationHeaderTitle}>{currentAddress?.title || "Locating..."}</Text>
-                        <Text style={styles.locationHeaderSubtitle}>{currentAddress?.subtitle || "Please wait"}</Text>
+                        <Text style={styles.locationHeaderTitle}>{currentAddress?.title || t('currentLocation')}</Text>
+                        <Text style={styles.locationHeaderSubtitle}>{currentAddress?.subtitle || t('locating')}</Text>
                     </View>
 
                     <TouchableOpacity style={styles.circleButton}>
@@ -164,11 +171,11 @@ export default function CustomerHomeScreen() {
 
                 {/* Safety Shield - Floating */}
                 <View style={styles.floatingUI} pointerEvents="box-none">
-                    <TouchableOpacity style={styles.safetyPill} onPress={() => navigation.navigate('Safety')}>
+                    <TouchableOpacity style={styles.safetyPill} onPress={() => navigation.navigate('Safety', {})}>
                         <View style={styles.shieldIconBg}>
                             <ShieldCheck color="#fff" size={14} fill="#fff" />
                         </View>
-                        <Text style={styles.safetyText}>Safety Center</Text>
+                        <Text style={styles.safetyText}>{t('safetyCenter')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.recenterButton}>
@@ -183,16 +190,16 @@ export default function CustomerHomeScreen() {
                         <View style={styles.dragHandle} />
 
                         {/* Search Component */}
-                        <TouchableOpacity style={styles.searchCard} onPress={() => navigation.navigate('SearchLocation')}>
+                        <TouchableOpacity style={styles.searchCard} onPress={handleWhereToPress}>
                             <View style={styles.searchIconBubble} />
-                            <Text style={styles.searchPlaceholder}>Where to?</Text>
+                            <Text style={styles.searchPlaceholder}>{t('where_to')}</Text>
                         </TouchableOpacity>
 
                         {/* Location Pin Row */}
                         <View style={styles.addressRow}>
                             <View style={styles.pinDot} />
                             <Text style={styles.addressText} numberOfLines={1}>
-                                {currentAddress ? `${currentAddress.title}, ${currentAddress.subtitle}` : "Fetching location..."}
+                                {currentAddress ? `${currentAddress.title}, ${currentAddress.subtitle}` : t('fetchingLocation')}
                             </Text>
                         </View>
 
@@ -213,12 +220,12 @@ export default function CustomerHomeScreen() {
                                     </View>
 
                                     <View style={styles.promoTexts}>
-                                        <Text style={styles.promoTitle}>Exclusive discounts for you!</Text>
-                                        <Text style={styles.promoSubtitle}>Don't miss out on your daily discounts</Text>
+                                        <Text style={styles.promoTitle}>{t('exclusiveDiscounts')}</Text>
+                                        <Text style={styles.promoSubtitle}>{t('dailyDiscounts')}</Text>
                                     </View>
 
                                     <View style={styles.clickButton}>
-                                        <Text style={styles.clickText}>click here</Text>
+                                        <Text style={styles.clickText}>{t('clickHere')}</Text>
                                         <Text style={{ fontSize: 12 }}>👆</Text>
                                     </View>
                                 </View>
@@ -227,20 +234,20 @@ export default function CustomerHomeScreen() {
                             {/* Secondary Options Column */}
                             <View style={styles.rightColumn}>
                                 {/* Safety Box */}
-                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('Safety')}>
+                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('Safety', {})}> 
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.featureTitle}>Enjoy the</Text>
-                                        <Text style={styles.featureSubHighlight}>safest trips with SmartLine</Text>
+                                        <Text style={styles.featureTitle}>{t('enjoy')}</Text>
+                                        <Text style={styles.featureSubHighlight}>{t('safestTrips')}</Text>
                                     </View>
                                     <ShieldCheck size={24} color="#4F46E5" fill="#fff" style={styles.featureIcon} />
                                 </TouchableOpacity>
 
                                 {/* Affordable Box */}
-                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('SearchLocation')}>
+                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('SearchLocation')}> 
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.featureTitle}>Enjoy</Text>
-                                        <Text style={styles.featureTitle}>affordable</Text>
-                                        <Text style={styles.featureTitle}>trips with us</Text>
+                                        <Text style={styles.featureTitle}>{t('enjoy')}</Text>
+                                        <Text style={styles.featureTitle}>{t('affordable')}</Text>
+                                        <Text style={styles.featureTitle}>{t('tripsWithUs')}</Text>
                                     </View>
                                     <CarFront size={24} color="#4F46E5" fill="#E0E7FF" style={styles.featureIcon} />
                                 </TouchableOpacity>

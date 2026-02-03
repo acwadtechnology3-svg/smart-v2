@@ -1,20 +1,19 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { I18nManager } from 'react-native';
-import * as Updates from 'expo-updates';
 
 type Language = 'en' | 'ar';
 
 interface LanguageContextType {
     language: Language;
-    setLanguage: (lang: Language) => void;
+    setLanguage: (lang: Language) => Promise<void>;
     isRTL: boolean;
     t: (key: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType>({
     language: 'ar',
-    setLanguage: () => { },
+    setLanguage: async () => { },
     isRTL: true,
     t: (key) => key,
 });
@@ -75,12 +74,15 @@ export const translations = {
         error: 'Error',
         success: 'Success',
         ok: 'OK',
+        loading: 'Loading',
         permissionDenied: 'Permission Denied',
         locationPermissionRequired: 'Location permission is required.',
         updateFailed: 'Failed to update settings',
         confirmLogout: 'Are you sure you want to log out?',
         account: 'Account',
         preferences: 'Preferences',
+        genericError: 'Something went wrong. Please try again.',
+        connectionError: 'Connection failed. Please check your internet.',
 
         // Trip Request
         newRequest: 'New Trip Request',
@@ -131,6 +133,7 @@ export const translations = {
         vehicleType: 'Vehicle Type',
         vehicleModel: 'Vehicle Model',
         vehiclePlate: 'Vehicle Plate',
+        vehicle: 'Vehicle',
         licensePhotos: 'License Photos',
         vehiclePhotos: 'Vehicle Photos',
         licenseFront: 'License Front',
@@ -145,6 +148,88 @@ export const translations = {
         car: 'Car',
         motorcycle: 'Motorcycle',
         taxi: 'Taxi',
+
+        // Customer Home
+        whereTo: 'Where to?',
+        currentLocation: 'Current Location',
+        locating: 'Locating...',
+        searchDestination: 'Search destination',
+        recentLocations: 'Recent Locations',
+        clearAll: 'Clear All',
+        noRecentLocations: 'No recent locations',
+        safetyCenter: 'Safety Center',
+        fetchingLocation: 'Fetching location...',
+        exclusiveDiscounts: 'Exclusive discounts for you!',
+        dailyDiscounts: "Don't miss out on your daily discounts",
+        clickHere: 'click here',
+        safestTrips: 'safest trips with SmartLine',
+        enjoy: 'Enjoy',
+        affordable: 'affordable',
+        tripsWithUs: 'trips with us',
+
+        // Trip Options
+        chooseRide: 'Choose a ride',
+        from: 'From',
+        to: 'To',
+        km: 'km',
+        min: 'min',
+        bestValue: 'Best Value',
+        recommended: 'Recommended',
+        premiumService: 'Premium Service',
+        fastest: 'Fastest',
+        select: 'Select',
+        paymentMethod: 'Payment Method',
+        cash: 'Cash',
+        promoCode: 'Promo Code',
+        apply: 'Apply',
+        requestFailed: 'Request Failed',
+        routeNotCalculated: 'Route not calculated yet',
+        authError: 'Auth Error',
+        pleaseLogin: 'Please log in again',
+
+        // Searching Driver
+        findingYourDriver: 'Finding your driver...',
+        searchingNearby: 'Searching for nearby drivers',
+        driverOffers: 'Driver Offers',
+        acceptRide: 'Accept Ride',
+        reject: 'Reject',
+        offer: 'Offer',
+        plate: 'Plate',
+        rating: 'Rating',
+        driverAlreadySelected: 'Driver Already Selected',
+        tripAlreadyAccepted: 'This trip has already been accepted by another driver',
+        viewDriver: 'View Driver',
+        cancelTrip: 'Cancel Trip',
+        cancelConfirm: 'Are you sure you want to cancel this trip request?',
+        yesCancel: 'Yes, Cancel',
+        noKeep: 'No, Keep',
+
+        // Driver Found
+        driverArriving: 'Driver Arriving',
+        arrivingIn: 'Arriving in',
+        minutes: 'minutes',
+        call: 'Call',
+        chat: 'Chat',
+        share: 'Share',
+        cancelSearch: 'Cancel Search',
+
+        // On Trip
+        tripInProgress: 'Trip in Progress',
+        takingYouToDest: 'Your driver is taking you to your destination',
+        pickupLocation: 'Pickup',
+        destination: 'Destination',
+        safety: 'Safety',
+        cancelFeeWarning: 'A cancellation fee may apply',
+        tripCancelledMsg: 'Trip has been cancelled',
+
+        // Trip Complete
+        tripCompleted: 'Trip Completed',
+        thankYou: 'Thank you for riding with us',
+        totalFare: 'Total Fare',
+        payCash: 'Please pay cash to driver',
+        rateDriver: 'Rate your driver',
+        addTip: 'Add Tip (Optional)',
+        done: 'Done',
 
         // Active Trip
         drivingToPickup: 'Driving to Pickup',
@@ -206,6 +291,10 @@ export const translations = {
         nextVehicleInfo: 'Next: Vehicle Info',
         nextProfilePhoto: 'Next: Profile Photo',
         nextDocuments: 'Next: Documents',
+        profilePhoto: 'Profile Photo',
+        uploadProfilePhoto: 'Upload Profile Photo',
+        profilePhotoDescription: 'Please upload a clear photo of yourself. This will be shown to customers.',
+        removePhoto: 'Remove Photo',
     },
     ar: {
         // Sidebar & Menu
@@ -262,12 +351,15 @@ export const translations = {
         error: 'خطأ',
         success: 'تم بنجاح',
         ok: 'حسناً',
+        loading: 'جاري التحميل',
         permissionDenied: 'تم رفض الإذن',
         locationPermissionRequired: 'مطلوب إذن الوصول للموقع.',
         updateFailed: 'فشل تحديث الإعدادات',
         confirmLogout: 'هل أنت متأكد من تسجيل الخروج؟',
         account: 'الحساب',
         preferences: 'التفضيلات',
+        genericError: 'حدث خطأ ما. حاول مرة أخرى.',
+        connectionError: 'فشل الاتصال. تأكد من الإنترنت.',
 
         // Trip Request
         newRequest: 'طلب رحلة جديد',
@@ -320,6 +412,7 @@ export const translations = {
         vehicleType: 'نوع السيارة',
         vehicleModel: 'موديل السيارة',
         vehiclePlate: 'رقم اللوحة',
+        vehicle: 'السيارة',
         licensePhotos: 'صور الرخصة',
         vehiclePhotos: 'صور السيارة',
         licenseFront: 'الرخصة (أمام)',
@@ -334,6 +427,87 @@ export const translations = {
         car: 'سيارة',
         motorcycle: 'دراجة نارية',
         taxi: 'تاكسي',
+
+        // Customer Home
+        whereTo: 'إلى أين؟',
+        currentLocation: 'الموقع الحالي',
+        searchDestination: 'ابحث عن وجهة',
+        recentLocations: 'المواقع الأخيرة',
+        clearAll: 'مسح الكل',
+        noRecentLocations: 'لا توجد مواقع أخيرة',
+        safetyCenter: 'مركز الأمان',
+        fetchingLocation: 'جاري تحديد الموقع...',
+        exclusiveDiscounts: 'خصومات حصرية لك!',
+        dailyDiscounts: 'لا تفوت خصوماتك اليومية',
+        clickHere: 'اضغط هنا',
+        safestTrips: 'أ safest trips with SmartLine',
+        enjoy: 'استمتع',
+        affordable: 'برحلات',
+        tripsWithUs: 'بأسعار معقولة معنا',
+
+        // Trip Options
+        chooseRide: 'اختر رحلة',
+        from: 'من',
+        to: 'إلى',
+        km: 'كم',
+        min: 'دقيقة',
+        bestValue: 'أفضل قيمة',
+        recommended: 'موصى به',
+        premiumService: 'خدمة مميزة',
+        fastest: 'الأسرع',
+        select: 'اختر',
+        paymentMethod: 'طريقة الدفع',
+        cash: 'كاش',
+        promoCode: 'كود الخصم',
+        apply: 'تطبيق',
+        requestFailed: 'فشل الطلب',
+        routeNotCalculated: 'لم يتم حساب المسار بعد',
+        authError: 'خطأ في المصادقة',
+        pleaseLogin: 'يرجى تسجيل الدخول مرة أخرى',
+
+        // Searching Driver
+        findingYourDriver: 'جاري البحث عن سائق...',
+        searchingNearby: 'جاري البحث في المنطقة',
+        driverOffers: 'عروض السائقين',
+        acceptRide: 'قبول الرحلة',
+        reject: 'رفض',
+        offer: 'عرض',
+        plate: 'لوحة',
+        rating: 'تقييم',
+        driverAlreadySelected: 'تم اختيار سائق',
+        tripAlreadyAccepted: 'تم قبول هذه الرحلة من سائق آخر',
+        viewDriver: 'عرض السائق',
+        cancelTrip: 'إلغاء الرحلة',
+        cancelConfirm: 'هل أنت متأكد من إلغاء طلب الرحلة؟',
+        yesCancel: 'نعم، إلغاء',
+        noKeep: 'لا، استمرار',
+
+        // Driver Found
+        driverArriving: 'السائق في الطريق',
+        arrivingIn: 'الوصول خلال',
+        minutes: 'دقيقة',
+        call: 'اتصال',
+        chat: 'محادثة',
+        share: 'مشاركة',
+        cancelSearch: 'إلغاء البحث',
+
+        // On Trip
+        tripInProgress: 'الرحلة قيد التنفيذ',
+        takingYouToDest: 'السائق يقلك إلى وجهتك',
+        pickupLocation: 'نقطة الالتقاط',
+        destination: 'الوجهة',
+        safety: 'الأمان',
+        cancelFeeWarning: 'قد يتم تطبيق رسوم الإلغاء',
+        tripCancelledMsg: 'تم إلغاء الرحلة',
+
+        // Trip Complete
+        tripCompleted: 'اكتملت الرحلة',
+        thankYou: 'شكراً لركوبك معنا',
+        totalFare: 'الأجرة الكلية',
+        payCash: 'يرجى الدفع نقداً للسائق',
+        rateDriver: 'قيّم سائقك',
+        addTip: 'إضافة بقشيش (اختياري)',
+        done: 'تم',
 
         // Active Trip
         drivingToPickup: 'في الطريق للراكب',
@@ -393,6 +567,10 @@ export const translations = {
         nextVehicleInfo: 'التالي: بيانات العربية',
         nextProfilePhoto: 'التالي: الصورة الشخصية',
         nextDocuments: 'التالي: المستندات',
+        profilePhoto: 'الصورة الشخصية',
+        uploadProfilePhoto: 'رفع الصورة الشخصية',
+        profilePhotoDescription: 'من فضلك ارفع صورة واضحة ليك. الصورة دي هتظهر للعملاء.',
+        removePhoto: 'حذف الصورة',
     }
 };
 
@@ -418,7 +596,13 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         try {
             await AsyncStorage.setItem('appLanguage', lang);
             setLanguageState(lang);
-            // Handle RTL logic here if needed beyond React Context
+
+            // Handle RTL - for Arabic, enable RTL; for English, disable RTL
+            const shouldBeRTL = lang === 'ar';
+            if (I18nManager.isRTL !== shouldBeRTL) {
+                I18nManager.allowRTL(shouldBeRTL);
+                I18nManager.forceRTL(shouldBeRTL);
+            }
         } catch (e) {
             console.error("Failed to save language", e);
         }

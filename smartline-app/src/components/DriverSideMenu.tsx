@@ -11,6 +11,7 @@ import { Colors } from '../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest } from '../services/backend';
 import { useLanguage } from '../context/LanguageContext';
+import { CachedImage } from './CachedImage';
 
 const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
@@ -162,7 +163,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
                             </View>
                             <View style={styles.avatarContainer}>
                                 {profileUrl ? (
-                                    <Image source={{ uri: profileUrl }} style={{ width: 60, height: 60 }} />
+                                    <CachedImage source={{ uri: profileUrl }} style={{ width: 60, height: 60 }} />
                                 ) : (
                                     <User size={30} color="#fff" />
                                 )}

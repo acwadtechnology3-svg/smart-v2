@@ -44,7 +44,7 @@ export default function DriverDocumentsScreen() {
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: false, // Documents usually full
-            quality: 0.5,
+            quality: 0.3,
             aspect: [4, 3],
         });
 
@@ -99,31 +99,53 @@ export default function DriverDocumentsScreen() {
             if (!userId) throw new Error('No user found');
 
 
-            // 1. Upload Profile Photo
-            let profilePhotoUrl = null;
-            if (profilePhoto) {
-                if (profilePhoto.startsWith('http')) {
-                    // Already uploaded
-                    profilePhotoUrl = profilePhoto;
-                } else {
-                    const ext = profilePhoto.split('.').pop();
-                    const path = `${userId}/profile.${ext}`;
-                    profilePhotoUrl = await uploadFile(profilePhoto, path);
+
+            // 1. Prepare Upload Promises (Parallel)
+            const uploadPromises: Promise<any>[] = [];
+
+            // Helper to handle individual upload and result mapping
+            // Returns [key, url]
+            const handleUpload = async (key: string, uri: string | null): Promise<[string, string] | null> => {
+                if (!uri) return null;
+
+                if (uri.startsWith('http')) {
+                    return [key, uri];
                 }
+
+                const ext = uri.split('/').pop()?.split('.').pop() || 'jpg';
+                const path = `${userId}/${key}.${ext}`;
+                const url = await uploadFile(uri, path);
+                return [key, url];
+            };
+
+            // Add Profile Photo
+            if (profilePhoto) {
+                uploadPromises.push(handleUpload('profile_photo_url', profilePhoto));
             }
 
-            // 2. Upload Documents
-            const uploadedDocs: any = {};
-            for (const [key, uri] of Object.entries(documents)) {
+            // Add Documents
+            Object.entries(documents).forEach(([key, uri]) => {
                 if (uri) {
-                    const ext = uri.split('.').pop();
-                    const path = `${userId}/${key}.${ext}`;
-                    uploadedDocs[`${key}_url`] = await uploadFile(uri, path);
+                    // Map local state key to API key suffix
+                    // idFront -> id_front_url
+                    // Convert camelCase to snake_case manually or map
+                    const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`) + '_url';
+                    uploadPromises.push(handleUpload(snakeKey, uri));
                 }
-            }
+            });
+
+            // Execute all
+            const results = await Promise.all(uploadPromises);
+
+            // Collect results
+            const uploadedUrls: any = {};
+            results.forEach(res => {
+                if (res) {
+                    uploadedUrls[res[0]] = res[1];
+                }
+            });
 
             // 3. Insert into Drivers Table
-            // Ensure snake_case matching DB
             await apiRequest('/drivers/register', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -132,17 +154,17 @@ export default function DriverDocumentsScreen() {
                     vehicle_type: vehicleType,
                     vehicle_model: vehicleModel,
                     vehicle_plate: vehiclePlate,
-                    profile_photo_url: profilePhotoUrl,
-                    id_front_url: uploadedDocs.idFront_url,
-                    id_back_url: uploadedDocs.idBack_url,
-                    license_front_url: uploadedDocs.licenseFront_url,
-                    license_back_url: uploadedDocs.licenseBack_url,
-                    vehicle_license_front_url: uploadedDocs.vehicleLicenseFront_url,
-                    vehicle_license_back_url: uploadedDocs.vehicleLicenseBack_url,
-                    vehicle_front_url: uploadedDocs.vehicleFront_url,
-                    vehicle_back_url: uploadedDocs.vehicleBack_url,
-                    vehicle_right_url: uploadedDocs.vehicleRight_url,
-                    vehicle_left_url: uploadedDocs.vehicleLeft_url,
+                    profile_photo_url: uploadedUrls.profile_photo_url || null,
+                    id_front_url: uploadedUrls.id_front_url,
+                    id_back_url: uploadedUrls.id_back_url,
+                    license_front_url: uploadedUrls.license_front_url,
+                    license_back_url: uploadedUrls.license_back_url,
+                    vehicle_license_front_url: uploadedUrls.vehicle_license_front_url,
+                    vehicle_license_back_url: uploadedUrls.vehicle_license_back_url,
+                    vehicle_front_url: uploadedUrls.vehicle_front_url,
+                    vehicle_back_url: uploadedUrls.vehicle_back_url,
+                    vehicle_left_url: uploadedUrls.vehicle_left_url,
+                    vehicle_right_url: uploadedUrls.vehicle_right_url,
                 })
             });
 

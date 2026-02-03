@@ -27,7 +27,7 @@ export default function DriverProfilePhotoScreen() {
             mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.5,
+            quality: 0.3,
         });
 
         if (!result.canceled) {
@@ -81,26 +81,17 @@ export default function DriverProfilePhotoScreen() {
             return;
         }
 
-        setUploading(true);
-
-        try {
-            const uploadedUrl = await uploadProfilePhoto(photo);
-
-            setUploading(false);
-            navigation.navigate('DriverDocuments', {
-                phone,
-                name,
-                nationalId,
-                city,
-                vehicleType,
-                vehicleModel,
-                vehiclePlate,
-                profilePhoto: uploadedUrl // Pass the Web URL now
-            });
-        } catch (err) {
-            setUploading(false);
-            Alert.alert('Error', 'Failed to upload profile photo. Please try again.');
-        }
+        // Pass local URI to next screen - upload will happen in batch at the end
+        navigation.navigate('DriverDocuments', {
+            phone,
+            name,
+            nationalId,
+            city,
+            vehicleType,
+            vehicleModel,
+            vehiclePlate,
+            profilePhoto: photo
+        });
     };
 
     return (

@@ -12,6 +12,7 @@ import Constants from 'expo-constants';
 import DriverSideMenu from '../../components/DriverSideMenu';
 import TripRequestModal from '../../components/TripRequestModal';
 import { useLanguage } from '../../context/LanguageContext';
+import { CachedImage } from '../../components/CachedImage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -101,7 +102,7 @@ export default function DriverHomeScreen() {
 
                 const summary = await apiRequest<{ driver: any; balance: number; dailyEarnings: number }>('/drivers/summary');
                 if (summary.driver?.profile_photo_url) {
-                    summary.driver.profile_photo_url = `${summary.driver.profile_photo_url}?t=${new Date().getTime()}`;
+                    // summary.driver.profile_photo_url = `${summary.driver.profile_photo_url}?t=${new Date().getTime()}`;
                 }
                 setDriverProfile(summary.driver);
                 setWalletBalance(summary.balance || 0);
@@ -504,13 +505,14 @@ export default function DriverHomeScreen() {
                     {/* Driver Profile Pic */}
                     <View style={styles.profileContainer}>
                         {driverProfile?.profile_photo_url ? (
-                            <Image source={{ uri: driverProfile.profile_photo_url }} style={styles.profileImage} />
+                            <CachedImage source={{ uri: driverProfile.profile_photo_url }} style={styles.profileImage} />
                         ) : (
                             <View style={[styles.profileImage, { backgroundColor: '#ccc' }]} />
                         )}
                         <View style={[
                             styles.statusDot,
-                            isRTL ? { left: 0 } : { right: 0 } // Move dot based on direction
+                            isRTL ? { left: 0 } : { right: 0 },
+                            { backgroundColor: isOnline ? '#10B981' : '#9CA3AF' }
                         ]} />
                     </View>
                 </View>

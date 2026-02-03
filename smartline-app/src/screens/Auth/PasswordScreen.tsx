@@ -93,16 +93,24 @@ export default function PasswordScreen() {
 
         } catch (err: any) {
             setLoading(false);
-            console.error(err);
-            const serverMsg = (err as any).response?.data?.error || (err as any).message || t('loginFailed');
-            const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
+            console.error('[Password] Login Error:', err);
 
-            // If error is specifically "This account is not registered..." use translation
-            if (errorMessage.includes('not registered as a Driver')) {
-                Alert.alert(t('loginError'), t('accountNotDriver'));
+            let message = t('loginFailed');
+
+            // Handle specific Known Errors
+            const rawMessage = err?.response?.data?.error || err.message || '';
+
+            if (rawMessage === t('accountNotDriver') || (typeof rawMessage === 'string' && rawMessage.includes('not registered'))) {
+                message = t('accountNotDriver');
+            } else if (typeof rawMessage === 'string' && (rawMessage.includes('Network Error') || rawMessage.includes('fetch failed'))) {
+                message = t('connectionError');
+            } else if (err?.response?.status === 401) {
+                message = t('loginFailed'); // Likely wrong password
             } else {
-                Alert.alert(t('loginError'), errorMessage);
+                message = t('genericError');
             }
+
+            Alert.alert(t('error'), message);
         }
     };
 

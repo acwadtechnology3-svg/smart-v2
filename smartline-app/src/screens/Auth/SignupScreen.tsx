@@ -58,9 +58,20 @@ export default function SignupScreen() {
             proceedToNextScreen();
 
         } catch (err: any) {
-            console.error('Signup logic error:', err);
+            console.error('[Signup] Error:', err);
             setLoading(false);
-            Alert.alert(t('error'), t('signupFailed'));
+
+            let message = t('signupFailed');
+            if (err.message && (err.message.includes('Network Error') || err.message.includes('fetch failed'))) {
+                message = t('connectionError');
+            } else {
+                // Determine if we should show generic or signup specific
+                // t('signupFailed') is "Signup Failed. Please try again." which is good.
+                // t('genericError') is "Something went wrong."
+                // I will use signupFailed as it gives context (Action failed).
+            }
+
+            Alert.alert(t('error'), message);
         }
     };
 

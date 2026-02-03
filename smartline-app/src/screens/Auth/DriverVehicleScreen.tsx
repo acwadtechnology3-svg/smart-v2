@@ -9,10 +9,13 @@ import { Car, Bike, Flag, ArrowLeft } from 'lucide-react-native';
 type DriverVehicleScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DriverVehicle'>;
 type DriverVehicleScreenRouteProp = RouteProp<RootStackParamList, 'DriverVehicle'>;
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function DriverVehicleScreen() {
     const navigation = useNavigation<DriverVehicleScreenNavigationProp>();
     const route = useRoute<DriverVehicleScreenRouteProp>();
     const { phone, name, nationalId, city } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [vehicleType, setVehicleType] = useState<'car' | 'motorcycle' | 'taxi' | null>(null);
     const [vehicleModel, setVehicleModel] = useState('');
@@ -20,7 +23,7 @@ export default function DriverVehicleScreen() {
 
     const handleNext = () => {
         if (!vehicleType || !vehicleModel || !vehiclePlate) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert(t('error'), t('pleaseFillAllFields'));
             return;
         }
 
@@ -53,26 +56,26 @@ export default function DriverVehicleScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={Colors.textPrimary} />
+            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+                    <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.title}>Select your vehicle</Text>
-                <Text style={styles.subtitle}>Step 2 of 3</Text>
+                <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>{t('changeVehicle')}</Text>
+                <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('step')} 2 {t('of')} 4</Text>
 
-                <View style={styles.vehiclesContainer}>
-                    {renderVehicleCard('car', 'Car', Car)}
-                    {renderVehicleCard('motorcycle', 'Motorcycle', Bike)}
-                    {renderVehicleCard('taxi', 'Taxi', Car)}
+                <View style={[styles.vehiclesContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    {renderVehicleCard('car', t('car'), Car)}
+                    {renderVehicleCard('motorcycle', t('motorcycle'), Bike)}
+                    {renderVehicleCard('taxi', t('taxi'), Car)}
                 </View>
 
                 <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Vehicle Model</Text>
+                    <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('vehicleModel')}</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                         placeholder="e.g. Nissan Sunny 2024"
                         value={vehicleModel}
                         onChangeText={setVehicleModel}
@@ -80,9 +83,9 @@ export default function DriverVehicleScreen() {
                 </View>
 
                 <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Vehicle Plate Number</Text>
+                    <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('vehiclePlate')}</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                         placeholder="e.g. ABC 123"
                         value={vehiclePlate}
                         onChangeText={setVehiclePlate}
@@ -90,7 +93,7 @@ export default function DriverVehicleScreen() {
                 </View>
 
                 <TouchableOpacity style={styles.button} onPress={handleNext}>
-                    <Text style={styles.buttonText}>Next</Text>
+                    <Text style={styles.buttonText}>{t('nextProfilePhoto')}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>

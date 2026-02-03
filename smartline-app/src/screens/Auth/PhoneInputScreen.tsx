@@ -47,12 +47,16 @@ export default function PhoneInputScreen() {
                 navigation.navigate('Signup', { phone: fullPhone, role });
             }
 
-        } catch (err) {
-            console.error(err);
+        } catch (err: any) {
+            console.error('[PhoneInput] Check Phone Error:', err);
             setLoading(false);
-            const serverMsg = (err as any).response?.data?.error || (err as any).message || 'Could not verify phone number.';
-            const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
-            Alert.alert(t('error'), errorMessage);
+
+            let message = t('genericError');
+            if (err.message && (err.message.includes('Network Error') || err.message.includes('fetch failed'))) {
+                message = t('connectionError');
+            }
+
+            Alert.alert(t('error'), message);
         }
     };
 
@@ -64,13 +68,12 @@ export default function PhoneInputScreen() {
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={styles.inner}>
-                        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', minHeight: 60 }]}>
                             <TouchableOpacity
                                 onPress={() => navigation.goBack()}
-                                style={{ padding: 8, flexDirection: 'row', alignItems: 'center' }}
+                                style={{ padding: 12, borderRadius: 20, backgroundColor: '#F3F4F6' }}
                             >
-                                <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
-                                {/* Optional: Add text if needed, but icon should be enough if visible */}
+                                <ArrowLeft size={30} color="#000000" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                             </TouchableOpacity>
                         </View>
 

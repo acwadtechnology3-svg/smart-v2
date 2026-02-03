@@ -15,10 +15,13 @@ import { decode } from 'base64-arraybuffer';
 type DriverProfilePhotoScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DriverProfilePhoto'>;
 type DriverProfilePhotoScreenRouteProp = RouteProp<RootStackParamList, 'DriverProfilePhoto'>;
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function DriverProfilePhotoScreen() {
     const navigation = useNavigation<DriverProfilePhotoScreenNavigationProp>();
     const route = useRoute<DriverProfilePhotoScreenRouteProp>();
     const { phone, name, nationalId, city, vehicleType, vehicleModel, vehiclePlate } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [photo, setPhoto] = useState<string | null>(null);
 
@@ -37,47 +40,9 @@ export default function DriverProfilePhotoScreen() {
 
     const [uploading, setUploading] = useState(false);
 
-    // ... class begins ...
-
-    const uploadProfilePhoto = async (uri: string) => {
-        try {
-            // Get user ID first
-            const sessionStr = await AsyncStorage.getItem('userSession');
-            if (!sessionStr) throw new Error('No user found');
-            const { user } = JSON.parse(sessionStr);
-            const userId: string | undefined = user?.id;
-            if (!userId) throw new Error('No user found');
-
-            // Read file as Base64
-            const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
-            const arrayBuffer = decode(base64);
-
-            const path = `${userId}/profile.jpg`;
-
-            // Upload ArrayBuffer
-            const { data, error } = await supabase.storage
-                .from('driver-documents')
-                .upload(path, arrayBuffer, {
-                    contentType: 'image/jpeg',
-                    upsert: true,
-                });
-
-            if (error) throw error;
-
-            const { data: publicUrlData } = supabase.storage
-                .from('driver-documents')
-                .getPublicUrl(path);
-
-            return publicUrlData.publicUrl;
-        } catch (e) {
-            console.error("Upload failed", e);
-            throw e;
-        }
-    };
-
     const handleNext = async () => {
         if (!photo) {
-            Alert.alert('Required', 'Please upload a profile photo to continue.');
+            Alert.alert(t('error'), t('uploadRequired'));
             return;
         }
 
@@ -96,17 +61,17 @@ export default function DriverProfilePhotoScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={Colors.textPrimary} />
+            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+                    <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.title}>Profile Photo</Text>
-                <Text style={styles.subtitle}>Step 3 of 4</Text>
-                <Text style={styles.description}>
-                    Please upload a clear photo of yourself. This will be shown to customers when they book a ride with you.
+                <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left', alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>{t('profilePhoto')}</Text>
+                <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left', alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>{t('step')} 3 {t('of')} 4</Text>
+                <Text style={[styles.description, { textAlign: isRTL ? 'right' : 'left', alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
+                    {t('profilePhotoDescription')}
                 </Text>
 
                 <View style={styles.photoContainer}>
@@ -124,18 +89,17 @@ export default function DriverProfilePhotoScreen() {
                     </TouchableOpacity>
                     {photo && (
                         <TouchableOpacity onPress={() => setPhoto(null)} style={styles.removeTextContainer}>
-                            <Text style={styles.removeText}>Remove Photo</Text>
+                            <Text style={styles.removeText}>{t('removePhoto')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
-
 
                 <TouchableOpacity
                     style={[styles.button, (!photo || uploading) && styles.buttonDisabled]}
                     onPress={handleNext}
                     disabled={!photo || uploading}
                 >
-                    {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Next</Text>}
+                    {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{t('nextDocuments')}</Text>}
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>

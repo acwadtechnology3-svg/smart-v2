@@ -12,6 +12,7 @@ import { apiRequest } from '../../services/backend';
 // @ts-ignore
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
+import { useLanguage } from '../../context/LanguageContext';
 
 type DriverDocumentsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DriverDocuments'>;
 type DriverDocumentsScreenRouteProp = RouteProp<RootStackParamList, 'DriverDocuments'>;
@@ -19,6 +20,7 @@ type DriverDocumentsScreenRouteProp = RouteProp<RootStackParamList, 'DriverDocum
 export default function DriverDocumentsScreen() {
     const navigation = useNavigation<DriverDocumentsScreenNavigationProp>();
     const route = useRoute<DriverDocumentsScreenRouteProp>();
+    const { t, isRTL } = useLanguage();
 
     // We expect profilePhoto to be passed from the previous screen (DriverProfilePhoto)
     // @ts-ignore 
@@ -84,13 +86,12 @@ export default function DriverDocumentsScreen() {
         // Validation
         const missing = Object.keys(documents).filter(k => !documents[k]);
         if (missing.length > 0) {
-            Alert.alert('Incomplete', 'Please upload all required documents.');
+            Alert.alert(t('error'), t('pleaseFillAllFields'));
             return;
         }
 
         setLoading(true);
 
-        // ... (inside component)
         try {
             const sessionStr = await AsyncStorage.getItem('userSession');
             if (!sessionStr) throw new Error('No user found');
@@ -173,8 +174,16 @@ export default function DriverDocumentsScreen() {
 
         } catch (err: any) {
             setLoading(false);
-            console.error(err);
-            Alert.alert('Error', err.message || 'Failed to submit application. Please check your connection.');
+            console.error('[DriverDocuments] Upload Error:', err);
+
+            let message = t('genericError');
+            if (err.message && (err.message.includes('Network Error') || err.message.includes('fetch failed'))) {
+                message = t('connectionError');
+            } else if (err.message === 'No user found') {
+                message = t('authError');
+            }
+
+            Alert.alert(t('error'), message);
         }
     };
 

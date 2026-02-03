@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
-import { ArrowLeft, User, Bell, Lock, Globe, Moon, ChevronRight, LogOut } from 'lucide-react-native';
+import { ArrowLeft, User, Bell, Lock, Globe, Moon, ChevronRight, LogOut, Trash2 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiRequest } from '../../services/backend';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -92,6 +92,37 @@ export default function SettingsScreen() {
         );
     };
 
+    const handleDeleteAccount = async () => {
+        Alert.alert(
+            t('deleteAccount'),
+            t('deleteAccountConfirm'),
+            [
+                { text: t('cancel'), style: "cancel" },
+                {
+                    text: t('delete'),
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await apiRequest('/users/account', { method: 'DELETE' });
+                            await AsyncStorage.multiRemove(['userSession', 'token']);
+                            Alert.alert(t('success'), t('accountDeleted'));
+                            navigation.reset({
+                                index: 0,
+                                routes: [{ name: 'Auth' as never }],
+                            });
+                        } catch (error: any) {
+                            const msg = error?.response?.data?.error || t('deleteAccountFailed');
+                            Alert.alert(t('error'), msg);
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     if (loading && !user) {
         return (
             <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -177,6 +208,14 @@ export default function SettingsScreen() {
                     <Text style={styles.logoutText}>{t('signOut')}</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity style={[
+                    styles.deleteBtn,
+                    { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                ]} onPress={handleDeleteAccount}>
+                    <Trash2 size={20} color="#DC2626" />
+                    <Text style={styles.deleteText}>{t('deleteAccount')}</Text>
+                </TouchableOpacity>
+
                 <Text style={styles.versionText}>Version 1.0.0</Text>
             </ScrollView>
         </SafeAreaView>
@@ -221,5 +260,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#FEE2E2', padding: 16, borderRadius: 12, marginTop: 32, gap: 8
     },
     logoutText: { color: '#EF4444', fontWeight: 'bold', fontSize: 16 },
+    deleteBtn: {
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#FECACA', padding: 16, borderRadius: 12, marginTop: 12, gap: 8
+    },
+    deleteText: { color: '#DC2626', fontWeight: 'bold', fontSize: 16 },
     versionText: { textAlign: 'center', color: '#9CA3AF', marginTop: 24, fontSize: 12 },
 });

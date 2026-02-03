@@ -84,6 +84,13 @@ export const translations = {
         genericError: 'Something went wrong. Please try again.',
         connectionError: 'Connection failed. Please check your internet.',
 
+        // Delete Account
+        deleteAccount: 'Delete Account',
+        deleteAccountConfirm: 'This will permanently delete your account. All your data will be removed. Are you sure?',
+        delete: 'Delete',
+        accountDeleted: 'Your account has been deleted successfully.',
+        deleteAccountFailed: 'Failed to delete account. Please try again.',
+
         // Trip Request
         newRequest: 'New Trip Request',
         accept: 'Accept',
@@ -360,6 +367,13 @@ export const translations = {
         preferences: 'التفضيلات',
         genericError: 'حدث خطأ ما. حاول مرة أخرى.',
         connectionError: 'فشل الاتصال. تأكد من الإنترنت.',
+
+        // Delete Account
+        deleteAccount: 'حذف الحساب',
+        deleteAccountConfirm: 'سيؤدي هذا إلى حذف حسابك نهائيًا. ستتم إزالة جميع بياناتك. هل أنت متأكد؟',
+        delete: 'حذف',
+        accountDeleted: 'تم حذف حسابك بنجاح.',
+        deleteAccountFailed: 'فشل حذف الحساب. يرجى المحاولة مرة أخرى.',
 
         // Trip Request
         newRequest: 'طلب رحلة جديد',

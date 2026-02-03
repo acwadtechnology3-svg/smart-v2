@@ -41,6 +41,42 @@ export default function DriverFoundScreen() {
         arrivedRef.current = isArrived;
     }, [isArrived]);
 
+    // Fetch driver info if not provided (e.g., from polling fallback)
+    useEffect(() => {
+        if (!driver && tripId) {
+            (async () => {
+                try {
+                    const tripData = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                    if (tripData.trip?.driver_id) {
+                        const response = await apiRequest<{ driver: any }>(`/drivers/public/${tripData.trip.driver_id}?tripId=${tripId}`);
+                        if (response.driver) {
+                            const data = response.driver;
+                            setDriverInfo({
+                                id: data.id,
+                                name: data.users?.full_name || 'Driver',
+                                phone: data.users?.phone,
+                                rating: data.rating || '5.0',
+                                image: data.profile_photo_url,
+                                car: data.vehicle_model,
+                                plate: data.vehicle_plate,
+                                color: data.vehicle_color,
+                                lat: data.current_lat,
+                                lng: data.current_lng,
+                                eta: '5 min',
+                            });
+                            if (typeof data.current_lat === 'number' && typeof data.current_lng === 'number') {
+                                setDriverLoc({ latitude: data.current_lat, longitude: data.current_lng });
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('[DriverFound] Failed to fetch trip/driver info:', err);
+                }
+            })();
+        }
+    }, [driver, tripId]);
+
+    // Refresh driver info periodically if driver was provided
     useEffect(() => {
         if (!driver?.id || !tripId) return;
 

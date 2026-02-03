@@ -92,6 +92,23 @@ export default function SearchingDriverScreen() {
 
         let unsubOffers: (() => void) | null = null;
         let unsubStatus: (() => void) | null = null;
+        let pollInterval: NodeJS.Timeout | null = null;
+        let isNavigating = false;
+
+        // Fallback polling in case realtime doesn't fire
+        pollInterval = setInterval(async () => {
+            if (isNavigating) return;
+            try {
+                const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                if (data.trip?.status === 'accepted' && data.trip?.driver_id && !isNavigating) {
+                    console.log('[SearchingDriver] Poll detected accepted trip, navigating...');
+                    isNavigating = true;
+                    navigation.replace('DriverFound', { tripId });
+                }
+            } catch (e) {
+                // ignore polling errors
+            }
+        }, 3000); // Poll every 3 seconds
 
         (async () => {
             unsubOffers = await realtimeClient.subscribe(
@@ -123,12 +140,13 @@ export default function SearchingDriverScreen() {
             unsubStatus = await realtimeClient.subscribe(
                 { channel: 'trip:status', tripId },
                 async (payload) => {
-                    console.log('[SearchingDriver] Trip status updated:', payload.new.status);
+                    console.log('[SearchingDriver] Trip status updated:', payload.new?.status, 'driver_id:', payload.new?.driver_id);
 
-                    if (payload.new.status === 'accepted') {
-                        console.log('[SearchingDriver] Trip accepted! Fetching driver details...');
+                    if (payload.new?.status === 'accepted' && payload.new?.driver_id) {
+                        console.log('[SearchingDriver] Trip accepted! Fetching driver details for driver:', payload.new.driver_id);
                         try {
                             const response = await apiRequest<{ driver: any }>(`/drivers/public/${payload.new.driver_id}?tripId=${tripId}`);
+                            console.log('[SearchingDriver] Driver details fetched:', response.driver);
                             const driverData = response.driver;
                             if (driverData) {
                                 navigation.replace('DriverFound', {
@@ -148,8 +166,10 @@ export default function SearchingDriverScreen() {
                                     },
                                 });
                             }
-                        } catch (e) {
-                            console.error('[SearchingDriver] Failed to fetch driver details', e);
+                        } catch (e: any) {
+                            console.error('[SearchingDriver] Failed to fetch driver details:', e.message || e);
+                            // Still navigate to DriverFound even if fetch fails - the screen can load details itself
+                            navigation.replace('DriverFound', { tripId });
                         }
                     }
                 }
@@ -159,6 +179,7 @@ export default function SearchingDriverScreen() {
         return () => {
             if (unsubOffers) unsubOffers();
             if (unsubStatus) unsubStatus();
+            if (pollInterval) clearInterval(pollInterval);
         };
     }, [tripId]);
 

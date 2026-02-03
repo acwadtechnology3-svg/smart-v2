@@ -232,7 +232,7 @@ export const getDriverPublic = async (req: Request, res: Response) => {
 
     const { data: driver, error } = await supabase
       .from('drivers')
-      .select('id, vehicle_model, vehicle_plate, rating, profile_photo_url, users!inner(full_name)')
+      .select('id, vehicle_model, vehicle_plate, vehicle_color, rating, profile_photo_url, current_lat, current_lng, users!inner(full_name, phone)')
       .eq('id', driverId)
       .single();
 

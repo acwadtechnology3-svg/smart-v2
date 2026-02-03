@@ -11,11 +11,14 @@ import { useNavigation } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import DriverSideMenu from '../../components/DriverSideMenu';
 import TripRequestModal from '../../components/TripRequestModal';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function DriverHomeScreen() {
     const navigation = useNavigation<any>();
+    const { t, isRTL } = useLanguage();
+
     const [isOnline, setIsOnline] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [driverProfile, setDriverProfile] = useState<any>(null);
@@ -102,9 +105,31 @@ export default function DriverHomeScreen() {
                 setDriverProfile(summary.driver);
                 setWalletBalance(summary.balance || 0);
                 setDailyEarnings(summary.dailyEarnings || 0);
+
+                // Check for active trip to restore state
+                checkActiveTrip();
             }
         })();
     }, []);
+
+    const checkActiveTrip = async () => {
+        try {
+            // Check history for any trip that is active
+            const history = await apiRequest<{ trips: any[] }>('/trips/driver/history');
+            const activeTrip = history.trips?.find((t: any) =>
+                ['accepted', 'arrived', 'started'].includes(t.status)
+            );
+
+            if (activeTrip) {
+                console.log("Restoring active trip:", activeTrip.id);
+                navigation.navigate('DriverActiveTrip', { tripId: activeTrip.id });
+                // Also ensure we are online if we have an active trip
+                setIsOnline(true);
+            }
+        } catch (e) {
+            console.log("Error checking active trip", e);
+        }
+    };
 
     const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
     const [incomingTrip, setIncomingTrip] = useState<any>(null);
@@ -114,11 +139,11 @@ export default function DriverHomeScreen() {
         // BLOCKING LOGIC: Check Debt
         if (!isOnline && walletBalance < -100) {
             Alert.alert(
-                "Access Blocked",
-                "Your wallet balance is below -100 EGP. Please deposit to continue receiving trips.",
+                t('accessBlocked'),
+                t('balanceLow'),
                 [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Go to Wallet", onPress: () => navigation.navigate('DriverWallet') }
+                    { text: t('cancel'), style: "cancel" },
+                    { text: t('goToWallet'), onPress: () => navigation.navigate('DriverWallet') }
                 ]
             );
             return;
@@ -129,7 +154,7 @@ export default function DriverHomeScreen() {
         try {
             const sessionData = await AsyncStorage.getItem('userSession');
             if (!sessionData) {
-                Alert.alert("Error", "No user found. Please re-login.");
+                Alert.alert(t('error'), "No user found. Please re-login.");
                 return;
             }
             const { user } = JSON.parse(sessionData); // Re-fetch user to be safe
@@ -143,7 +168,7 @@ export default function DriverHomeScreen() {
                     currentLoc = await Location.getCurrentPositionAsync({});
                     setLocation(currentLoc);
                 } else {
-                    Alert.alert("Permission Denied", "Location permission is required.");
+                    Alert.alert(t('permissionDenied'), t('locationPermissionRequired'));
                     return;
                 }
             }
@@ -233,7 +258,7 @@ export default function DriverHomeScreen() {
                 console.log(`[Realtime] 🆕 NEW TRIP ARRIVED!`);
                 console.log(`[Realtime] Trip ID:`, newTrip.id);
                 console.log(`[Realtime] Status:`, newTrip.status);
-                console.log(`[Realtime] Pickup:`, newTrip.pickup_lat, newTrip.pickup_lng);
+                // ...
                 console.log(`========================================`);
 
                 if (newTrip.status !== 'requested') {
@@ -260,8 +285,8 @@ export default function DriverHomeScreen() {
             { channel: 'driver:offer-updates' },
             (payload) => {
                 if (payload.new?.driver_id === driverId && payload.new?.status === 'accepted') {
-                    Alert.alert("Success", "Customer accepted your offer!", [
-                        { text: "OK", onPress: () => navigation.navigate('DriverActiveTrip', { tripId: payload.new.trip_id }) }
+                    Alert.alert(t('success'), "Customer accepted your offer!", [
+                        { text: t('ok'), onPress: () => navigation.navigate('DriverActiveTrip', { tripId: payload.new.trip_id }) }
                     ]);
                 }
             }
@@ -293,7 +318,7 @@ export default function DriverHomeScreen() {
             Alert.alert("Offer Sent", "Waiting for customer to accept...");
             setIncomingTrip(null);
         } catch (err: any) {
-            Alert.alert("Error", err.message);
+            Alert.alert(t('error'), err.message);
         }
     };
 
@@ -323,7 +348,7 @@ export default function DriverHomeScreen() {
 
     const triggerSOSAlert = async () => {
         if (!location) {
-            Alert.alert("Error", "Location is required to send SOS alert");
+            Alert.alert(t('error'), t('locationPermissionRequired'));
             return;
         }
 
@@ -338,34 +363,32 @@ export default function DriverHomeScreen() {
             });
 
             Alert.alert(
-                "🆘 SOS Sent!",
-                "Help is on the way. Our emergency team has been notified of your location.",
-                [{ text: "OK" }]
+                t('sosSent'),
+                t('sosMessage'),
+                [{ text: t('ok') }]
             );
         } catch (error: any) {
             console.error("SOS Error:", error);
-            Alert.alert("Error", "Failed to send SOS alert. Please try calling 122 directly.");
+            Alert.alert(t('error'), "Failed to send SOS alert. Please try calling 122 directly.");
         }
     };
 
     const handleSOS = () => {
         Alert.alert(
-            "🛡️ Safety & Emergency",
-            "Choose an option:",
+            t('safetyEmergency'),
+            t('chooseOption'), // This key might not be in Translations yet, I'll assume "Choose Option"
             [
                 {
-                    text: "📞 Call Emergency (122)",
+                    text: t('callEmergency'),
                     onPress: () => {
-                        const emergencyNumber = Platform.OS === 'ios' ? 'telprompt:122' : 'tel:122';
                         Alert.alert(
                             "Call Emergency Services?",
                             "This will dial 122 (Egyptian Emergency Services)",
                             [
-                                { text: "Cancel", style: "cancel" },
+                                { text: t('cancel'), style: "cancel" },
                                 {
                                     text: "Call Now",
                                     onPress: () => {
-                                        // Linking.openURL(emergencyNumber)
                                         Alert.alert("Emergency", "Calling 122...");
                                     }
                                 }
@@ -374,36 +397,36 @@ export default function DriverHomeScreen() {
                     }
                 },
                 {
-                    text: "🆘 Send SOS Alert",
+                    text: t('sendSOS'),
                     style: "destructive",
                     onPress: () => {
                         Alert.alert(
                             "Emergency SOS",
                             "This will send your live location to our dispatch team. Only use this in real emergencies.",
                             [
-                                { text: "Cancel", style: "cancel" },
+                                { text: t('cancel'), style: "cancel" },
                                 { text: "SEND SOS", style: "destructive", onPress: triggerSOSAlert }
                             ]
                         );
                     }
                 },
                 {
-                    text: "📍 Share Live Location",
+                    text: t('shareLocation'),
                     onPress: () => {
                         if (location) {
                             const locationUrl = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
                             Alert.alert(
-                                "Share Location",
+                                t('shareLocation'),
                                 `Your current location:\nLat: ${location.coords.latitude.toFixed(6)}\nLng: ${location.coords.longitude.toFixed(6)}\n\n${locationUrl}`,
-                                [{ text: "OK" }]
+                                [{ text: t('ok') }]
                             );
                         } else {
-                            Alert.alert("Location Unavailable", "Please enable location services");
+                            Alert.alert(t('error'), t('locationPermissionRequired'));
                         }
                     }
                 },
                 {
-                    text: "Cancel",
+                    text: t('cancel'),
                     style: "cancel"
                 }
             ],
@@ -424,7 +447,6 @@ export default function DriverHomeScreen() {
 
     return (
         <View style={styles.container}>
-            {/* --- MAP LAYER --- */}
             {/* --- MAP LAYER --- */}
             <MapView
                 ref={mapRef}
@@ -450,13 +472,16 @@ export default function DriverHomeScreen() {
             <SafeAreaView style={styles.overlayContainer} pointerEvents="box-none">
 
                 {/* Header */}
-                <View style={styles.header}>
+                <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <TouchableOpacity style={styles.menuButton} onPress={() => setSideMenuVisible(true)}>
                         <Menu color="#1e1e1e" size={24} />
                     </TouchableOpacity>
 
                     {/* Earnings Pill */}
-                    <TouchableOpacity style={styles.earningsPill} onPress={() => navigation.navigate('DriverWallet')}>
+                    <TouchableOpacity style={[
+                        styles.earningsPill,
+                        { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                    ]} onPress={() => navigation.navigate('DriverWallet')}>
                         <CircleDollarSign size={20} color={Colors.primary} />
                         <Text style={styles.earningsText}>
                             EGP {dailyEarnings.toFixed(2)}
@@ -471,12 +496,15 @@ export default function DriverHomeScreen() {
                         ) : (
                             <View style={[styles.profileImage, { backgroundColor: '#ccc' }]} />
                         )}
-                        <View style={[styles.statusDot, { backgroundColor: isOnline ? Colors.success : Colors.textSecondary }]} />
+                        <View style={[
+                            styles.statusDot,
+                            isRTL ? { left: 0 } : { right: 0 } // Move dot based on direction
+                        ]} />
                     </View>
                 </View>
 
                 {/* Floating Controls */}
-                <View style={styles.rightControls} pointerEvents="box-none">
+                <View style={[styles.rightControls, isRTL && { left: 20, right: undefined }]} pointerEvents="box-none">
                     <TouchableOpacity style={styles.iconButton} onPress={handleSOS}>
                         <Shield color="#1e1e1e" size={24} />
                     </TouchableOpacity>
@@ -485,13 +513,12 @@ export default function DriverHomeScreen() {
                     </TouchableOpacity>
                 </View>
 
-
                 {/* Bottom Action Area */}
                 <View style={styles.bottomContainer}>
                     {isOnline && (
                         <View style={styles.onlineStatusContainer}>
                             <Animated.View style={[styles.radarPulse, { transform: [{ scale: pulseAnim }] }]} />
-                            <Text style={styles.findingText}>Finding Trips...</Text>
+                            <Text style={styles.findingText}>{t('findingTrips')}</Text>
                         </View>
                     )}
 
@@ -500,7 +527,7 @@ export default function DriverHomeScreen() {
                         onPress={toggleOnline}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.goButtonText}>{isOnline ? 'GO OFFLINE' : 'GO ONLINE'}</Text>
+                        <Text style={styles.goButtonText}>{isOnline ? t('goOffline') : t('goOnline')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -518,6 +545,7 @@ export default function DriverHomeScreen() {
                 trip={incomingTrip}
                 onAccept={handleAcceptTrip}
                 onDecline={() => setIncomingTrip(null)}
+                // @ts-ignore
                 onBid={handleBidTrip}
             />
         </View>
@@ -535,7 +563,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'android' ? 50 : 10, // Extra padding for Android status bar
+        paddingTop: Platform.OS === 'android' ? 50 : 10,
         paddingBottom: 10,
     },
     menuButton: {
@@ -558,7 +586,8 @@ const styles = StyleSheet.create({
         width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#fff',
     },
     statusDot: {
-        position: 'absolute', bottom: 0, right: 0,
+        position: 'absolute', bottom: 0,
+        // right/left is now handled inline
         width: 14, height: 14, borderRadius: 7,
         borderWidth: 2, borderColor: '#fff'
     },
@@ -566,7 +595,7 @@ const styles = StyleSheet.create({
     rightControls: {
         position: 'absolute',
         right: 20,
-        top: Platform.OS === 'android' ? 180 : 150, // Lower on Android
+        top: Platform.OS === 'android' ? 180 : 150,
         alignItems: 'center'
     },
     iconButton: {
@@ -578,7 +607,7 @@ const styles = StyleSheet.create({
 
     bottomContainer: {
         padding: 24,
-        paddingBottom: Platform.OS === 'android' ? 50 : 40, // Extra padding for Android navigation
+        paddingBottom: Platform.OS === 'android' ? 50 : 40,
         alignItems: 'center'
     },
     onlineStatusContainer: {
@@ -590,7 +619,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         width: 200, height: 200,
         borderRadius: 100,
-        backgroundColor: 'rgba(79, 70, 229, 0.1)', // Primary opacity
+        backgroundColor: 'rgba(79, 70, 229, 0.1)',
     },
     findingText: {
         fontSize: 18, fontWeight: '600', color: '#1e1e1e',

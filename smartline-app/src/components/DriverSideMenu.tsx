@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -11,8 +10,9 @@ import { RootStackParamList } from '../types/navigation';
 import { Colors } from '../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest } from '../services/backend';
+import { useLanguage } from '../context/LanguageContext';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
 
 interface SideMenuProps {
@@ -24,9 +24,14 @@ interface SideMenuProps {
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function DriverSideMenu({ visible, onClose, initialProfile }: SideMenuProps) {
+    const { t, isRTL } = useLanguage();
     const [modalVisible, setModalVisible] = React.useState(false);
-    const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+
+    // Initial position logic
+    const hiddenValue = isRTL ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH;
+    const slideAnim = useRef(new Animated.Value(hiddenValue)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
+
     const navigation = useNavigation<NavigationProp>();
 
     // User Data State
@@ -35,7 +40,6 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
 
     useEffect(() => {
         if (initialProfile) {
-            console.log("Hydrating SideMenu. Photo URL:", initialProfile.profile_photo_url); // Debug log
             if (initialProfile.users?.full_name) setDriverName(initialProfile.users.full_name);
             if (initialProfile.profile_photo_url) {
                 setProfileUrl(initialProfile.profile_photo_url);
@@ -44,15 +48,16 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
     }, [initialProfile]);
 
     useEffect(() => {
+        // Reset animation value immediately when direction changes while hidden
+        if (!visible) {
+            slideAnim.setValue(isRTL ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH);
+        }
+    }, [isRTL, visible]);
+
+    useEffect(() => {
         if (visible) {
-            if (!initialProfile) {
+            if (!initialProfile || (!initialProfile.users?.full_name && !initialProfile.profile_photo_url)) {
                 fetchDriverData();
-            } else {
-                // Even if we have initial profile, maybe fetch fresh name just in case? 
-                // Nah, trust initial data for speed, fetch if missing.
-                if (!initialProfile.users?.full_name || !initialProfile.profile_photo_url) {
-                    fetchDriverData();
-                }
             }
 
             setModalVisible(true);
@@ -71,7 +76,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
         } else {
             Animated.parallel([
                 Animated.timing(slideAnim, {
-                    toValue: -SIDEBAR_WIDTH,
+                    toValue: isRTL ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH,
                     duration: 300,
                     useNativeDriver: true,
                 }),
@@ -84,7 +89,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
                 setModalVisible(false);
             });
         }
-    }, [visible]);
+    }, [visible, isRTL]);
 
     const fetchDriverData = async () => {
         try {
@@ -105,9 +110,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
     const handleNavigation = (screen: any) => {
         onClose();
         setTimeout(() => {
-            // Ensure these routes exist in your RootStackParamList
             navigation.navigate(screen);
-            console.log("Navigating to", screen);
         }, 300);
     };
 
@@ -120,18 +123,13 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
         });
     };
 
-    const handleSwitchRole = () => {
-        onClose();
-        // Logic to switch to passenger mode if applicable, or go to role selection
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'RoleSelection' }],
-        });
-    };
+    const flexDirection = isRTL ? 'row-reverse' : 'row';
+    const textAlign = isRTL ? 'right' : 'left';
+    const itemFlexDirection = isRTL ? 'row-reverse' : 'row';
 
     return (
         <Modal transparent visible={modalVisible} onRequestClose={onClose} animationType="none">
-            <View style={styles.overlay}>
+            <View style={[styles.overlay, { flexDirection }]}>
                 {/* Backdrop / Click outside to close */}
                 <TouchableWithoutFeedback onPress={onClose}>
                     <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} />
@@ -141,12 +139,25 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
                 <Animated.View style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}>
                     <View style={styles.safeArea}>
                         {/* Header */}
-                        <View style={styles.header}>
+                        <View style={[styles.header, { flexDirection }]}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.userName}>{driverName}</Text>
-                                <TouchableOpacity style={styles.editProfileRow} onPress={() => handleNavigation('Settings')}>
-                                    <Text style={styles.editProfileText}>View Profile</Text>
-                                    <ChevronRight size={14} color="#6B7280" />
+                                <Text style={[styles.userName, { textAlign }]}>{driverName}</Text>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.editProfileRow,
+                                        {
+                                            flexDirection: isRTL ? 'row' : 'row-reverse',
+                                            justifyContent: isRTL ? 'flex-end' : 'flex-start'
+                                        }
+                                    ]}
+                                    onPress={() => handleNavigation('Settings')}
+                                >
+                                    <View style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }}>
+                                        <ChevronRight size={14} color="#6B7280" />
+                                    </View>
+                                    <Text style={[styles.editProfileText, { marginRight: isRTL ? 0 : 4, marginLeft: isRTL ? 4 : 0 }]}>
+                                        {t('viewProfile')}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                             <View style={styles.avatarContainer}>
@@ -160,27 +171,25 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
 
                         {/* Top Menu Items */}
                         <View style={styles.menuSection}>
-                            <MenuItem icon={<Wallet size={22} color={Colors.primary} />} label="Wallet" onPress={() => handleNavigation('DriverWallet')} />
-                            <MenuItem icon={<History size={22} color="#F97316" />} label="Trip History" onPress={() => handleNavigation('DriverHistory')} />
-                            <MenuItem icon={<CircleDollarSign size={22} color="#10B981" />} label="Earnings" onPress={() => handleNavigation('DriverEarnings')} />
-                            <MenuItem icon={<Car size={22} color="#3B82F6" />} label="My Vehicle" onPress={() => handleNavigation('DriverMyVehicle')} />
+                            <MenuItem icon={<Wallet size={22} color={Colors.primary} />} label={t('wallet')} onPress={() => handleNavigation('DriverWallet')} isRTL={isRTL} />
+                            <MenuItem icon={<History size={22} color="#F97316" />} label={t('tripHistory')} onPress={() => handleNavigation('DriverHistory')} isRTL={isRTL} />
+                            <MenuItem icon={<CircleDollarSign size={22} color="#10B981" />} label={t('earnings')} onPress={() => handleNavigation('DriverEarnings')} isRTL={isRTL} />
+                            <MenuItem icon={<Car size={22} color="#3B82F6" />} label={t('myVehicle')} onPress={() => handleNavigation('DriverMyVehicle')} isRTL={isRTL} />
                         </View>
 
                         <View style={styles.divider} />
 
                         {/* Bottom Menu Items */}
                         <View style={styles.menuSection}>
-                            <MenuItem icon={<Headphones size={22} color="#3B82F6" />} label="Support" onPress={() => handleNavigation('DriverSupport')} />
-                            <MenuItem icon={<Settings size={22} color="#6B7280" />} label="Settings" onPress={() => handleNavigation('Settings')} />
-
-                            {/* Switch Role removed as requested */}
+                            <MenuItem icon={<Headphones size={22} color="#3B82F6" />} label={t('support')} onPress={() => handleNavigation('DriverSupport')} isRTL={isRTL} />
+                            <MenuItem icon={<Settings size={22} color="#6B7280" />} label={t('settings')} onPress={() => handleNavigation('Settings')} isRTL={isRTL} />
 
                             {/* Sign Out */}
-                            <TouchableOpacity style={[styles.menuItem, { marginTop: 12 }]} onPress={handleSignOut}>
+                            <TouchableOpacity style={[styles.menuItem, { marginTop: 12, flexDirection: itemFlexDirection }]} onPress={handleSignOut}>
                                 <View style={styles.iconBox}>
                                     <LogOut size={22} color={Colors.danger} />
                                 </View>
-                                <Text style={[styles.menuLabel, { color: Colors.danger }]}>Sign Out</Text>
+                                <Text style={[styles.menuLabel, { color: Colors.danger, textAlign }]}>{t('signOut')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -190,19 +199,18 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
     );
 }
 
-const MenuItem = ({ icon, label, onPress }: { icon: React.ReactNode, label: string, onPress: () => void }) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+const MenuItem = ({ icon, label, onPress, isRTL }: { icon: React.ReactNode, label: string, onPress: () => void, isRTL: boolean }) => (
+    <TouchableOpacity style={[styles.menuItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={onPress}>
         <View style={styles.iconBox}>
             {icon}
         </View>
-        <Text style={styles.menuLabel}>{label}</Text>
+        <Text style={[styles.menuLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
     </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        flexDirection: 'row',
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
@@ -225,10 +233,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
     },
     header: {
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 40,
+        gap: 15
     },
     userName: {
         fontSize: 22,
@@ -237,13 +245,12 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     editProfileRow: {
-        flexDirection: 'row',
         alignItems: 'center',
+        gap: 4
     },
     editProfileText: {
         fontSize: 14,
         color: '#6B7280',
-        marginRight: 2,
     },
     avatarContainer: {
         width: 60,
@@ -258,7 +265,6 @@ const styles = StyleSheet.create({
         gap: 24,
     },
     menuItem: {
-        flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
     },
@@ -270,6 +276,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#111827',
         fontWeight: '500',
+        flex: 1
     },
     divider: {
         height: 1,

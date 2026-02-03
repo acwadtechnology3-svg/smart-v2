@@ -4,9 +4,11 @@ import { Colors } from '../../constants/Colors';
 import { ArrowLeft, Phone, MessageCircle, Plus, MessageSquare } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { apiRequest } from '../../services/backend';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function DriverSupportScreen() {
     const navigation = useNavigation<any>();
+    const { t, isRTL } = useLanguage();
     const [tickets, setTickets] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [showNewTicketInput, setShowNewTicketInput] = useState(false);
@@ -34,7 +36,7 @@ export default function DriverSupportScreen() {
 
     const handleCreateTicket = async () => {
         if (!newSubject.trim()) {
-            Alert.alert('Error', 'Please enter a subject');
+            Alert.alert(t('error'), t('enterSubjectError'));
             return;
         }
 
@@ -49,22 +51,25 @@ export default function DriverSupportScreen() {
             fetchTickets();
             navigation.navigate('SupportChat', { ticketId: data.ticket.id, subject: data.ticket.subject });
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            Alert.alert(t('error'), e.message);
         }
     };
 
     const openWhatsApp = () => Linking.openURL('whatsapp://send?phone=+201000000000');
     const callSupport = () => Linking.openURL('tel:+201000000000');
 
+    const rowStyle = { flexDirection: isRTL ? 'row-reverse' : 'row' } as any;
+    const textAlign = { textAlign: isRTL ? 'right' : 'left' } as any;
+
     const renderTicket = ({ item }: { item: any }) => (
         <TouchableOpacity
-            style={styles.ticketCard}
+            style={[styles.ticketCard, rowStyle]}
             onPress={() => navigation.navigate('SupportChat', { ticketId: item.id, subject: item.subject })}
         >
-            <View style={styles.ticketIcon}>
+            <View style={[styles.ticketIcon, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
                 <MessageSquare size={24} color={Colors.primary} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
                 <Text style={styles.ticketSubject}>{item.subject}</Text>
                 <Text style={styles.ticketDate}>
                     {new Date(item.updated_at || item.created_at).toLocaleDateString()}
@@ -80,56 +85,56 @@ export default function DriverSupportScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <View style={[styles.header, rowStyle]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }]}>
                     <ArrowLeft size={24} color="#1e1e1e" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Support</Text>
+                <Text style={styles.headerTitle}>{t('support')}</Text>
                 <View style={{ width: 24 }} />
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
                 {/* Instant Actions */}
-                <Text style={styles.sectionHeader}>Contact Us</Text>
-                <View style={styles.actionGrid}>
+                <Text style={[styles.sectionHeader, textAlign]}>{t('contactUs')}</Text>
+                <View style={[styles.actionGrid, rowStyle]}>
                     <TouchableOpacity style={styles.actionCard} onPress={callSupport}>
                         <View style={[styles.iconBox, { backgroundColor: '#DBEAFE' }]}>
                             <Phone size={24} color="#2563EB" />
                         </View>
-                        <Text style={styles.actionLabel}>Call Us</Text>
+                        <Text style={styles.actionLabel}>{t('callUs')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.actionCard} onPress={openWhatsApp}>
                         <View style={[styles.iconBox, { backgroundColor: '#DCFCE7' }]}>
                             <MessageCircle size={24} color="#166534" />
                         </View>
-                        <Text style={styles.actionLabel}>WhatsApp</Text>
+                        <Text style={styles.actionLabel}>{t('whatsapp')}</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* My Tickets */}
-                <View style={styles.ticketsHeader}>
-                    <Text style={styles.sectionHeader}>My Requests</Text>
+                <View style={[styles.ticketsHeader, rowStyle]}>
+                    <Text style={styles.sectionHeader}>{t('myRequests')}</Text>
                     <TouchableOpacity
-                        style={styles.newButton}
+                        style={[styles.newButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                         onPress={() => setShowNewTicketInput(!showNewTicketInput)}
                     >
                         <Plus size={20} color="#fff" />
-                        <Text style={styles.newButtonText}>New Request</Text>
+                        <Text style={styles.newButtonText}>{t('newRequest')}</Text>
                     </TouchableOpacity>
                 </View>
 
                 {showNewTicketInput && (
                     <View style={styles.newTicketBox}>
-                        <Text style={styles.boxTitle}>What is your issue?</Text>
+                        <Text style={[styles.boxTitle, textAlign]}>{t('whatIsYourIssue')}</Text>
                         <TextInput
-                            style={styles.input}
-                            placeholder="e.g. Payment Issue, App Bug..."
+                            style={[styles.input, textAlign]}
+                            placeholder={t('enterSubject')}
                             value={newSubject}
                             onChangeText={setNewSubject}
                         />
                         <TouchableOpacity style={styles.createButton} onPress={handleCreateTicket}>
-                            <Text style={styles.createButtonText}>Start Chat</Text>
+                            <Text style={styles.createButtonText}>{t('startChat')}</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -138,7 +143,7 @@ export default function DriverSupportScreen() {
                     <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />
                 ) : tickets.length === 0 ? (
                     <View style={styles.emptyBox}>
-                        <Text style={styles.emptyText}>No support requests yet.</Text>
+                        <Text style={styles.emptyText}>{t('noTickets')}</Text>
                     </View>
                 ) : (
                     <View style={styles.ticketList}>
@@ -154,7 +159,7 @@ export default function DriverSupportScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff',
         borderBottomWidth: 1, borderBottomColor: '#E5E7EB'
     },
@@ -163,7 +168,7 @@ const styles = StyleSheet.create({
     content: { padding: 20 },
     sectionHeader: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 12 },
 
-    actionGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
+    actionGrid: { justifyContent: 'space-between', marginBottom: 32 },
     actionCard: {
         flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16, marginHorizontal: 4,
         alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2
@@ -171,16 +176,16 @@ const styles = StyleSheet.create({
     iconBox: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
     actionLabel: { fontWeight: '600', color: '#1f2937' },
 
-    ticketsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    newButton: { flexDirection: 'row', backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center', gap: 4 },
+    ticketsHeader: { justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    newButton: { backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center', gap: 4 },
     newButtonText: { color: '#fff', fontWeight: '600', fontSize: 12 },
 
     ticketList: { gap: 12 },
     ticketCard: {
-        flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12,
+        alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12,
         marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1
     },
-    ticketIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    ticketIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
     ticketSubject: { fontSize: 16, fontWeight: '600', color: '#1f2937', marginBottom: 4 },
     ticketDate: { fontSize: 12, color: '#6b7280' },
     statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },

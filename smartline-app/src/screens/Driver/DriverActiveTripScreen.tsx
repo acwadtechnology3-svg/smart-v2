@@ -3,20 +3,22 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, ActivityIn
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { Phone, MessageSquare, MapPin, Navigation, ArrowRight, CheckCircle2, XCircle } from 'lucide-react-native';
+import { Phone, MessageSquare, Navigation } from 'lucide-react-native';
 import MapView, { UrlTile, Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { apiRequest } from '../../services/backend';
 import { realtimeClient } from '../../services/realtimeClient';
 import { getDirections } from '../../services/mapService';
+import { useLanguage } from '../../context/LanguageContext';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
 
 export default function DriverActiveTripScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<RootStackParamList, 'DriverActiveTrip'>>();
     const { tripId } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [trip, setTrip] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -26,14 +28,11 @@ export default function DriverActiveTripScreen() {
 
     // 1. Fetch Trip Details & Subscriptions
     useEffect(() => {
-        // Initial Fetch
         fetchTrip();
         startLocationTracking();
 
-        // Handle App State Changes (Background -> Foreground)
         const appStateSub = AppState.addEventListener('change', (nextAppState) => {
             if (nextAppState === 'active') {
-                console.log("App foregrounded, checking trip status...");
                 handleCheckStatus();
             }
         });
@@ -45,17 +44,15 @@ export default function DriverActiveTripScreen() {
                 (payload) => {
                     const newTrip = payload.new;
                     if (newTrip) {
-                        console.log("Realtime update:", newTrip.status);
                         setTrip(newTrip);
                     }
                 }
             );
         })();
 
-        // Aggressive Polling (Every 1000ms)
         const interval = setInterval(() => {
             handleCheckStatus();
-        }, 1000);
+        }, 3000); // Polling every 3s is enough usually
 
         return () => {
             if (unsubscribe) unsubscribe();
@@ -64,20 +61,16 @@ export default function DriverActiveTripScreen() {
         };
     }, [tripId]);
 
-    // 2. Monitor Status Cancellation (Side Effect)
+    // 2. Monitor Status Cancellation
     useEffect(() => {
         if (trip?.status === 'cancelled') {
-            // AUTOMATIC NAVIGATION: Don't wait for user
             if (navigation.canGoBack()) {
                 navigation.popToTop();
             } else {
                 navigation.navigate('DriverHome' as any);
             }
-
-            // Show Alert informing them of the auto-action
-            // Adding a slight delay prevents it from being swallowed if the screen unmounts instantly effectively
             setTimeout(() => {
-                Alert.alert("Trip Cancelled", "The passenger has cancelled this trip. You have been returned to the home screen.");
+                Alert.alert(t('tripCancelled'), t('passengerCancelled'));
             }, 500);
         }
     }, [trip?.status]);
@@ -86,10 +79,8 @@ export default function DriverActiveTripScreen() {
         try {
             const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
             if (data.trip) {
-                // Only update if status changed to avoid re-renders
                 setTrip((prev: any) => {
                     if (prev && prev.status !== data.trip.status) {
-                        console.log("Polling updated status to:", data.trip.status);
                         return { ...prev, status: data.trip.status };
                     }
                     return prev;
@@ -106,8 +97,7 @@ export default function DriverActiveTripScreen() {
             setTrip(data.trip);
             setLoading(false);
         } catch (error: any) {
-            console.error("Fetch Trip Error", error);
-            Alert.alert("Error", "Could not load trip details.");
+            Alert.alert(t('error'), "Could not load trip details.");
             navigation.goBack();
         }
     };
@@ -120,17 +110,15 @@ export default function DriverActiveTripScreen() {
         setDriverLoc(loc.coords);
     };
 
-    // Calculate directions based on trip status
+    // Calculate directions
     useEffect(() => {
         if (!trip || !driverLoc) return;
 
         const getRoute = async () => {
             let destination: [number, number];
             if (trip.status === 'accepted' || trip.status === 'arrived') {
-                // Navigate to Pickup
                 destination = [trip.pickup_lng, trip.pickup_lat];
             } else {
-                // Navigate to Destination
                 destination = [trip.dest_lng, trip.dest_lat];
             }
 
@@ -141,8 +129,6 @@ export default function DriverActiveTripScreen() {
                     longitude: pt[0]
                 }));
                 setRouteCoords(points);
-
-                // Fit map
                 mapRef.current?.fitToCoordinates(points, {
                     edgePadding: { top: 50, right: 50, bottom: 350, left: 50 },
                     animated: true
@@ -153,24 +139,15 @@ export default function DriverActiveTripScreen() {
         getRoute();
     }, [trip?.status, driverLoc]);
 
-    // SAFE GUARDED Action Handler
     const handleUpdateStatus = async (newStatus: string) => {
         try {
-            // 1. Double-Check Server State
             const latestTrip = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
-
-            // 2. Reject if Cancelled
             if (latestTrip.trip?.status === 'cancelled') {
-                Alert.alert("Trip Cancelled", "This trip was cancelled by the passenger.");
-                if (navigation.canGoBack()) {
-                    navigation.popToTop();
-                } else {
-                    navigation.navigate('DriverHome' as any);
-                }
+                Alert.alert(t('tripCancelled'), t('passengerCancelled'));
+                navigation.navigate('DriverHome' as any);
                 return;
             }
 
-            // 3. Proceed if Active
             const response = await apiRequest<{ success: boolean; trip: any }>('/trips/update-status', {
                 method: 'POST',
                 body: JSON.stringify({ tripId, status: newStatus })
@@ -178,14 +155,13 @@ export default function DriverActiveTripScreen() {
 
             if (response.success) {
                 if (newStatus === 'completed') {
-                    Alert.alert("Success", "Trip completed!", [{ text: "OK", onPress: () => navigation.navigate('DriverHome') }]);
+                    Alert.alert(t('success'), t('tripFinished'), [{ text: t('ok'), onPress: () => navigation.navigate('DriverHome') }]);
                 } else {
                     setTrip(response.trip);
                 }
             }
         } catch (error: any) {
-            console.error("Status Update Error:", error);
-            Alert.alert("Error", "Failed to update status. Please check your connection.");
+            Alert.alert(t('error'), "Failed to update status.");
         }
     };
 
@@ -198,10 +174,21 @@ export default function DriverActiveTripScreen() {
     }
 
     const currentStatus = trip.status;
+    const rowStyle = { flexDirection: isRTL ? 'row-reverse' : 'row' } as any;
+    const textAlign = { textAlign: isRTL ? 'right' : 'left' } as any;
+
+    const getStatusText = () => {
+        switch (currentStatus) {
+            case 'accepted': return t('drivingToPickup');
+            case 'arrived': return t('atPickup');
+            case 'started': return t('onTrip');
+            case 'cancelled': return t('tripCancelled');
+            default: return t('tripFinished');
+        }
+    };
 
     return (
         <View style={styles.container}>
-            {/* Map Layer */}
             <MapView
                 ref={mapRef}
                 style={styles.map}
@@ -218,53 +205,39 @@ export default function DriverActiveTripScreen() {
                     flipY={false}
                     tileSize={256}
                 />
-
                 {driverLoc && (
-                    <Marker coordinate={driverLoc} title="You">
+                    <Marker coordinate={driverLoc} title={t('myVehicle')}>
                         <View style={styles.driverMarker}>
                             <Navigation size={20} color="#fff" fill="#fff" transform={[{ rotate: '45deg' }]} />
                         </View>
                     </Marker>
                 )}
-
-                <Marker coordinate={{ latitude: trip.pickup_lat, longitude: trip.pickup_lng }} title="Pickup">
+                <Marker coordinate={{ latitude: trip.pickup_lat, longitude: trip.pickup_lng }} title={t('pickup')}>
                     <View style={[styles.dotMarker, { backgroundColor: Colors.success }]} />
                 </Marker>
-
-                <Marker coordinate={{ latitude: trip.dest_lat, longitude: trip.dest_lng }} title="Destination">
+                <Marker coordinate={{ latitude: trip.dest_lat, longitude: trip.dest_lng }} title={t('dropoff')}>
                     <View style={[styles.dotMarker, { backgroundColor: Colors.danger }]} />
                 </Marker>
-
                 {routeCoords.length > 0 && (
                     <Polyline coordinates={routeCoords} strokeWidth={5} strokeColor={Colors.primary} />
                 )}
             </MapView>
 
-            {/* UI Overlay */}
             <View style={styles.topBanner}>
-                <Text style={styles.statusTitle}>
-                    {currentStatus === 'accepted' ? 'Driving to Pickup' :
-                        currentStatus === 'arrived' ? 'At Pickup Location' :
-                            currentStatus === 'started' ? 'On Trip' :
-                                currentStatus === 'cancelled' ? 'CANCELLED' : 'Trip Finished'}
-                </Text>
+                <Text style={styles.statusTitle}>{getStatusText()}</Text>
                 <Text style={styles.addressText} numberOfLines={1}>
                     {currentStatus === 'started' ? trip.dest_address : trip.pickup_address}
                 </Text>
-                {currentStatus === 'cancelled' && (
-                    <Text style={{ color: 'red', fontWeight: 'bold', marginTop: 4 }}>TRIP CANCELLED</Text>
-                )}
             </View>
 
-            {/* Bottom Sheet */}
             <View style={styles.bottomSheet}>
-                <View style={styles.passengerInfo}>
-                    <View style={styles.avatar}>
+                <View style={[styles.passengerInfo, rowStyle]}>
+                    <View style={[styles.avatar, isRTL ? { marginLeft: 16, marginRight: 0 } : { marginRight: 16, marginLeft: 0 }]}>
                         <Image source={{ uri: 'https://ui-avatars.com/api/?name=' + trip.customer?.full_name }} style={styles.avatarImg} />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
                         <Text style={styles.customerName}>{trip.customer?.full_name || 'Passenger'}</Text>
-                        <Text style={styles.customerSub}>Payment: {trip.payment_method?.toUpperCase()}</Text>
+                        <Text style={styles.customerSub}>{t('payment')}: {trip.payment_method?.toUpperCase()}</Text>
                     </View>
                     <View style={styles.actionIcons}>
                         <TouchableOpacity style={styles.iconCircle}>
@@ -276,34 +249,31 @@ export default function DriverActiveTripScreen() {
                     </View>
                 </View>
 
-                {/* Earnings */}
-                <View style={styles.earningsRow}>
-                    <Text style={styles.earningsLabel}>Trip Earnings</Text>
-                    <Text style={styles.earningsValue}>EGP {trip.price}</Text>
+                <View style={[styles.earningsRow, rowStyle]}>
+                    <Text style={styles.earningsLabel}>{t('tripEarnings') || t('estEarnings')}</Text>
+                    <Text style={styles.earningsValue}>{trip.price} EGP</Text>
                 </View>
 
-                {/* Main Action Button */}
                 {currentStatus === 'accepted' && (
                     <TouchableOpacity style={styles.mainBtn} onPress={() => handleUpdateStatus('arrived')}>
-                        <Text style={styles.mainBtnText}>ARRIVED AT PICKUP</Text>
+                        <Text style={styles.mainBtnText}>{t('arrivedAtPickup')}</Text>
                     </TouchableOpacity>
                 )}
 
                 {currentStatus === 'arrived' && (
                     <TouchableOpacity style={[styles.mainBtn, { backgroundColor: Colors.success }]} onPress={() => handleUpdateStatus('started')}>
-                        <Text style={styles.mainBtnText}>START TRIP</Text>
+                        <Text style={styles.mainBtnText}>{t('startTrip')}</Text>
                     </TouchableOpacity>
                 )}
 
                 {currentStatus === 'started' && (
                     <TouchableOpacity style={[styles.mainBtn, { backgroundColor: Colors.danger }]} onPress={() => handleUpdateStatus('completed')}>
-                        <Text style={styles.mainBtnText}>COMPLETE TRIP</Text>
+                        <Text style={styles.mainBtnText}>{t('completeTrip')}</Text>
                     </TouchableOpacity>
                 )}
 
-                {/* Fallback Refresh Button (Only if cancelled or stuck) */}
                 <TouchableOpacity style={{ alignSelf: 'center', marginTop: 10 }} onPress={handleCheckStatus}>
-                    <Text style={{ color: '#9CA3AF', fontSize: 12 }}>Refresh Status</Text>
+                    <Text style={{ color: '#9CA3AF', fontSize: 12 }}>{t('refreshStatus')}</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -319,15 +289,15 @@ const styles = StyleSheet.create({
     addressText: { fontSize: 16, fontWeight: 'bold', color: '#1e1e1e' },
 
     bottomSheet: { position: 'absolute', bottom: 0, width: width, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, shadowColor: '#000', shadowOpacity: 0.1, elevation: 20 },
-    passengerInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
-    avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#F3F4F6', marginRight: 16, overflow: 'hidden' },
+    passengerInfo: { alignItems: 'center', marginBottom: 24 },
+    avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#F3F4F6', overflow: 'hidden' },
     avatarImg: { width: '100%', height: '100%' },
     customerName: { fontSize: 18, fontWeight: 'bold', color: '#1e1e1e' },
     customerSub: { fontSize: 14, color: '#6B7280' },
     actionIcons: { flexDirection: 'row', gap: 12 },
     iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
 
-    earningsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 16, borderRadius: 12, marginBottom: 24 },
+    earningsRow: { justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 16, borderRadius: 12, marginBottom: 24 },
     earningsLabel: { fontSize: 16, color: '#4B5563' },
     earningsValue: { fontSize: 18, fontWeight: 'bold', color: '#3B82F6' },
 

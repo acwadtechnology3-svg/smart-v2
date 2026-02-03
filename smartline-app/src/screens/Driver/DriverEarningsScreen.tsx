@@ -3,14 +3,15 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } fr
 import { Colors } from '../../constants/Colors';
 import { ArrowLeft, Wallet, TrendingUp, Calendar } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-// import { LineChart } from 'react-native-chart-kit';
 import { Dimensions } from "react-native";
 import { apiRequest } from '../../services/backend';
+import { useLanguage } from '../../context/LanguageContext';
 
 const screenWidth = Dimensions.get("window").width;
 
 export default function DriverEarningsScreen() {
     const navigation = useNavigation<any>();
+    const { t, isRTL } = useLanguage();
     const [totalEarnings, setTotalEarnings] = useState(0);
     const [todayEarnings, setTodayEarnings] = useState(0);
     const [tripCount, setTripCount] = useState(0);
@@ -29,12 +30,6 @@ export default function DriverEarningsScreen() {
             setTotalEarnings(walletData.balance || 0);
             setTodayEarnings(walletData.today_earnings || 0);
 
-            // Count completed trips today? Or total trips?
-            // "Trips" label usually means total trips for the period (Today/Week) or lifetime.
-            // Let's show Today's trips count if "Today" is the context, or Total if general.
-            // The UI has "Today" box, "Trips" box, "Hours" box.
-            // Usually "Trips" next to "Today" implies "Today's Trips".
-
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
@@ -48,13 +43,15 @@ export default function DriverEarningsScreen() {
         }
     };
 
+    const rowStyle = { flexDirection: isRTL ? 'row-reverse' : 'row' } as any;
+
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <View style={[styles.header, rowStyle]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }]}>
                     <ArrowLeft size={24} color="#1e1e1e" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Earnings</Text>
+                <Text style={styles.headerTitle}>{t('earnings')}</Text>
                 <View style={{ width: 24 }} />
             </View>
 
@@ -62,34 +59,34 @@ export default function DriverEarningsScreen() {
 
                 {/* Total Balance Card */}
                 <View style={styles.balanceCard}>
-                    <Text style={styles.balanceLabel}>Total Balance</Text>
+                    <Text style={styles.balanceLabel}>{t('totalBalance')}</Text>
                     <Text style={styles.balanceValue}>EGP {totalEarnings.toFixed(2)}</Text>
                     <View style={styles.payoutRow}>
-                        <Text style={styles.payoutText}>Available for withdrawal</Text>
+                        <Text style={styles.payoutText}>{t('availableWithdrawal')}</Text>
                     </View>
                 </View>
 
                 {/* Quick Stats Grid */}
-                <View style={styles.statsGrid}>
+                <View style={[styles.statsGrid, rowStyle]}>
                     <View style={styles.statBox}>
                         <View style={[styles.iconBg, { backgroundColor: '#DBEAFE' }]}>
                             <TrendingUp size={20} color="#2563EB" />
                         </View>
-                        <Text style={styles.statLabel}>Today</Text>
+                        <Text style={styles.statLabel}>{t('today')}</Text>
                         <Text style={styles.statValue}>EGP {todayEarnings}</Text>
                     </View>
                     <View style={styles.statBox}>
                         <View style={[styles.iconBg, { backgroundColor: '#DCFCE7' }]}>
                             <Wallet size={20} color="#166534" />
                         </View>
-                        <Text style={styles.statLabel}>Trips</Text>
+                        <Text style={styles.statLabel}>{t('trips')}</Text>
                         <Text style={styles.statValue}>{tripCount}</Text>
                     </View>
                     <View style={styles.statBox}>
                         <View style={[styles.iconBg, { backgroundColor: '#FAE8FF' }]}>
                             <Calendar size={20} color="#9333EA" />
                         </View>
-                        <Text style={styles.statLabel}>Hours</Text>
+                        <Text style={styles.statLabel}>{t('hours')}</Text>
                         <Text style={styles.statValue}>5.5</Text>
                     </View>
                 </View>
@@ -102,7 +99,7 @@ export default function DriverEarningsScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff',
         borderBottomWidth: 1, borderBottomColor: '#E5E7EB'
     },
@@ -121,7 +118,7 @@ const styles = StyleSheet.create({
     payoutRow: { marginTop: 8, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
     payoutText: { color: '#fff', fontSize: 12 },
 
-    statsGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+    statsGrid: { justifyContent: 'space-between', marginBottom: 24 },
     statBox: {
         flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16, marginHorizontal: 4,
         alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2

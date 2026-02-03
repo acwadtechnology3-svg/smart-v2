@@ -1,16 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
 import { Colors } from '../../constants/Colors';
 import { ArrowLeft, Car, PenTool, AlertCircle } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { apiRequest } from '../../services/backend';
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function DriverMyVehicleScreen() {
     const navigation = useNavigation<any>();
+    const { t, isRTL } = useLanguage();
     const [vehicle, setVehicle] = useState<any>(null);
 
     useFocusEffect(
@@ -20,7 +19,6 @@ export default function DriverMyVehicleScreen() {
     );
 
     const loadData = async () => {
-        // Try to load header/cache first for instant result
         try {
             const cached = await AsyncStorage.getItem('driver_vehicle_cache');
             if (cached) {
@@ -29,8 +27,6 @@ export default function DriverMyVehicleScreen() {
         } catch (e) {
             // ignore cache error
         }
-
-        // Then fetch fresh data
         fetchVehicleData();
     };
 
@@ -43,7 +39,6 @@ export default function DriverMyVehicleScreen() {
             }
         } catch (e) {
             console.error(e);
-            // On error, if we have no vehicle, show fallback
             if (!vehicle) setFallbackData();
         }
     };
@@ -57,28 +52,31 @@ export default function DriverMyVehicleScreen() {
         });
     };
 
+    const rowStyle = { flexDirection: isRTL ? 'row-reverse' : 'row' } as any;
+    const textAlign = { textAlign: isRTL ? 'right' : 'left' } as any;
+
     if (!vehicle) return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <View style={[styles.header, rowStyle]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }]}>
                     <ArrowLeft size={24} color="#1e1e1e" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>My Vehicle</Text>
+                <Text style={styles.headerTitle}>{t('myVehicle')}</Text>
                 <View style={{ width: 24 }} />
             </View>
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text>Loading vehicle info...</Text>
+                <Text>{t('loadingVehicleInfo')}</Text>
             </View>
         </SafeAreaView>
     );
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <View style={[styles.header, rowStyle]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }]}>
                     <ArrowLeft size={24} color="#1e1e1e" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>My Vehicle</Text>
+                <Text style={styles.headerTitle}>{t('myVehicle')}</Text>
                 <TouchableOpacity onPress={() => navigation.navigate('DriverChangeVehicle')}>
                     <PenTool size={20} color={Colors.primary} />
                 </TouchableOpacity>
@@ -86,10 +84,10 @@ export default function DriverMyVehicleScreen() {
 
             {vehicle.pendingRequest && (
                 <View style={[styles.statusBanner, { backgroundColor: vehicle.pendingRequest.status === 'rejected' ? '#FEE2E2' : '#FEF3C7' }]}>
-                    <Text style={[styles.statusBannerText, { color: vehicle.pendingRequest.status === 'rejected' ? '#DC2626' : '#D97706' }]}>
+                    <Text style={[styles.statusBannerText, { color: vehicle.pendingRequest.status === 'rejected' ? '#DC2626' : '#D97706', textAlign: 'center' }]}>
                         {vehicle.pendingRequest.status === 'rejected'
-                            ? `Vehicle Change Rejected: ${vehicle.pendingRequest.admin_notes || 'Contact support'}`
-                            : 'Vehicle Change Request Pending Approval'}
+                            ? `${t('vehicleChangeRejected')}: ${vehicle.pendingRequest.admin_notes || ''}`
+                            : t('vehicleChangePending')}
                     </Text>
                 </View>
             )}
@@ -104,10 +102,10 @@ export default function DriverMyVehicleScreen() {
                         resizeMode="cover"
                     />
                     <View style={styles.vehicleInfo}>
-                        <Text style={styles.modelName}>{vehicle.vehicle_model}</Text>
-                        <Text style={styles.plateNumber}>{vehicle.vehicle_plate}</Text>
+                        <Text style={[styles.modelName, textAlign]}>{vehicle.vehicle_model}</Text>
+                        <Text style={[styles.plateNumber, textAlign]}>{vehicle.vehicle_plate}</Text>
 
-                        <View style={styles.typeBadge}>
+                        <View style={[styles.typeBadge, { alignSelf: isRTL ? 'flex-end' : 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                             <Car size={14} color="#4F46E5" />
                             <Text style={styles.typeText}>{vehicle.vehicle_type}</Text>
                         </View>
@@ -115,35 +113,38 @@ export default function DriverMyVehicleScreen() {
                 </View>
 
                 {/* Documents Status */}
-                <Text style={styles.sectionTitle}>Documents Status</Text>
+                <Text style={[styles.sectionTitle, textAlign]}>{t('documentsStatus')}</Text>
                 <View style={styles.docList}>
                     <DocumentRow
-                        label="Driver License"
-                        status={vehicle.license_front_url ? "Uploaded" : "Missing"}
-                        expires={vehicle.license_front_url ? "View Document" : "Upload Required"}
+                        label={t('driverLicense')}
+                        status={vehicle.license_front_url ? t('uploaded') : t('missing')}
+                        expires={vehicle.license_front_url ? t('viewDocument') : t('uploadRequired')}
                         isWarning={!vehicle.license_front_url}
+                        isRTL={isRTL}
                     />
                     <DocumentRow
-                        label="Vehicle License"
-                        status={vehicle.vehicle_license_front_url ? "Uploaded" : "Missing"}
-                        expires={vehicle.vehicle_license_front_url ? "View Document" : "Upload Required"}
+                        label={t('vehicleLicense')}
+                        status={vehicle.vehicle_license_front_url ? t('uploaded') : t('missing')}
+                        expires={vehicle.vehicle_license_front_url ? t('viewDocument') : t('uploadRequired')}
                         isWarning={!vehicle.vehicle_license_front_url}
+                        isRTL={isRTL}
                     />
                     <DocumentRow
-                        label="National ID"
-                        status={vehicle.id_front_url ? "Uploaded" : "Missing"}
-                        expires={vehicle.id_front_url ? "View Document" : "Upload Required"}
+                        label={t('nationalID')}
+                        status={vehicle.id_front_url ? t('uploaded') : t('missing')}
+                        expires={vehicle.id_front_url ? t('viewDocument') : t('uploadRequired')}
                         isWarning={!vehicle.id_front_url}
+                        isRTL={isRTL}
                     />
                 </View>
 
                 {/* Info Note */}
                 <TouchableOpacity
-                    style={styles.actionButton}
+                    style={[styles.actionButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     onPress={() => navigation.navigate('DriverChangeVehicle')}
                 >
-                    <PenTool size={20} color="#fff" style={{ marginRight: 10 }} />
-                    <Text style={styles.actionButtonText}>Request Vehicle Change</Text>
+                    <PenTool size={20} color="#fff" style={isRTL ? { marginLeft: 10 } : { marginRight: 10 }} />
+                    <Text style={styles.actionButtonText}>{t('requestVehicleChange')}</Text>
                 </TouchableOpacity>
 
             </ScrollView>
@@ -151,11 +152,11 @@ export default function DriverMyVehicleScreen() {
     );
 }
 
-const DocumentRow = ({ label, status, expires, isWarning }: any) => (
-    <View style={styles.docRow}>
-        <View>
+const DocumentRow = ({ label, status, expires, isWarning, isRTL }: any) => (
+    <View style={[styles.docRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
             <Text style={styles.docLabel}>{label}</Text>
-            <Text style={styles.docExpiry}>Expires: {expires}</Text>
+            <Text style={styles.docExpiry}>{expires}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: isWarning ? '#FEF3C7' : '#DCFCE7' }]}>
             <Text style={[styles.statusText, { color: isWarning ? '#D97706' : '#166534' }]}>{status}</Text>
@@ -166,7 +167,7 @@ const DocumentRow = ({ label, status, expires, isWarning }: any) => (
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff',
         borderBottomWidth: 1, borderBottomColor: '#E5E7EB'
     },
@@ -184,8 +185,8 @@ const styles = StyleSheet.create({
     modelName: { fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
     plateNumber: { fontSize: 16, color: Colors.textSecondary, fontFamily: 'monospace', letterSpacing: 1, marginBottom: 12 },
     typeBadge: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: '#EEF2FF', alignSelf: 'flex-start',
+        alignItems: 'center', gap: 6,
+        backgroundColor: '#EEF2FF',
         paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20
     },
     typeText: { color: '#4F46E5', fontWeight: '600', fontSize: 12 },
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
 
     docList: { backgroundColor: '#fff', borderRadius: 16, padding: 8, marginBottom: 24 },
     docRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        justifyContent: 'space-between', alignItems: 'center',
         paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6'
     },
     docLabel: { fontSize: 14, fontWeight: '600', color: '#111827' },
@@ -202,15 +203,10 @@ const styles = StyleSheet.create({
     statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
     statusText: { fontSize: 12, fontWeight: '600' },
 
-    noteBox: {
-        flexDirection: 'row', gap: 12, backgroundColor: '#FFFBEB',
-        padding: 16, borderRadius: 12, alignItems: 'flex-start'
-    },
-    noteText: { flex: 1, fontSize: 13, color: '#B45309', lineHeight: 20 },
     statusBanner: { padding: 12, alignItems: 'center', justifyContent: 'center' },
     statusBannerText: { fontSize: 14, fontWeight: 'bold' },
     actionButton: {
-        flexDirection: 'row', backgroundColor: Colors.primary, padding: 16, borderRadius: 12,
+        backgroundColor: Colors.primary, padding: 16, borderRadius: 12,
         alignItems: 'center', justifyContent: 'center', marginTop: 24, marginBottom: 40
     },
     actionButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }

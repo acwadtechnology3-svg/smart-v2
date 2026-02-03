@@ -9,6 +9,7 @@ import * as Location from 'expo-location';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import SideMenu from '../../components/SideMenu';
+import { apiRequest } from '../../services/backend';
 
 type CustomerHomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CustomerHome'>;
 
@@ -28,7 +29,7 @@ export default function CustomerHomeScreen() {
     const navigation = useNavigation<CustomerHomeScreenNavigationProp>();
     const [isSideMenuVisible, setSideMenuVisible] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
-    const [currentAddress, setCurrentAddress] = useState<{ title: string, subtitle: string } | null>(null); // 👽 02-02-2026: Added state for real address
+    const [currentAddress, setCurrentAddress] = useState<{ title: string, subtitle: string } | null>(null);
 
     useEffect(() => {
         (async () => {
@@ -39,6 +40,26 @@ export default function CustomerHomeScreen() {
 
             let location = await Location.getCurrentPositionAsync({});
             setLocation(location);
+
+            // Check for active trip
+            try {
+                const history = await apiRequest<{ trips: any[] }>('/trips/passenger/history');
+                if (history.trips && history.trips.length > 0) {
+                    const lastTrip = history.trips[0];
+                    if (['requested', 'accepted', 'arrived', 'started'].includes(lastTrip.status)) {
+                        console.log("Restoring passenger trip:", lastTrip.id, lastTrip.status);
+                        if (lastTrip.status === 'requested') {
+                            navigation.navigate('SearchingDriver', { tripId: lastTrip.id });
+                        } else if (lastTrip.status === 'accepted') {
+                            navigation.navigate('DriverFound', { tripId: lastTrip.id });
+                        } else if (lastTrip.status === 'arrived' || lastTrip.status === 'started') {
+                            navigation.navigate('OnTrip', { tripId: lastTrip.id });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log("Error checking passenger active trip", e);
+            }
 
             // 👽 02-02-2026: Added Reverse Geocoding to get real address
             try {

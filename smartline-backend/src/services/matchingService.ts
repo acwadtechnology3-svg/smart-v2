@@ -62,13 +62,33 @@ export class MatchingService {
     limit: number = 10
   ): Promise<ScoredDriver[]> {
     try {
-      // Step 1: Get nearby drivers from Redis (fast geospatial query)
-      const nearbyDrivers = await locationCache.getNearbyDrivers(
+      // Step 1: Try to get nearby drivers from Redis (fast geospatial query)
+      let nearbyDrivers = await locationCache.getNearbyDrivers(
         tripRequest.pickupLat,
         tripRequest.pickupLng,
         this.MAX_SEARCH_RADIUS_KM,
-        50 // Get more than needed for filtering
+        50
       );
+
+      // Step 1b: If Redis fails (empty result), fallback to database PostGIS query
+      if (nearbyDrivers.length === 0) {
+        console.log('[MatchingService] Redis cache empty, using database fallback');
+        const dbDrivers = await driverRepo.findNearbyOnlineDrivers(
+          tripRequest.pickupLat,
+          tripRequest.pickupLng,
+          this.MAX_SEARCH_RADIUS_KM,
+          tripRequest.vehicleType,
+          50
+        );
+        
+        // Convert to NearbyDriver format
+        nearbyDrivers = dbDrivers.map(d => ({
+          driverId: d.driver_id,
+          lat: d.current_lat,
+          lng: d.current_lng,
+          distance: d.distance_meters,
+        }));
+      }
 
       if (nearbyDrivers.length === 0) {
         return [];

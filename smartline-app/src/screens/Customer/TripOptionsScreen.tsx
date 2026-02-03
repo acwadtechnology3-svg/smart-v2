@@ -48,6 +48,8 @@ export default function TripOptionsScreen() {
     const [destCoords, setDestCoords] = useState<{ latitude: number, longitude: number } | null>(null);
     const [routeCoords, setRouteCoords] = useState<{ latitude: number, longitude: number }[]>([]);
     const [routeInfo, setRouteInfo] = useState<{ distance: number, duration: number } | null>(null);
+    const [routeLoading, setRouteLoading] = useState(false);
+    const [routeError, setRouteError] = useState<string | null>(null);
     const mapRef = useRef<MapView>(null);
 
     // Promo Logic
@@ -68,62 +70,80 @@ export default function TripOptionsScreen() {
 
     // 1. Resolve Coords & Fetch Route
     useEffect(() => {
-        const initRoute = async () => {
-            // 1. Get Pickup Coords
-            let pCoords = { latitude: 0, longitude: 0 };
-            if (pickup === 'Current Location' || !pickup) {
-                const { status } = await Location.requestForegroundPermissionsAsync();
-                if (status === 'granted') {
-                    const loc = await Location.getCurrentPositionAsync({});
+        const initRoute = async (retryCount = 0) => {
+            setRouteLoading(true);
+            setRouteError(null);
+            
+            try {
+                // 1. Get Pickup Coords
+                let pCoords = { latitude: 0, longitude: 0 };
+                if (pickup === 'Current Location' || !pickup) {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                        pCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+                    }
+                } else {
+                    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
                     pCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
                 }
-            } else {
-                // If pickup passed as address but no coords, we might need geocoding again?
-                // For now assume Current Location if not coords. 
-                // If coming from search, SearchLocation should pass coords. 
-                // We will assume "Current Location" if missing.
-                const loc = await Location.getCurrentPositionAsync({});
-                pCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-            }
-            setPickupCoords(pCoords);
+                setPickupCoords(pCoords);
 
-            // 2. Get Dest Coords
-            let dCoords = { latitude: 0, longitude: 0 };
-            if (destinationCoordinates) {
-                // destinationCoordinates in Navigation is [lng, lat] (Mapbox style)? Or [lat, lng]?
-                // Mapbox API returns [lng, lat]. My SearchLocation passed "center" which is [lng, lat].
-                dCoords = { latitude: destinationCoordinates[1], longitude: destinationCoordinates[0] };
-                setDestCoords(dCoords);
-            }
-
-            // 3. Fetch Directions
-            if (pCoords.latitude !== 0 && dCoords.latitude !== 0) {
-                const routeData = await getDirections(
-                    [pCoords.longitude, pCoords.latitude], // Mapbox expects [lng, lat]
-                    [dCoords.longitude, dCoords.latitude]
-                );
-
-                if (routeData) {
-                    // Decode or map geometry
-                    // Mapbox geometry is GeoJSON LineString coordinates [[lng, lat], ...]
-                    const points = routeData.geometry.coordinates.map((pt: number[]) => ({
-                        latitude: pt[1],
-                        longitude: pt[0]
-                    }));
-                    setRouteCoords(points);
-                    setRouteInfo({
-                        distance: routeData.distance / 1000, // meters to km
-                        duration: routeData.duration / 60 // seconds to min
-                    });
-
-                    // Fit Bounds
-                    setTimeout(() => {
-                        mapRef.current?.fitToCoordinates(points, {
-                            edgePadding: { top: 50, right: 50, bottom: height / 2, left: 50 },
-                            animated: true
-                        });
-                    }, 500);
+                // 2. Get Dest Coords
+                let dCoords = { latitude: 0, longitude: 0 };
+                if (destinationCoordinates) {
+                    dCoords = { latitude: destinationCoordinates[1], longitude: destinationCoordinates[0] };
+                    setDestCoords(dCoords);
                 }
+
+                // 3. Fetch Directions with timeout
+                if (pCoords.latitude !== 0 && dCoords.latitude !== 0) {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+                    
+                    try {
+                        const routeData = await getDirections(
+                            [pCoords.longitude, pCoords.latitude],
+                            [dCoords.longitude, dCoords.latitude]
+                        );
+                        clearTimeout(timeoutId);
+
+                        if (routeData) {
+                            const points = routeData.geometry.coordinates.map((pt: number[]) => ({
+                                latitude: pt[1],
+                                longitude: pt[0]
+                            }));
+                            setRouteCoords(points);
+                            setRouteInfo({
+                                distance: routeData.distance / 1000,
+                                duration: routeData.duration / 60
+                            });
+
+                            // Fit Bounds with delay for Android rendering
+                            setTimeout(() => {
+                                mapRef.current?.fitToCoordinates(points, {
+                                    edgePadding: { top: 50, right: 50, bottom: height / 2, left: 50 },
+                                    animated: true
+                                });
+                            }, 800);
+                        } else {
+                            throw new Error('No route data received');
+                        }
+                    } catch (dirError: any) {
+                        clearTimeout(timeoutId);
+                        if (retryCount < 2) {
+                            console.log(`[TripOptions] Retrying route fetch (${retryCount + 1}/2)...`);
+                            setTimeout(() => initRoute(retryCount + 1), 1000);
+                            return;
+                        }
+                        throw dirError;
+                    }
+                }
+            } catch (err: any) {
+                console.error('[TripOptions] Route error:', err);
+                setRouteError('Failed to calculate route. Please try again.');
+            } finally {
+                setRouteLoading(false);
             }
         };
 

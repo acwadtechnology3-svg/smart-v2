@@ -133,7 +133,6 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
             })
             .eq('id', tripId)
             .eq('status', 'requested') // Optimistic locking - only update if still requested
-            .eq('driver_id', null) // Extra safety - ensure no driver assigned
             .select()
             .single();
 

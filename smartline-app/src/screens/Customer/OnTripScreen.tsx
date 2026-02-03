@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, ActivityIndicator, Linking } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Phone, MessageSquare, ShieldCheck } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
@@ -96,6 +96,16 @@ export default function OnTripScreen() {
         );
     };
 
+    const handleCall = () => {
+        const phone = trip?.driver?.phone || trip?.driver?.user?.phone || trip?.driver?.mobile;
+        if (phone) {
+            Linking.openURL(`tel:${phone}`);
+        } else {
+            console.log("Trip Driver Data:", trip?.driver);
+            Alert.alert("Error", "No driver phone number available.");
+        }
+    };
+
     if (loading || !trip) {
         return (
             <View style={styles.loadingContainer}>
@@ -163,14 +173,18 @@ export default function OnTripScreen() {
                 </View>
 
                 <View style={styles.actionsGrid}>
-                    <TouchableOpacity style={styles.actionBtn}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={handleCall}>
                         <View style={styles.iconCircle}>
                             <Phone size={24} color={Colors.primary} />
                         </View>
                         <Text style={styles.actionLabel}>Call</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Chat', { driverName: 'Driver', tripId, role: 'customer' })}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Chat', {
+                        driverName: trip?.driver?.full_name || trip?.driver?.user?.full_name || 'Driver',
+                        tripId,
+                        role: 'customer'
+                    })}>
                         <View style={styles.iconCircle}>
                             <MessageSquare size={24} color={Colors.primary} />
                         </View>

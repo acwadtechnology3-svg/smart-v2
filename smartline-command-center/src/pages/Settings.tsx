@@ -22,6 +22,7 @@ interface PricingTier {
   base_fare: number;
   per_km_rate: number;
   per_min_rate: number;
+  waiting_price_per_min: number; // Analyzed: Added waiting fee
   minimum_trip_price: number;
   platform_fee_percent: number;
 }
@@ -65,6 +66,7 @@ export default function Settings() {
           base_fare: tier.base_fare,
           per_km_rate: tier.per_km_rate,
           per_min_rate: tier.per_min_rate,
+          waiting_price_per_min: tier.waiting_price_per_min,
           minimum_trip_price: tier.minimum_trip_price,
           platform_fee_percent: tier.platform_fee_percent
         })
@@ -135,6 +137,16 @@ export default function Settings() {
                       type="number"
                       value={tier.per_min_rate}
                       onChange={(e) => handlePriceChange(index, 'per_min_rate', e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500">Waiting Fee (/min)</Label>
+                    <Input
+                      type="number"
+                      value={tier.waiting_price_per_min}
+                      onChange={(e) => handlePriceChange(index, 'waiting_price_per_min', e.target.value)}
                       className="h-9"
                     />
                   </div>

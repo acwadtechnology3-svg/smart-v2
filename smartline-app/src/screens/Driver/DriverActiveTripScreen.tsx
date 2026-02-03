@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, ActivityIndicator, Image, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, ActivityIndicator, Image, AppState, Linking } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
@@ -24,6 +24,8 @@ export default function DriverActiveTripScreen() {
     const [loading, setLoading] = useState(true);
     const [driverLoc, setDriverLoc] = useState<any>(null);
     const [routeCoords, setRouteCoords] = useState<any[]>([]);
+    const [waitingTime, setWaitingTime] = useState<string>('5:00');
+    const [isPaidWaiting, setIsPaidWaiting] = useState(false);
     const mapRef = useRef<MapView>(null);
 
     // 1. Fetch Trip Details & Subscriptions
@@ -60,6 +62,40 @@ export default function DriverActiveTripScreen() {
             appStateSub.remove();
         };
     }, [tripId]);
+
+    // Timer Logic for Waiting Time
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (trip?.status === 'arrived' && trip.arrived_at) {
+            const arrivedAt = new Date(trip.arrived_at).getTime();
+
+            interval = setInterval(() => {
+                const now = new Date().getTime();
+                const diffMs = now - arrivedAt;
+
+                // 5 minutes free waiting
+                const freeTimeMs = 5 * 60 * 1000;
+
+                if (diffMs < freeTimeMs) {
+                    setIsPaidWaiting(false);
+                    const remainingMs = freeTimeMs - diffMs;
+                    const m = Math.floor(remainingMs / 60000);
+                    const s = Math.floor((remainingMs % 60000) / 1000);
+                    setWaitingTime(`${m}:${s < 10 ? '0' + s : s}`);
+                } else {
+                    setIsPaidWaiting(true);
+                    const paidMs = diffMs - freeTimeMs;
+                    const m = Math.floor(paidMs / 60000);
+                    const s = Math.floor((paidMs % 60000) / 1000);
+                    setWaitingTime(`${m}:${s < 10 ? '0' + s : s}`);
+                }
+            }, 1000);
+        } else {
+            setWaitingTime('5:00');
+            setIsPaidWaiting(false);
+        }
+        return () => clearInterval(interval);
+    }, [trip?.status, trip?.arrived_at]);
 
     // 2. Monitor Status Cancellation
     useEffect(() => {
@@ -134,6 +170,24 @@ export default function DriverActiveTripScreen() {
 
         getRoute();
     }, [trip?.status, driverLoc]);
+
+    const onCallPress = () => {
+        if (trip?.customer?.phone) {
+            Linking.openURL(`tel:${trip.customer.phone}`);
+        } else {
+            Alert.alert(t('error'), t('noPhone') || 'No phone number available');
+        }
+    };
+
+    const onChatPress = () => {
+        if (trip?.id) {
+            navigation.navigate('Chat', {
+                tripId: trip.id,
+                driverName: trip.customer?.full_name || 'Passenger',
+                role: 'driver'
+            });
+        }
+    };
 
     const handleUpdateStatus = async (newStatus: string) => {
         try {
@@ -236,10 +290,10 @@ export default function DriverActiveTripScreen() {
                         <Text style={styles.customerSub}>{t('payment')}: {trip.payment_method?.toUpperCase()}</Text>
                     </View>
                     <View style={styles.actionIcons}>
-                        <TouchableOpacity style={styles.iconCircle}>
+                        <TouchableOpacity style={styles.iconCircle} onPress={onCallPress}>
                             <Phone size={24} color={Colors.primary} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.iconCircle}>
+                        <TouchableOpacity style={styles.iconCircle} onPress={onChatPress}>
                             <MessageSquare size={24} color={Colors.primary} />
                         </TouchableOpacity>
                     </View>
@@ -257,9 +311,19 @@ export default function DriverActiveTripScreen() {
                 )}
 
                 {currentStatus === 'arrived' && (
-                    <TouchableOpacity style={[styles.mainBtn, { backgroundColor: Colors.success }]} onPress={() => handleUpdateStatus('started')}>
-                        <Text style={styles.mainBtnText}>{t('startTrip')}</Text>
-                    </TouchableOpacity>
+                    <View style={{ width: '100%' }}>
+                        <View style={styles.timerContainer}>
+                            <Text style={styles.timerLabel}>
+                                {isPaidWaiting ? (t('paidWaiting') || 'Paid Waiting Time') : (t('freeWaiting') || 'Free Waiting Time')}
+                            </Text>
+                            <Text style={[styles.timerValue, isPaidWaiting && { color: Colors.danger }]}>
+                                {waitingTime}
+                            </Text>
+                        </View>
+                        <TouchableOpacity style={[styles.mainBtn, { backgroundColor: Colors.success }]} onPress={() => handleUpdateStatus('started')}>
+                            <Text style={styles.mainBtnText}>{t('startTrip')}</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
 
                 {currentStatus === 'started' && (
@@ -302,4 +366,8 @@ const styles = StyleSheet.create({
 
     driverMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.2, elevation: 5 },
     dotMarker: { width: 20, height: 20, borderRadius: 10, borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.2, elevation: 5 },
+
+    timerContainer: { alignItems: 'center', marginBottom: 16, backgroundColor: '#F3F4F6', padding: 12, borderRadius: 12 },
+    timerLabel: { fontSize: 14, color: '#6B7280', marginBottom: 4 },
+    timerValue: { fontSize: 24, fontWeight: 'bold', color: '#10B981', fontFamily: 'monospace' },
 });

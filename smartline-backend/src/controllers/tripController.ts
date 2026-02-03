@@ -174,6 +174,12 @@ export const updateTripStatus = async (req: Request, res: Response) => {
         console.log('Trip ID:', tripId);
         console.log('New Status:', status);
 
+        const updates: any = { status };
+        const now = new Date().toISOString();
+
+        if (status === 'arrived') updates.arrived_at = now;
+        if (status === 'started') updates.started_at = now;
+
         const { data: tripData, error: fetchError } = await supabase
             .from('trips')
             .select('*')
@@ -202,18 +208,41 @@ export const updateTripStatus = async (req: Request, res: Response) => {
             // In createTrip we insert car_type.
 
             let commissionRate = 0.15; // default 15%
+            let waitingRate = 0;
 
             // Try fetch pricing
             if (tripData.car_type) {
                 console.log('Fetching pricing for car_type:', tripData.car_type);
-                const { data: pricing } = await supabase.from('pricing_settings').select('platform_fee_percent').eq('service_tier', tripData.car_type).single();
+                const { data: pricing } = await supabase.from('pricing_settings')
+                    .select('platform_fee_percent, waiting_price_per_min')
+                    .eq('service_tier', tripData.car_type)
+                    .single();
+
                 if (pricing) {
                     commissionRate = pricing.platform_fee_percent / 100;
-                    console.log('Found pricing:', pricing.platform_fee_percent, '% -> rate:', commissionRate);
+                    waitingRate = Number(pricing.waiting_price_per_min) || 0;
+                    console.log('Found pricing:', pricing.platform_fee_percent, '% -> rate:', commissionRate, 'Waiting Rate:', waitingRate);
                 }
             }
 
-            const finalPrice = tripData.final_price || tripData.price; // Fallback
+            // Calculate Waiting Fee
+            let waitingFee = 0;
+            if (tripData.arrived_at && tripData.started_at) {
+                const arrive = new Date(tripData.arrived_at);
+                const start = new Date(tripData.started_at);
+                const diffMins = (start.getTime() - arrive.getTime()) / 60000;
+
+                if (diffMins > 5) {
+                    waitingFee = (diffMins - 5) * waitingRate;
+                    console.log(`[Billing] Waiting time: ${diffMins.toFixed(1)}m. Billable: ${(diffMins - 5).toFixed(1)}m. Fee: ${waitingFee}`);
+                }
+            }
+
+            updates.waiting_cost = waitingFee;
+
+            const finalPrice = (tripData.final_price || tripData.price) + waitingFee;
+            updates.final_price = finalPrice;
+
             const platformFee = finalPrice * commissionRate;
             const driverEarnings = finalPrice - platformFee;
 
@@ -285,7 +314,7 @@ export const updateTripStatus = async (req: Request, res: Response) => {
 
         const { data, error } = await supabase
             .from('trips')
-            .update({ status })
+            .update(updates)
             .eq('id', tripId)
             .select()
             .single();

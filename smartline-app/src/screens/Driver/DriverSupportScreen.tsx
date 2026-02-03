@@ -120,7 +120,7 @@ export default function DriverSupportScreen() {
                         onPress={() => setShowNewTicketInput(!showNewTicketInput)}
                     >
                         <Plus size={20} color="#fff" />
-                        <Text style={styles.newButtonText}>{t('newRequest')}</Text>
+                        <Text style={styles.newButtonText}>{t('newSupportRequest')}</Text>
                     </TouchableOpacity>
                 </View>
 

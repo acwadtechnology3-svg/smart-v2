@@ -1,7 +1,48 @@
+import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { tripStatusData } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
 
 export function TripStatusChart() {
+  const [data, setData] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchTripStatusData();
+  }, []);
+
+  async function fetchTripStatusData() {
+    try {
+      const { data: trips } = await supabase
+        .from('trips')
+        .select('status');
+
+      if (trips) {
+        const statusCounts: Record<string, number> = {
+          completed: 0,
+          active: 0,
+          cancelled: 0,
+        };
+
+        trips.forEach(trip => {
+          const status = trip.status?.toLowerCase() || 'active';
+          if (status in statusCounts) {
+            statusCounts[status]++;
+          }
+        });
+
+        const total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+        const chartData = [
+          { name: 'Completed', value: total > 0 ? Math.round((statusCounts.completed / total) * 100) : 0, fill: '#22c55e' },
+          { name: 'Active', value: total > 0 ? Math.round((statusCounts.active / total) * 100) : 0, fill: '#3b82f6' },
+          { name: 'Cancelled', value: total > 0 ? Math.round((statusCounts.cancelled / total) * 100) : 0, fill: '#ef4444' },
+        ];
+
+        setData(chartData);
+      }
+    } catch (error) {
+      console.error('Error fetching trip status data:', error);
+    }
+  }
+
   return (
     <div className="stat-card">
       <div className="mb-4">
@@ -12,7 +53,7 @@ export function TripStatusChart() {
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={tripStatusData}
+              data={data}
               cx="50%"
               cy="50%"
               innerRadius={60}
@@ -20,7 +61,7 @@ export function TripStatusChart() {
               paddingAngle={5}
               dataKey="value"
             >
-              {tripStatusData.map((entry, index) => (
+              {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
             </Pie>

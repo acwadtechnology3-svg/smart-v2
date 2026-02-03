@@ -119,7 +119,7 @@ export const translations = {
         callUs: 'Call Us',
         whatsapp: 'WhatsApp',
         myRequests: 'My Requests',
-        newRequest: 'New Request',
+        newSupportRequest: 'New Request',
         startChat: 'Start Chat',
         whatIsYourIssue: 'What is your issue?',
         enterSubject: 'e.g. Payment Issue, App Bug...',
@@ -158,6 +158,8 @@ export const translations = {
         completeTrip: 'COMPLETE TRIP',
         refreshStatus: 'Refresh Status',
         payment: 'Payment',
+        freeWaiting: 'Free Waiting Time',
+        paidWaiting: 'Paid Waiting Time',
     },
     ar: {
         // Sidebar & Menu
@@ -260,7 +262,7 @@ export const translations = {
         callUs: 'اتصل بنا',
         whatsapp: 'واتساب',
         myRequests: 'طلباتي',
-        newRequest: 'طلب جديد',
+        newSupportRequest: 'طلب جديد',
         startChat: 'بدء المحادثة',
         whatIsYourIssue: 'ما هي مشكلتك؟',
         enterSubject: 'مثال: مشكلة في الدفع، خطأ في التطبيق...',
@@ -299,6 +301,8 @@ export const translations = {
         completeTrip: 'إنهاء الرحلة',
         refreshStatus: 'تحديث الحالة',
         payment: 'الدفع',
+        freeWaiting: 'وقت انتظار مجاني',
+        paidWaiting: 'وقت انتظار مدفوع',
     }
 };
 

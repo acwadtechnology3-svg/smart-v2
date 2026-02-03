@@ -117,17 +117,48 @@ export default function ChatScreen() {
         const textToSend = inputText.trim();
         setInputText('');
 
+        // Optimistic Update
+        const tempId = 'temp-' + new Date().getTime();
+        const effectiveSenderId = userId || (role === 'customer' ? participants?.customer_id : participants?.driver_id);
+
+        const tempMsg: Message = {
+            id: tempId,
+            text: textToSend,
+            senderId: effectiveSenderId || 'unknown',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setMessages(prev => [tempMsg, ...prev]);
+
         try {
-            await apiRequest('/messages', {
+            const response = await apiRequest<{ message: any }>('/messages', {
                 method: 'POST',
                 body: JSON.stringify({
                     tripId,
                     content: textToSend
                 })
             });
+
+            // Replace temp message with real one from server
+            if (response.message) {
+                const realMsg = response.message;
+                setMessages(prev => prev.map(m => {
+                    if (m.id === tempId) {
+                        return {
+                            id: realMsg.id,
+                            text: realMsg.content,
+                            senderId: realMsg.sender_id,
+                            time: new Date(realMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        };
+                    }
+                    return m;
+                }));
+            }
         } catch (err) {
             console.error('[Chat] Unexpected Error:', err);
             Alert.alert('Error', "Failed to send.");
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(m => m.id !== tempId));
             setInputText(textToSend);
         }
     };

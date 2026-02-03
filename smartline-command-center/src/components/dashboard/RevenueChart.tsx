@@ -1,7 +1,44 @@
+import { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { tripChartData } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
 
 export function RevenueChart() {
+  const [data, setData] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchRevenueData();
+  }, []);
+
+  async function fetchRevenueData() {
+    try {
+      const { data: trips } = await supabase
+        .from('trips')
+        .select('price, created_at')
+        .order('created_at', { ascending: true });
+
+      if (trips) {
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const chartData = days.map((day, idx) => ({
+          name: day,
+          revenue: 0,
+        }));
+
+        trips.forEach(trip => {
+          const date = new Date(trip.created_at);
+          const dayIndex = date.getDay();
+          const adjustedIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+          if (chartData[adjustedIndex]) {
+            chartData[adjustedIndex].revenue += trip.price || 0;
+          }
+        });
+
+        setData(chartData);
+      }
+    } catch (error) {
+      console.error('Error fetching revenue data:', error);
+    }
+  }
+
   return (
     <div className="stat-card">
       <div className="mb-4">
@@ -10,7 +47,7 @@ export function RevenueChart() {
       </div>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={tripChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />

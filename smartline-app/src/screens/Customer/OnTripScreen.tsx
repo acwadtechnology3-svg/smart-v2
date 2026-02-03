@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NativeStackNavigationProp } from '@react-navigation/native';
 import { Phone, MessageSquare, ShieldCheck } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { apiRequest } from '../../services/backend';
+import { tripStatusService } from '../../services/tripStatusService';
+import { realtimeClient } from '../../services/realtimeClient';
 
 const { width } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -41,6 +43,33 @@ export default function OnTripScreen() {
         };
 
         fetchTrip();
+    }, [tripId]);
+
+    // Start trip status monitoring for completion/cancellation
+    useEffect(() => {
+        console.log('[OnTrip] Starting trip status monitoring for trip:', tripId);
+        tripStatusService.startMonitoring(tripId);
+
+        // Also subscribe to real-time updates for trip status changes
+        let unsubscribe: (() => void) | null = null;
+        (async () => {
+            unsubscribe = await realtimeClient.subscribe(
+                { channel: 'trip:status', tripId },
+                (payload) => {
+                    const newStatus = payload?.new?.status;
+                    console.log('[OnTrip] Trip status update:', newStatus);
+                    if (newStatus) {
+                        setTrip((prev: any) => prev ? { ...prev, status: newStatus } : prev);
+                    }
+                }
+            );
+        })();
+
+        return () => {
+            console.log('[OnTrip] Cleaning up trip monitoring');
+            if (unsubscribe) unsubscribe();
+            // Don't stop tripStatusService here - it handles navigation on completion
+        };
     }, [tripId]);
 
     const handleCancel = async () => {

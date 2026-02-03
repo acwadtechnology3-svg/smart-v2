@@ -115,7 +115,15 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        // 1. Update the Trip
+        // CRITICAL: Check if trip is already accepted (prevent race condition)
+        if (trip.status !== 'requested') {
+            return res.status(409).json({ error: 'Trip already has a driver' });
+        }
+        if (trip.driver_id) {
+            return res.status(409).json({ error: 'Trip already assigned to another driver' });
+        }
+
+        // 1. Update the Trip with optimistic locking
         const { data: updatedTrip, error: tripError } = await supabase
             .from('trips')
             .update({
@@ -124,10 +132,20 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
                 status: 'accepted'
             })
             .eq('id', tripId)
+            .eq('status', 'requested') // Optimistic locking - only update if still requested
+            .eq('driver_id', null) // Extra safety - ensure no driver assigned
             .select()
             .single();
 
-        if (tripError) throw tripError;
+        if (tripError) {
+            console.error('Trip update error:', tripError);
+            throw new Error('Failed to accept offer');
+        }
+
+        if (!updatedTrip) {
+            // Another request already updated this trip
+            return res.status(409).json({ error: 'Trip already accepted by another driver' });
+        }
 
         // 2. Update the accepted offer
         await supabase

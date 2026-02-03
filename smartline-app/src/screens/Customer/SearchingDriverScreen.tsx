@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Alert, Image, ScrollView } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { X, MapPin, Navigation as NavigationIcon } from 'lucide-react-native';
@@ -178,9 +178,23 @@ export default function SearchingDriverScreen() {
 
             console.log('[SearchingDriver] Offer accepted successfully');
             // Navigation will happen automatically via the status listener
-        } catch (err) {
+        } catch (err: any) {
             console.error('[SearchingDriver] Error:', err);
-            Alert.alert('Error', 'Something went wrong');
+            // Check if trip was already accepted by another driver
+            if (err.status === 409 || err.message?.includes('already accepted')) {
+                Alert.alert(
+                    'Driver Already Selected',
+                    'This trip has already been accepted by another driver.',
+                    [
+                        {
+                            text: 'View Driver',
+                            onPress: () => navigation.replace('DriverFound', { tripId })
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert('Error', 'Failed to accept offer. Please try again.');
+            }
         }
     };
 
@@ -327,7 +341,7 @@ export default function SearchingDriverScreen() {
 
                 {/* Driver Offers */}
                 {offers.length > 0 && (
-                    <View style={styles.offersListContainer}>
+                    <ScrollView style={styles.offersListContainer} showsVerticalScrollIndicator={false}>
                         {offers.map((offer, index) => (
                             <View key={offer.id || index} style={styles.offerCard}>
                                 <View style={styles.offerHeader}>
@@ -378,7 +392,7 @@ export default function SearchingDriverScreen() {
                                 </View>
                             </View>
                         ))}
-                    </View>
+                    </ScrollView>
                 )}
 
                 <View style={styles.tripDetails}>
@@ -576,7 +590,7 @@ const styles = StyleSheet.create({
     // Driver Offer Styles
     offersListContainer: {
         width: '100%',
-        maxHeight: 200,
+        maxHeight: 280,
         marginBottom: 16,
     },
     offerCard: {

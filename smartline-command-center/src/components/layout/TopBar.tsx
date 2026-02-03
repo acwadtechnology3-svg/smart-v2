@@ -1,4 +1,4 @@
-import { Bell, Search, ChevronDown } from 'lucide-react';
+import { Bell, Search, ChevronDown, LogOut, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,12 +11,49 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface TopBarProps {
   title: string;
 }
 
+const getRoleColor = (role: string) => {
+  switch (role) {
+    case 'super_admin': return 'bg-red-500';
+    case 'admin': return 'bg-orange-500';
+    case 'manager': return 'bg-blue-500';
+    case 'viewer': return 'bg-gray-500';
+    default: return 'bg-gray-500';
+  }
+};
+
+const getRoleLabel = (role: string) => {
+  switch (role) {
+    case 'super_admin': return 'Super Admin';
+    case 'admin': return 'Admin';
+    case 'manager': return 'Manager';
+    case 'viewer': return 'Viewer';
+    default: return role;
+  }
+};
+
 export function TopBar({ title }: TopBarProps) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Logged out successfully');
+    navigate('/login');
+  };
+
+  const handleProfile = () => {
+    navigate('/settings');
+  };
+
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-card/80 backdrop-blur-sm">
       <div className="flex h-full items-center justify-between px-6">
@@ -70,12 +107,18 @@ export function TopBar({ title }: TopBarProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-2 px-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" />
-                  <AvatarFallback>AD</AvatarFallback>
+                  {user ? (
+                    <div className={cn('w-full h-full flex items-center justify-center text-white text-sm font-medium', getRoleColor(user.role))}>
+                      {user.full_name.charAt(0).toUpperCase()}
+                    </div>
+                  ) : (
+                    <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" />
+                  )}
+                  <AvatarFallback>{user ? user.full_name.slice(0, 2).toUpperCase() : 'AD'}</AvatarFallback>
                 </Avatar>
                 <div className="hidden md:flex flex-col items-start">
-                  <span className="text-sm font-medium">Admin User</span>
-                  <span className="text-xs text-muted-foreground">Operations</span>
+                  <span className="text-sm font-medium">{user?.full_name || 'Admin User'}</span>
+                  <span className="text-xs text-muted-foreground">{user ? getRoleLabel(user.role) : 'Operations'}</span>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -83,10 +126,16 @@ export function TopBar({ title }: TopBarProps) {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleProfile}>
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleProfile}>Settings</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">Logout</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

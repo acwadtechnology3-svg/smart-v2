@@ -5,25 +5,46 @@ import { ArrowLeft, Car, PenTool, AlertCircle } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiRequest } from '../../services/backend';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+
 export default function DriverMyVehicleScreen() {
     const navigation = useNavigation<any>();
     const [vehicle, setVehicle] = useState<any>(null);
 
-    useEffect(() => {
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [])
+    );
+
+    const loadData = async () => {
+        // Try to load header/cache first for instant result
+        try {
+            const cached = await AsyncStorage.getItem('driver_vehicle_cache');
+            if (cached) {
+                setVehicle(JSON.parse(cached));
+            }
+        } catch (e) {
+            // ignore cache error
+        }
+
+        // Then fetch fresh data
         fetchVehicleData();
-    }, []);
+    };
 
     const fetchVehicleData = async () => {
         try {
             const data = await apiRequest<{ driver: any }>('/drivers/me');
             if (data.driver) {
                 setVehicle(data.driver);
-            } else {
-                setFallbackData();
+                AsyncStorage.setItem('driver_vehicle_cache', JSON.stringify(data.driver));
             }
         } catch (e) {
             console.error(e);
-            setFallbackData();
+            // On error, if we have no vehicle, show fallback
+            if (!vehicle) setFallbackData();
         }
     };
 
@@ -58,10 +79,20 @@ export default function DriverMyVehicleScreen() {
                     <ArrowLeft size={24} color="#1e1e1e" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Vehicle</Text>
-                <TouchableOpacity onPress={() => Alert.alert("Edit", "Please contact support to update vehicle details.")}>
+                <TouchableOpacity onPress={() => navigation.navigate('DriverChangeVehicle')}>
                     <PenTool size={20} color={Colors.primary} />
                 </TouchableOpacity>
             </View>
+
+            {vehicle.pendingRequest && (
+                <View style={[styles.statusBanner, { backgroundColor: vehicle.pendingRequest.status === 'rejected' ? '#FEE2E2' : '#FEF3C7' }]}>
+                    <Text style={[styles.statusBannerText, { color: vehicle.pendingRequest.status === 'rejected' ? '#DC2626' : '#D97706' }]}>
+                        {vehicle.pendingRequest.status === 'rejected'
+                            ? `Vehicle Change Rejected: ${vehicle.pendingRequest.admin_notes || 'Contact support'}`
+                            : 'Vehicle Change Request Pending Approval'}
+                    </Text>
+                </View>
+            )}
 
             <ScrollView contentContainerStyle={styles.content}>
 
@@ -86,18 +117,34 @@ export default function DriverMyVehicleScreen() {
                 {/* Documents Status */}
                 <Text style={styles.sectionTitle}>Documents Status</Text>
                 <View style={styles.docList}>
-                    <DocumentRow label="Vehicle Registration" status="Active" expires="12 Dec 2026" />
-                    <DocumentRow label="Insurance Policy" status="Active" expires="15 Jan 2027" />
-                    <DocumentRow label="Periodic Inspection" status="Pending" expires="01 Mar 2026" isWarning />
+                    <DocumentRow
+                        label="Driver License"
+                        status={vehicle.license_front_url ? "Uploaded" : "Missing"}
+                        expires={vehicle.license_front_url ? "View Document" : "Upload Required"}
+                        isWarning={!vehicle.license_front_url}
+                    />
+                    <DocumentRow
+                        label="Vehicle License"
+                        status={vehicle.vehicle_license_front_url ? "Uploaded" : "Missing"}
+                        expires={vehicle.vehicle_license_front_url ? "View Document" : "Upload Required"}
+                        isWarning={!vehicle.vehicle_license_front_url}
+                    />
+                    <DocumentRow
+                        label="National ID"
+                        status={vehicle.id_front_url ? "Uploaded" : "Missing"}
+                        expires={vehicle.id_front_url ? "View Document" : "Upload Required"}
+                        isWarning={!vehicle.id_front_url}
+                    />
                 </View>
 
                 {/* Info Note */}
-                <View style={styles.noteBox}>
-                    <AlertCircle size={20} color="#F59E0B" />
-                    <Text style={styles.noteText}>
-                        To change your vehicle or update documents, please visit a SmartLine inspection center.
-                    </Text>
-                </View>
+                <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('DriverChangeVehicle')}
+                >
+                    <PenTool size={20} color="#fff" style={{ marginRight: 10 }} />
+                    <Text style={styles.actionButtonText}>Request Vehicle Change</Text>
+                </TouchableOpacity>
 
             </ScrollView>
         </SafeAreaView>
@@ -159,5 +206,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row', gap: 12, backgroundColor: '#FFFBEB',
         padding: 16, borderRadius: 12, alignItems: 'flex-start'
     },
-    noteText: { flex: 1, fontSize: 13, color: '#B45309', lineHeight: 20 }
+    noteText: { flex: 1, fontSize: 13, color: '#B45309', lineHeight: 20 },
+    statusBanner: { padding: 12, alignItems: 'center', justifyContent: 'center' },
+    statusBannerText: { fontSize: 14, fontWeight: 'bold' },
+    actionButton: {
+        flexDirection: 'row', backgroundColor: Colors.primary, padding: 16, borderRadius: 12,
+        alignItems: 'center', justifyContent: 'center', marginTop: 24, marginBottom: 40
+    },
+    actionButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });

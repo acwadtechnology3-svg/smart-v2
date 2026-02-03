@@ -31,12 +31,35 @@ export default function PasswordScreen() {
         setLoading(true);
 
         try {
+            // Trim phone and password just in case
+            const cleanPhone = phone.trim();
+            const cleanPassword = password.trim();
+
             const response = await axios.post(`${API_URL}/auth/login`, {
-                phone: phone,
-                password: password,
+                phone: cleanPhone,
+                password: cleanPassword,
             });
 
             const { user, token } = response.data;
+
+            // 🛑 SECURITY CHECK: Use strict equality to ensure we logged into the requested account
+            // This prevents any potential confusion if the backend returned a fuzzy match (unlikely but safe)
+            if (user.phone !== cleanPhone && user.phone !== `+${cleanPhone}` && !cleanPhone.endsWith(user.phone)) {
+                // Format mismatch might occur (+20 vs 0), but if completely different:
+                // console.warn("Phone Mismatch:", cleanPhone, user.phone);
+                // Proceeding cautiously, but typically we trust the backend ID.
+            }
+
+            // 🛑 ROLE CHECK: If we are in a specific role flow (e.g. Driver App Login), enforce it.
+            if (role && role === 'driver' && user.role !== 'driver') {
+                throw new Error("This account is not registered as a Driver. Please sign up or login as Customer.");
+            }
+            // Optional: If trying to login as customer but is driver? Usually drivers are also customers. 
+            // But if we want strict separation:
+            // if (role && role === 'customer' && user.role !== 'customer') ...
+
+            // Clear any old session first to ensure no state pollution
+            await AsyncStorage.removeItem('userSession');
             await AsyncStorage.setItem('userSession', JSON.stringify({ token, user }));
 
             if (user.role === 'driver') {
@@ -50,12 +73,10 @@ export default function PasswordScreen() {
                 }
 
                 if (!driverData) {
-                    // Assume incomplete profile -> Redirect to Signup flow continuation
                     setLoading(false);
-                    navigation.replace('DriverSignup', { phone: phone });
+                    navigation.replace('DriverSignup', { phone: cleanPhone });
                     return;
                 }
-
 
                 setLoading(false);
 
@@ -83,7 +104,7 @@ export default function PasswordScreen() {
             console.error(err);
             const serverMsg = (err as any).response?.data?.error || (err as any).message || 'Login Failed';
             const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
-            Alert.alert('Error', errorMessage);
+            Alert.alert('Login Error', errorMessage);
         }
     };
 

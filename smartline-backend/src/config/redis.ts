@@ -7,26 +7,25 @@ const redisConfig = {
   host: config.REDIS_HOST,
   port: config.REDIS_PORT,
   password: config.REDIS_PASSWORD || undefined,
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: null, // Disable retries to prevent spam
+  lazyConnect: true, // Don't connect until first command
   retryStrategy(times: number) {
-    const delay = Math.min(times * 50, 2000);
-    console.log(`Redis reconnecting in ${delay}ms (attempt ${times})`);
-    return delay;
-  },
-  reconnectOnError(err: Error) {
-    const targetError = 'READONLY';
-    if (err.message.includes(targetError)) {
-      // Reconnect on READONLY errors
-      return true;
+    // Stop retrying after 3 attempts
+    if (times > 3) {
+      console.warn('⚠️  Redis unavailable - Running without Redis');
+      return null; // Stop retrying
     }
-    return false;
+    return Math.min(times * 1000, 3000);
+  },
+  reconnectOnError() {
+    return false; // Don't auto-reconnect on errors
   },
 };
 
 // Create Redis client instance
 export const redis = config.REDIS_URL ? new Redis(config.REDIS_URL) : new Redis(redisConfig);
 
-// Redis event handlers
+// Redis event handlers (disabled to reduce console noise when Redis is unavailable)
 redis.on('connect', () => {
   console.log('✅ Redis connected successfully');
 });
@@ -36,16 +35,15 @@ redis.on('ready', () => {
 });
 
 redis.on('error', (err) => {
-  console.error('❌ Redis connection error:', err.message);
+  // Only log once, not on every retry
+  if (!redis.status || redis.status === 'end') {
+    console.warn('⚠️  Redis unavailable - Running without Redis (location features disabled)');
+  }
 });
 
-redis.on('close', () => {
-  console.warn('⚠️  Redis connection closed');
-});
-
-redis.on('reconnecting', () => {
-  console.log('🔄 Redis reconnecting...');
-});
+// Disable noisy reconnection logs
+// redis.on('close', () => { ... });
+// redis.on('reconnecting', () => { ... });
 
 // Health check function
 export async function checkRedisConnection(): Promise<boolean> {

@@ -209,16 +209,26 @@ export default function SearchingDriverScreen() {
                     text: 'Yes, Cancel',
                     style: 'destructive',
                     onPress: async () => {
-                        await apiRequest(`/trips/${tripId}/cancel`, { method: 'POST' });
+                        try {
+                            console.log('[SearchingDriver] Cancelling trip:', tripId);
+                            await apiRequest(`/trips/${tripId}/cancel`, { method: 'POST' });
 
-                        const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
-                        if (data.trip) {
-                            navigation.navigate('TripOptions', {
-                                pickup: data.trip.pickup_address,
-                                destination: data.trip.dest_address,
-                                destinationCoordinates: [data.trip.dest_lng, data.trip.dest_lat]
-                            });
-                        } else {
+                            // Optional: Fetch updated data or just navigate back
+                            const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+
+                            if (data.trip) {
+                                // Navigate back to options with pre-filled addresses
+                                navigation.replace('TripOptions', {
+                                    pickup: data.trip.pickup_address,
+                                    destination: data.trip.dest_address,
+                                    destinationCoordinates: [data.trip.dest_lng, data.trip.dest_lat]
+                                });
+                            } else {
+                                navigation.goBack();
+                            }
+                        } catch (err) {
+                            console.error('[SearchingDriver] Cancel Error:', err);
+                            // Even if error, likely want to leave this screen if user intends to cancel
                             navigation.goBack();
                         }
                     },
@@ -437,6 +447,7 @@ const styles = StyleSheet.create({
     },
     closeButton: {
         position: 'absolute',
+        zIndex: 50,
         top: 50,
         left: 20,
         width: 44,

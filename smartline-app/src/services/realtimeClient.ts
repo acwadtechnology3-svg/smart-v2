@@ -9,7 +9,8 @@ type SubscribeParams =
   | { channel: 'driver:location'; tripId: string; driverId: string }
   | { channel: 'trip:offers'; tripId: string }
   | { channel: 'trip:status'; tripId: string }
-  | { channel: 'trip:messages'; tripId: string };
+  | { channel: 'trip:messages'; tripId: string }
+  | { channel: 'support:messages'; ticketId: string };
 
 type PendingSub = {
   handler: SubscriptionHandler;

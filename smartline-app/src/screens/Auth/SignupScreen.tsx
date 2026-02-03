@@ -56,10 +56,42 @@ export default function SignupScreen() {
 
         } catch (err: any) {
             console.error('Signup logic error:', err);
+            console.error('Error response:', err.response?.data);
             setLoading(false);
-            const serverMsg = err.response?.data?.error || err.message || 'Signup Failed. Please try again.';
-            const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
-            Alert.alert('Error', errorMessage);
+
+            // Get detailed error message
+            const errorData = err.response?.data;
+            let errorMessage = 'Signup Failed. Please try again.';
+
+            if (errorData) {
+                // Handle validation errors (from middleware)
+                if (errorData.error && typeof errorData.error === 'object') {
+                    if (errorData.error.details && Array.isArray(errorData.error.details)) {
+                        // Validation errors
+                        const validationErrors = errorData.error.details
+                            .map((e: any) => `${e.field}: ${e.message}`)
+                            .join('\n');
+                        errorMessage = `Validation Error:\n${validationErrors}`;
+                    } else {
+                        errorMessage = errorData.error.message || 'Validation failed';
+                    }
+                }
+                // Handle simple error string
+                else if (typeof errorData.error === 'string') {
+                    errorMessage = errorData.error;
+                    if (errorData.details) {
+                        errorMessage += `\n\nDetails: ${errorData.details}`;
+                    }
+                }
+                // Handle plain string response
+                else if (typeof errorData === 'string') {
+                    errorMessage = errorData;
+                }
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+
+            Alert.alert('Signup Error', errorMessage);
         }
     };
 

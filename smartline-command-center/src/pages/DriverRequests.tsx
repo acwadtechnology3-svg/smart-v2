@@ -37,6 +37,8 @@ interface Driver {
     id_back_url: string;
     license_front_url: string;
     license_back_url: string;
+    vehicle_license_front_url?: string;
+    vehicle_license_back_url?: string;
     vehicle_front_url: string;
     vehicle_back_url: string;
     vehicle_right_url: string;
@@ -62,13 +64,13 @@ const DriverRequests = () => {
     const fetchPendingDrivers = async () => {
         setLoading(true);
         try {
-            // NOTE: Ensure 'drivers' table has a foreign key to 'users' table for this join to work automatically.
-            // If not, we might need to fetch users manually. unique column 'id' references 'users.id'.
+            // Fetch drivers with user information
+            // drivers.id = users.id (same UUID for both tables)
             const { data, error } = await supabase
                 .from('drivers')
                 .select(`
           *,
-          users!drivers_id_fkey (
+          users!inner (
             full_name,
             phone
           )
@@ -76,7 +78,11 @@ const DriverRequests = () => {
                 .eq('status', 'pending')
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase error:', error);
+                throw error;
+            }
+
             console.log("Fetched Drivers:", data); // Debugging
             setDrivers(data as any || []);
         } catch (error) {
@@ -297,6 +303,8 @@ const DriverRequests = () => {
                                                             {renderImage(driver.id_back_url, "ID Back")}
                                                             {renderImage(driver.license_front_url, "License Front")}
                                                             {renderImage(driver.license_back_url, "License Back")}
+                                                            {driver.vehicle_license_front_url && renderImage(driver.vehicle_license_front_url, "Vehicle License Front")}
+                                                            {driver.vehicle_license_back_url && renderImage(driver.vehicle_license_back_url, "Vehicle License Back")}
                                                             {renderImage(driver.vehicle_front_url, "Vehicle Front")}
                                                             {renderImage(driver.vehicle_back_url, "Vehicle Back")}
                                                             {renderImage(driver.vehicle_right_url, "Vehicle Right")}

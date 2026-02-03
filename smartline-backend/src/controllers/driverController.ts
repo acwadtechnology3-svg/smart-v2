@@ -60,7 +60,17 @@ export const getDriverMe = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Driver profile not found' });
     }
 
-    res.json({ driver: data });
+    // Check for pending or rejected vehicle change requests
+    const { data: request } = await supabase
+      .from('vehicle_change_requests')
+      .select('*')
+      .eq('driver_id', driverId)
+      .neq('status', 'approved') // Only interested in pending or rejected to show status
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    res.json({ driver: { ...data, pendingRequest: request } });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -99,6 +109,8 @@ export const registerDriver = async (req: Request, res: Response) => {
       id_back_url,
       license_front_url,
       license_back_url,
+      vehicle_license_front_url,
+      vehicle_license_back_url,
       vehicle_front_url,
       vehicle_back_url,
       vehicle_right_url,
@@ -121,6 +133,8 @@ export const registerDriver = async (req: Request, res: Response) => {
           id_back_url,
           license_front_url,
           license_back_url,
+          vehicle_license_front_url,
+          vehicle_license_back_url,
           vehicle_front_url,
           vehicle_back_url,
           vehicle_right_url,
@@ -132,6 +146,62 @@ export const registerDriver = async (req: Request, res: Response) => {
     if (error) throw error;
 
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+
+
+};
+
+export const requestVehicleChange = async (req: Request, res: Response) => {
+  try {
+    const driverId = req.user!.id;
+    const {
+      new_vehicle_type,
+      new_vehicle_model,
+      new_vehicle_plate,
+      new_vehicle_front_url,
+      new_vehicle_back_url,
+      new_vehicle_left_url,
+      new_vehicle_right_url,
+      new_vehicle_license_front_url,
+      new_vehicle_license_back_url,
+    } = req.body;
+
+    // Basic Validation
+    if (!new_vehicle_type || !new_vehicle_model || !new_vehicle_plate) {
+      return res.status(400).json({ error: 'Missing required vehicle information' });
+    }
+
+    // Get current vehicle info to store in history
+    const { data: currentDriver } = await supabase
+      .from('drivers')
+      .select('vehicle_type, vehicle_model, vehicle_plate')
+      .eq('id', driverId)
+      .single();
+
+    const { data, error } = await supabase
+      .from('vehicle_change_requests')
+      .insert({
+        driver_id: driverId,
+        current_vehicle_type: currentDriver?.vehicle_type,
+        current_vehicle_model: currentDriver?.vehicle_model,
+        current_vehicle_plate: currentDriver?.vehicle_plate,
+        new_vehicle_type,
+        new_vehicle_model,
+        new_vehicle_plate,
+        new_vehicle_front_url,
+        new_vehicle_back_url,
+        new_vehicle_left_url,
+        new_vehicle_right_url,
+        new_vehicle_license_front_url,
+        new_vehicle_license_back_url,
+        status: 'pending'
+      });
+
+    if (error) throw error;
+
+    res.json({ success: true, message: 'Request submitted successfully' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

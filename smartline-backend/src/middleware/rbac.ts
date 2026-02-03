@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-type Role = 'customer' | 'driver' | 'admin';
+type Role = 'customer' | 'driver' | 'admin' | 'super_admin' | 'manager' | 'viewer';
 
 /**
  * Middleware to require specific role(s) for access
@@ -71,8 +71,8 @@ export function requireOwnership(userIdParam: string = 'userId') {
 
     const resourceUserId = req.params[userIdParam] || req.body[userIdParam];
 
-    // Admins can access any resource
-    if (req.user.role === 'admin') {
+    // Admins and super admins can access any resource
+    if (req.user.role === 'admin' || req.user.role === 'super_admin') {
       return next();
     }
 

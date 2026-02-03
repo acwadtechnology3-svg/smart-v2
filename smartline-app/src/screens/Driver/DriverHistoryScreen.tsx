@@ -19,24 +19,44 @@ const MOCK_TRIPS = [
     { id: '3', date: new Date(Date.now() - 172800000).toISOString(), pickup: 'Zamalek', dropoff: 'Dokki', price: 60, status: 'completed' },
 ];
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+
 export default function DriverHistoryScreen() {
     const navigation = useNavigation<any>();
     const [trips, setTrips] = useState<any[]>([]);
 
-    useEffect(() => {
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [])
+    );
+
+    const loadData = async () => {
+        // 1. Instant Load from Cache
+        try {
+            const cached = await AsyncStorage.getItem('driver_trips_cache');
+            if (cached) {
+                setTrips(JSON.parse(cached));
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        // 2. Silent Update from API
         fetchTrips();
-    }, []);
+    };
 
     const fetchTrips = async () => {
         try {
             const data = await apiRequest<{ trips: any[] }>('/trips/driver/history');
-            if (data.trips && data.trips.length > 0) {
+            if (data.trips) {
                 setTrips(data.trips);
-            } else {
-                setTrips(MOCK_TRIPS);
+                AsyncStorage.setItem('driver_trips_cache', JSON.stringify(data.trips));
             }
-        } catch {
-            setTrips(MOCK_TRIPS);
+        } catch (e) {
+            console.error(e);
         }
     };
 

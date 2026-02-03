@@ -1,19 +1,82 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Linking, FlatList, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { Colors } from '../../constants/Colors';
-import { ArrowLeft, Phone, MessageCircle, HelpCircle, ChevronRight, FileText } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { ArrowLeft, Phone, MessageCircle, Plus, MessageSquare } from 'lucide-react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { apiRequest } from '../../services/backend';
 
 export default function DriverSupportScreen() {
     const navigation = useNavigation<any>();
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [showNewTicketInput, setShowNewTicketInput] = useState(false);
+    const [newSubject, setNewSubject] = useState('');
 
-    const openWhatsApp = () => {
-        Linking.openURL('whatsapp://send?phone=+201000000000');
+    useFocusEffect(
+        useCallback(() => {
+            fetchTickets();
+        }, [])
+    );
+
+    const fetchTickets = async () => {
+        setLoading(true);
+        try {
+            const data = await apiRequest<{ tickets: any[] }>('/support/tickets');
+            if (data.tickets) {
+                setTickets(data.tickets);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const callSupport = () => {
-        Linking.openURL('tel:+201000000000');
+    const handleCreateTicket = async () => {
+        if (!newSubject.trim()) {
+            Alert.alert('Error', 'Please enter a subject');
+            return;
+        }
+
+        try {
+            const data = await apiRequest<{ ticket: any }>('/support/tickets', {
+                method: 'POST',
+                body: JSON.stringify({ subject: newSubject })
+            });
+
+            setNewSubject('');
+            setShowNewTicketInput(false);
+            fetchTickets();
+            navigation.navigate('SupportChat', { ticketId: data.ticket.id, subject: data.ticket.subject });
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        }
     };
+
+    const openWhatsApp = () => Linking.openURL('whatsapp://send?phone=+201000000000');
+    const callSupport = () => Linking.openURL('tel:+201000000000');
+
+    const renderTicket = ({ item }: { item: any }) => (
+        <TouchableOpacity
+            style={styles.ticketCard}
+            onPress={() => navigation.navigate('SupportChat', { ticketId: item.id, subject: item.subject })}
+        >
+            <View style={styles.ticketIcon}>
+                <MessageSquare size={24} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+                <Text style={styles.ticketSubject}>{item.subject}</Text>
+                <Text style={styles.ticketDate}>
+                    {new Date(item.updated_at || item.created_at).toLocaleDateString()}
+                </Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: item.status === 'open' ? '#DCFCE7' : '#E5E7EB' }]}>
+                <Text style={[styles.statusText, { color: item.status === 'open' ? '#166534' : '#374151' }]}>
+                    {item.status.toUpperCase()}
+                </Text>
+            </View>
+        </TouchableOpacity>
+    );
 
     return (
         <SafeAreaView style={styles.container}>
@@ -26,10 +89,8 @@ export default function DriverSupportScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-
-                <Text style={styles.sectionHeader}>How can we help you?</Text>
-
                 {/* Instant Actions */}
+                <Text style={styles.sectionHeader}>Contact Us</Text>
                 <View style={styles.actionGrid}>
                     <TouchableOpacity style={styles.actionCard} onPress={callSupport}>
                         <View style={[styles.iconBox, { backgroundColor: '#DBEAFE' }]}>
@@ -44,39 +105,51 @@ export default function DriverSupportScreen() {
                         </View>
                         <Text style={styles.actionLabel}>WhatsApp</Text>
                     </TouchableOpacity>
+                </View>
 
-                    <TouchableOpacity style={styles.actionCard}>
-                        <View style={[styles.iconBox, { backgroundColor: '#F3E8FF' }]}>
-                            <HelpCircle size={24} color="#9333EA" />
-                        </View>
-                        <Text style={styles.actionLabel}>FAQ</Text>
+                {/* My Tickets */}
+                <View style={styles.ticketsHeader}>
+                    <Text style={styles.sectionHeader}>My Requests</Text>
+                    <TouchableOpacity
+                        style={styles.newButton}
+                        onPress={() => setShowNewTicketInput(!showNewTicketInput)}
+                    >
+                        <Plus size={20} color="#fff" />
+                        <Text style={styles.newButtonText}>New Request</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Common Topics */}
-                <Text style={styles.subHeader}>Common Topics</Text>
+                {showNewTicketInput && (
+                    <View style={styles.newTicketBox}>
+                        <Text style={styles.boxTitle}>What is your issue?</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="e.g. Payment Issue, App Bug..."
+                            value={newSubject}
+                            onChangeText={setNewSubject}
+                        />
+                        <TouchableOpacity style={styles.createButton} onPress={handleCreateTicket}>
+                            <Text style={styles.createButtonText}>Start Chat</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
-                <View style={styles.topicsList}>
-                    <TopicItem label="Earning & Payments" />
-                    <TopicItem label="Account & Profile" />
-                    <TopicItem label="Safety & Insurance" />
-                    <TopicItem label="App Issues" />
-                </View>
+                {loading ? (
+                    <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 20 }} />
+                ) : tickets.length === 0 ? (
+                    <View style={styles.emptyBox}>
+                        <Text style={styles.emptyText}>No support requests yet.</Text>
+                    </View>
+                ) : (
+                    <View style={styles.ticketList}>
+                        {tickets.map(ticket => <View key={ticket.id}>{renderTicket({ item: ticket })}</View>)}
+                    </View>
+                )}
 
             </ScrollView>
         </SafeAreaView>
     );
 }
-
-const TopicItem = ({ label }: { label: string }) => (
-    <TouchableOpacity style={styles.topicRow}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <FileText size={20} color={Colors.textSecondary} />
-            <Text style={styles.topicText}>{label}</Text>
-        </View>
-        <ChevronRight size={20} color="#D1D5DB" />
-    </TouchableOpacity>
-);
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
@@ -87,10 +160,8 @@ const styles = StyleSheet.create({
     },
     backButton: { padding: 4 },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1e1e' },
-
     content: { padding: 20 },
-
-    sectionHeader: { fontSize: 22, fontWeight: 'bold', color: '#111827', marginBottom: 20 },
+    sectionHeader: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 12 },
 
     actionGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
     actionCard: {
@@ -100,12 +171,27 @@ const styles = StyleSheet.create({
     iconBox: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
     actionLabel: { fontWeight: '600', color: '#1f2937' },
 
-    subHeader: { fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 12 },
+    ticketsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    newButton: { flexDirection: 'row', backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center', gap: 4 },
+    newButtonText: { color: '#fff', fontWeight: '600', fontSize: 12 },
 
-    topicsList: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden' },
-    topicRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        padding: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6'
+    ticketList: { gap: 12 },
+    ticketCard: {
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12,
+        marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1
     },
-    topicText: { fontSize: 16, color: '#374151' }
+    ticketIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    ticketSubject: { fontSize: 16, fontWeight: '600', color: '#1f2937', marginBottom: 4 },
+    ticketDate: { fontSize: 12, color: '#6b7280' },
+    statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    statusText: { fontSize: 10, fontWeight: '700' },
+
+    newTicketBox: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 20 },
+    boxTitle: { fontSize: 14, fontWeight: '600', marginBottom: 12 },
+    input: { backgroundColor: '#f3f4f6', padding: 12, borderRadius: 8, marginBottom: 12 },
+    createButton: { backgroundColor: Colors.primary, padding: 12, borderRadius: 8, alignItems: 'center' },
+    createButtonText: { color: '#fff', fontWeight: 'bold' },
+
+    emptyBox: { alignItems: 'center', padding: 20 },
+    emptyText: { color: '#6b7280' }
 });

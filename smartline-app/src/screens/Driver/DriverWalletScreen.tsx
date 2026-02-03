@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, TextInput, Linking, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, TextInput, Linking, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Wallet, CreditCard, ArrowDownLeft, ArrowUpRight, Banknote, X } from 'lucide-react-native';
 import { apiRequest } from '../../services/backend';
@@ -18,7 +18,8 @@ export default function DriverWalletScreen() {
     const navigation = useNavigation();
     const [balance, setBalance] = useState<number | null>(null);
     const [transactions, setTransactions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Changed to false for instant display
+    const [refreshing, setRefreshing] = useState(false);
     const [userId, setUserId] = useState<string | null>(null);
 
     // Deposit State
@@ -34,11 +35,28 @@ export default function DriverWalletScreen() {
     const [withdrawing, setWithdrawing] = useState(false);
 
     useEffect(() => {
+        loadCachedData();
         fetchWalletData();
     }, []);
 
-    const fetchWalletData = async () => {
+    const loadCachedData = async () => {
         try {
+            const cached = await AsyncStorage.getItem('wallet_data');
+            if (cached) {
+                const { balance: cachedBalance, transactions: cachedTxs } = JSON.parse(cached);
+                setBalance(cachedBalance);
+                setTransactions(cachedTxs);
+            }
+        } catch (error) {
+            console.error('Error loading cached wallet data:', error);
+        }
+    };
+
+    const fetchWalletData = async (isRefresh = false) => {
+        try {
+            if (isRefresh) setRefreshing(true);
+            else setLoading(true);
+
             const session = await AsyncStorage.getItem('userSession');
             if (!session) return;
             const { user } = JSON.parse(session);
@@ -48,10 +66,17 @@ export default function DriverWalletScreen() {
             setBalance(data.balance || 0);
             setTransactions(data.transactions || []);
 
+            // Cache the data
+            await AsyncStorage.setItem('wallet_data', JSON.stringify({
+                balance: data.balance || 0,
+                transactions: data.transactions || []
+            }));
+
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -63,23 +88,24 @@ export default function DriverWalletScreen() {
 
         setDepositing(true);
         try {
-            const response = await fetch(`${BACKEND_URL}/payment/deposit/init`, {
+            // Use apiRequest helper to ensuring headers (Auth Token) are sent
+            const data = await apiRequest<{ paymentUrl: string; orderId: string }>('/payment/deposit/init', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, amount: parseFloat(depositAmount) })
             });
 
-            const data = await response.json();
-
-            if (data.error) throw new Error(data.error);
             if (data.paymentUrl) {
                 // Open Kashier Page
                 Linking.openURL(data.paymentUrl);
                 setDepositModalVisible(false);
                 setDepositAmount('');
                 Alert.alert("Redirecting", "Complete payment in your browser. Your balance will update shortly.");
+
+                // Refresh wallet data after a short delay to catch completed payments
+                setTimeout(() => fetchWalletData(), 3000);
             }
         } catch (error: any) {
+            console.error(error);
             Alert.alert("Error", error.message || "Failed to initiate deposit");
         } finally {
             setDepositing(false);
@@ -103,56 +129,91 @@ export default function DriverWalletScreen() {
 
         setWithdrawing(true);
         try {
-            const response = await fetch(`${BACKEND_URL}/payment/withdraw/request`, {
+            // Use apiRequest helper which handles authentication
+            await apiRequest('/payment/withdraw/request', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    driverId: userId,
                     amount: parseFloat(withdrawAmount),
                     method: withdrawMethod,
                     accountNumber: withdrawAccount
                 })
             });
 
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-
             Alert.alert("Success", "Withdrawal request sent! Admin will review shortly.");
             setWithdrawModalVisible(false);
             setWithdrawAmount('');
             setWithdrawAccount('');
-            fetchWalletData(); // Refresh to see if reserved or just to sync
+            fetchWalletData(); // Refresh to see updated data
 
         } catch (error: any) {
+            console.error('Withdrawal request error:', error);
             Alert.alert("Error", error.message || "Failed to request withdrawal");
         } finally {
             setWithdrawing(false);
         }
     };
 
-    const renderTransaction = ({ item }: { item: any }) => (
-        <View style={styles.txCard}>
-            <View style={styles.txIcon}>
-                {item.amount > 0 ? (
-                    <ArrowDownLeft size={20} color={Colors.success} />
-                ) : (
-                    <ArrowUpRight size={20} color={Colors.danger} />
-                )}
+    const renderTransaction = ({ item }: { item: any }) => {
+        // Determine Status Color & Label
+        let statusColor = '#6B7280';
+        let statusLabel = item.status || 'Completed';
+        let icon = <Banknote size={20} color={Colors.textSecondary} />;
+        let iconBg = '#F3F4F6';
+
+        if (item.status === 'pending') {
+            statusColor = '#F59E0B'; // Orange
+            statusLabel = 'Pending';
+        } else if (item.status === 'failed' || item.status === 'rejected' || item.status === 'cancelled') {
+            statusColor = '#EF4444'; // Red
+            statusLabel = item.status === 'rejected' ? 'Rejected' : 'Failed';
+        } else if (item.status === 'completed' || item.status === 'approved') {
+            statusColor = '#10B981'; // Green
+            statusLabel = 'Success';
+        }
+
+        // Determine Icon & Main Color based on Type
+        if (item.type === 'deposit') {
+            icon = <ArrowDownLeft size={20} color="#10B981" />;
+            iconBg = '#DCFCE7';
+        } else if (item.type === 'withdrawal' || item.type === 'withdrawal_request') {
+            icon = <ArrowUpRight size={20} color="#EF4444" />;
+            iconBg = '#FEE2E2';
+        } else if (item.type === 'trip_earnings') {
+            icon = <Wallet size={20} color={Colors.primary} />;
+            iconBg = '#E0E7FF';
+        } else if (item.type === 'payment' || item.type === 'fee') {
+            icon = <CreditCard size={20} color="#F59E0B" />;
+            iconBg = '#FEF3C7';
+        }
+
+        const isPositive = item.amount > 0;
+        const amountColor = isPositive ? '#10B981' : '#111827';
+
+        return (
+            <View style={styles.txCard}>
+                <View style={[styles.txIcon, { backgroundColor: iconBg }]}>
+                    {icon}
+                </View>
+                <View style={styles.txInfo}>
+                    <Text style={styles.txTitle}>
+                        {item.type === 'withdrawal_request' ? 'Withdrawal Request' :
+                            item.type === 'payment' ? 'Platform Fee' :
+                                item.type === 'trip_earnings' ? 'Trip Earnings' :
+                                    item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                    </Text>
+                    <Text style={styles.txDate}>{format(new Date(item.created_at), 'MMM dd, hh:mm a')}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.txAmount, { color: amountColor }]}>
+                        {isPositive ? '+' : ''}{item.amount.toFixed(2)} EGP
+                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                        <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+                    </View>
+                </View>
             </View>
-            <View style={styles.txInfo}>
-                <Text style={styles.txTitle}>
-                    {item.type === 'payment' ? 'Platform Fee' :
-                        item.type === 'trip_earnings' ? 'Trip Earnings' :
-                            item.type === 'withdrawal' ? 'Withdrawal' :
-                                item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                </Text>
-                <Text style={styles.txDate}>{format(new Date(item.created_at), 'MMM dd, hh:mm a')}</Text>
-            </View>
-            <Text style={[styles.txAmount, { color: item.amount > 0 ? Colors.success : Colors.textPrimary }]}>
-                {item.amount > 0 ? '+' : ''}{item.amount.toFixed(2)} EGP
-            </Text>
-        </View>
-    );
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -207,6 +268,13 @@ export default function DriverWalletScreen() {
                     keyExtractor={item => item.id}
                     renderItem={renderTransaction}
                     contentContainerStyle={{ paddingBottom: 20 }}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={() => fetchWalletData(true)}
+                            colors={[Colors.primary]}
+                        />
+                    }
                     ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>No transactions yet.</Text>}
                 />
             </View>
@@ -355,7 +423,8 @@ const styles = StyleSheet.create({
     txTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
     txDate: { fontSize: 12, color: '#9CA3AF' },
     txAmount: { fontSize: 16, fontWeight: 'bold' },
-
+    statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, marginTop: 4 },
+    statusText: { fontSize: 10, fontWeight: 'bold' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Dimensions, Animated, Modal, TouchableWithoutFeedback, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Dimensions, Animated, Modal, TouchableWithoutFeedback, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,10 +20,18 @@ const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIw
 type TripOptionsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripOptions'>;
 type TripOptionsScreenRouteProp = RouteProp<RootStackParamList, 'TripOptions'>;
 
+const RIDE_IMAGES: any = {
+    saver: require('../../../assets/rides/ride_saver.png'),
+    comfort: require('../../../assets/rides/ride_comfort.png'),
+    vip: require('../../../assets/rides/ride_vip.png'),
+    taxi: require('../../../assets/rides/ride_taxi.png'),
+    scooter: require('../../../assets/rides/ride_taxi.png'), // Placeholder
+};
+
 const BASE_RIDES = [
-    { id: 'saver', name: 'Saver', ratePerKm: 5, baseFooter: 10, etaMultiplier: 1.2, icon: Car, color: '#10B981', promo: 'Best Value' },
-    { id: 'comfort', name: 'Comfort', ratePerKm: 7, baseFooter: 15, etaMultiplier: 1.0, icon: Car, color: Colors.primary, promo: 'Recommended' },
-    { id: 'vip', name: 'VIP', ratePerKm: 12, baseFooter: 25, etaMultiplier: 0.9, icon: Star, color: '#1e1e1e', promo: 'Premium Service' },
+    { id: 'saver', name: 'Saver', ratePerKm: 5, baseFooter: 10, etaMultiplier: 1.2, image: RIDE_IMAGES.saver, color: '#10B981', promo: 'Best Value' },
+    { id: 'comfort', name: 'Comfort', ratePerKm: 7, baseFooter: 15, etaMultiplier: 1.0, image: RIDE_IMAGES.comfort, color: Colors.primary, promo: 'Recommended' },
+    { id: 'vip', name: 'VIP', ratePerKm: 12, baseFooter: 25, etaMultiplier: 0.9, image: RIDE_IMAGES.vip, color: '#1e1e1e', promo: 'Premium Service' },
 ];
 
 export default function TripOptionsScreen() {
@@ -159,11 +167,11 @@ export default function TripOptionsScreen() {
 
         // Default valid definitions if DB is empty or loading
         const Definitions = [
-            { id: 'saver', name: 'Saver', icon: Car, color: '#10B981', promo: 'Best Value', etaMult: 1.2 },
-            { id: 'comfort', name: 'Comfort', icon: Car, color: Colors.primary, promo: 'Recommended', etaMult: 1.0 },
-            { id: 'vip', name: 'VIP', icon: Star, color: '#1e1e1e', promo: null, etaMult: 1.0 },
-            { id: 'scooter', name: 'Scooter', icon: CloudLightning, color: '#F59E0B', promo: 'Fastest', etaMult: 0.8 },
-            { id: 'taxi', name: 'Taxi', icon: Car, color: '#FBBF24', promo: null, etaMult: 1.1 },
+            { id: 'saver', name: 'Saver', image: RIDE_IMAGES.saver, color: '#10B981', promo: 'Best Value', etaMult: 1.2 },
+            { id: 'comfort', name: 'Comfort', image: RIDE_IMAGES.comfort, color: Colors.primary, promo: 'Recommended', etaMult: 1.0 },
+            { id: 'vip', name: 'VIP', image: RIDE_IMAGES.vip, color: '#1e1e1e', promo: null, etaMult: 1.0 },
+            { id: 'scooter', name: 'Scooter', image: RIDE_IMAGES.scooter, color: '#F59E0B', promo: 'Fastest', etaMult: 0.8 },
+            { id: 'taxi', name: 'Taxi', image: RIDE_IMAGES.taxi, color: '#FBBF24', promo: null, etaMult: 1.1 },
         ];
 
         // Filter definitions based on what we have in pricingConfig
@@ -351,7 +359,19 @@ export default function TripOptionsScreen() {
                     )}
                 </MapView>
 
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => {
+                        if (navigation.canGoBack()) {
+                            navigation.goBack();
+                        } else {
+                            navigation.reset({
+                                index: 0,
+                                routes: [{ name: 'CustomerHome' }],
+                            });
+                        }
+                    }}
+                >
                     <ArrowLeft size={24} color="#1e1e1e" />
                 </TouchableOpacity>
             </View>
@@ -399,8 +419,8 @@ export default function TripOptionsScreen() {
                         >
                             {/* Icon Section */}
                             <View style={styles.rideIconWrapper}>
-                                <ride.icon size={28} color={selectedRide === ride.id ? '#fff' : ride.color} />
-                                {selectedRide === ride.id && <View style={[styles.iconBg, { backgroundColor: ride.color }]} />}
+                                <Image source={ride.image} style={styles.rideImage} resizeMode="contain" />
+                                {selectedRide === ride.id && <View style={[styles.iconBg, { backgroundColor: ride.color + '10' }]} />}
                             </View>
 
                             {/* Info Section */}
@@ -614,7 +634,8 @@ const styles = StyleSheet.create({
     },
     rideCardSelected: { borderColor: Colors.primary, backgroundColor: '#F0F9FF' },
 
-    rideIconWrapper: { width: 56, height: 40, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+    rideIconWrapper: { width: 100, height: 60, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    rideImage: { width: '100%', height: '100%' },
     iconBg: { ...StyleSheet.absoluteFillObject, borderRadius: 8, opacity: 1, zIndex: -1 },
 
     rideInfo: { flex: 1 },

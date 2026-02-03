@@ -6,13 +6,14 @@ export const uuidSchema = z.string().uuid('Invalid UUID format');
 
 export const phoneSchema = z
   .string()
-  .regex(/^\+20\d{10}$/, 'Phone must be Egyptian format: +20XXXXXXXXXX');
+  .refine(
+    (phone) => /^(\+20|0)?1\d{9}$/.test(phone),
+    'Phone must be Egyptian format: +201XXXXXXXXX or 01XXXXXXXXX'
+  );
 
 export const passwordSchema = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
-  .regex(/[A-Za-z]/, 'Password must contain at least one letter')
-  .regex(/[0-9]/, 'Password must contain at least one number');
+  .min(6, 'Password must be at least 6 characters');
 
 export const coordinateSchema = z.object({
   lat: z.number().min(-90).max(90, 'Invalid latitude'),
@@ -95,7 +96,6 @@ export const depositInitSchema = z.object({
 });
 
 export const withdrawRequestSchema = z.object({
-  driverId: uuidSchema,
   amount: z.number().positive('Amount must be positive').max(100000, 'Amount too large'),
   method: z.string().min(1, 'Payment method is required'),
   accountNumber: z.string().min(1, 'Account number is required').max(100),
@@ -112,8 +112,8 @@ export const withdrawManageSchema = z.object({
 export const locationUpdateSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  heading: z.number().min(0).max(360).optional(),
-  speed: z.number().min(0).max(200).optional(), // km/h
+  heading: z.number().min(0).max(360).nullable().optional(),
+  speed: z.number().min(0).max(200).nullable().optional(), // km/h
   accuracy: z.number().positive().optional(), // meters
   timestamp: z.string().datetime().optional(),
 });
@@ -140,6 +140,53 @@ export const updateDriverStatusSchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
 });
+
+// ===== Dashboard Auth Schemas =====
+
+export const dashboardRoleSchema = z.enum(['super_admin', 'admin', 'manager', 'viewer']);
+
+export const dashboardLoginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export const dashboardRegisterSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  full_name: z.string().min(1, 'Full name is required').max(100),
+  role: dashboardRoleSchema.default('viewer'),
+});
+
+export const dashboardUpdateSchema = z.object({
+  full_name: z.string().min(1).max(100).optional(),
+  role: dashboardRoleSchema.optional(),
+  is_active: z.boolean().optional(),
+}).refine(data => Object.keys(data).length > 0, {
+  message: 'At least one field must be provided for update',
+});
+
+export const passwordChangeSchema = z.object({
+  current_password: z.string().min(1, 'Current password is required'),
+  new_password: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+export const passwordResetSchema = z.object({
+  new_password: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+export const initSuperAdminSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  full_name: z.string().min(1, 'Full name is required').max(100),
+});
+
+// Type exports for dashboard auth
+export type DashboardLoginInput = z.infer<typeof dashboardLoginSchema>;
+export type DashboardRegisterInput = z.infer<typeof dashboardRegisterSchema>;
+export type DashboardUpdateInput = z.infer<typeof dashboardUpdateSchema>;
+export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;
+export type PasswordResetInput = z.infer<typeof passwordResetSchema>;
+export type InitSuperAdminInput = z.infer<typeof initSuperAdminSchema>;
 
 // Type exports for use in controllers
 export type CheckPhoneInput = z.infer<typeof checkPhoneSchema>;

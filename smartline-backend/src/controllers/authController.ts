@@ -48,7 +48,10 @@ export const signup = async (req: Request, res: Response) => {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase Insert Error:', error);
+            throw error;
+        }
 
         // 3. Generate Token
         const token = jwt.sign({ id: data.id, role: data.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
@@ -56,7 +59,13 @@ export const signup = async (req: Request, res: Response) => {
         res.status(201).json({ user: data, token });
     } catch (error: any) {
         console.error('Signup Error:', error);
-        res.status(500).json({ error: error.message });
+        // Return more detailed error for debugging
+        const errorMessage = error.message || 'Signup failed';
+        const errorDetails = error.details || error.hint || '';
+        res.status(400).json({
+            error: errorMessage,
+            details: errorDetails
+        });
     }
 };
 

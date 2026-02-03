@@ -13,11 +13,12 @@ type SubscriptionType =
   | 'driver:location'
   | 'trip:offers'
   | 'trip:status'
-  | 'trip:messages';
+  | 'trip:messages'
+  | 'support:messages';
 
 type ClientMessage =
   | { type: 'auth'; token: string }
-  | { type: 'subscribe'; subscriptionId: string; channel: SubscriptionType; tripId?: string; driverId?: string }
+  | { type: 'subscribe'; subscriptionId: string; channel: SubscriptionType; tripId?: string; driverId?: string; ticketId?: string }
   | { type: 'unsubscribe'; subscriptionId: string }
   | { type: 'ping' };
 
@@ -131,7 +132,7 @@ export function startRealtimeServer(server: Server) {
 
       if (message.type !== 'subscribe') return;
 
-      const { subscriptionId, channel, tripId } = message;
+      const { subscriptionId, channel, tripId, ticketId } = message;
       if (!subscriptionId) {
         send(ws, { type: 'error', message: 'subscriptionId is required' });
         return;
@@ -238,6 +239,33 @@ export function startRealtimeServer(server: Server) {
               .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'messages', filter: `trip_id=eq.${tripId}` },
+                (payload) => {
+                  send(ws, { type: 'event', subscriptionId, payload });
+                }
+              );
+            break;
+          }
+          case 'support:messages': {
+            if (!isUuid(ticketId)) throw new Error('ticketId is required');
+
+            // Check authorization
+            if (ctx.role !== 'admin') {
+              const { data: ticket } = await supabase
+                .from('support_tickets')
+                .select('user_id')
+                .eq('id', ticketId)
+                .single();
+
+              if (!ticket || ticket.user_id !== ctx.userId) {
+                throw new Error('Not authorized for this ticket');
+              }
+            }
+
+            supaChannel = supabase
+              .channel(`support-messages-${ticketId}-${subscriptionId}`)
+              .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `ticket_id=eq.${ticketId}` },
                 (payload) => {
                   send(ws, { type: 'event', subscriptionId, payload });
                 }

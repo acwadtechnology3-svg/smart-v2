@@ -42,6 +42,14 @@ export default function DriverHomeScreen() {
     const [dailyEarnings, setDailyEarnings] = useState(0);
     const [walletBalance, setWalletBalance] = useState(0);
 
+    // Default to Cairo if location not yet found
+    const DEFAULT_REGION = {
+        latitude: 30.0444,
+        longitude: 31.2357,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+    };
+
     // Initial Data Fetch
     useEffect(() => {
         (async () => {
@@ -49,9 +57,37 @@ export default function DriverHomeScreen() {
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') return;
 
-            // 2. Get Initial Location
-            let location = await Location.getCurrentPositionAsync({});
-            setLocation(location);
+            // 2. Fast Location Strategy
+            try {
+                // Try last known location first (Instant)
+                const lastKnown = await Location.getLastKnownPositionAsync({});
+                if (lastKnown) {
+                    setLocation(lastKnown);
+                    // Animate immediately (with small delay to ensure ref is ready)
+                    setTimeout(() => {
+                        mapRef.current?.animateToRegion({
+                            latitude: lastKnown.coords.latitude,
+                            longitude: lastKnown.coords.longitude,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                        }, 500);
+                    }, 100);
+                }
+
+                // Fetch precise location in background
+                Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(curr => {
+                    setLocation(curr);
+                    mapRef.current?.animateToRegion({
+                        latitude: curr.coords.latitude,
+                        longitude: curr.coords.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                    }, 1000);
+                }).catch(e => console.log("Precise location error:", e));
+
+            } catch (e) {
+                console.log("Location error:", e);
+            }
 
             // 3. Fetch Driver Profile & Finances
             const sessionData = await AsyncStorage.getItem('userSession');
@@ -172,8 +208,8 @@ export default function DriverHomeScreen() {
                 body: JSON.stringify({
                     lat: loc.coords.latitude,
                     lng: loc.coords.longitude,
-                    heading: loc.coords.heading,
-                    speed: loc.coords.speed,
+                    heading: loc.coords.heading !== null && loc.coords.heading >= 0 ? loc.coords.heading : null,
+                    speed: loc.coords.speed !== null && loc.coords.speed >= 0 ? loc.coords.speed : null,
                     accuracy: loc.coords.accuracy,
                     timestamp: new Date().toISOString()
                 })
@@ -285,6 +321,96 @@ export default function DriverHomeScreen() {
         };
     }, [locationSubscription]);
 
+    const triggerSOSAlert = async () => {
+        if (!location) {
+            Alert.alert("Error", "Location is required to send SOS alert");
+            return;
+        }
+
+        try {
+            await apiRequest('/sos/create', {
+                method: 'POST',
+                body: JSON.stringify({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    notes: "High priority SOS alert triggered from driver app"
+                })
+            });
+
+            Alert.alert(
+                "🆘 SOS Sent!",
+                "Help is on the way. Our emergency team has been notified of your location.",
+                [{ text: "OK" }]
+            );
+        } catch (error: any) {
+            console.error("SOS Error:", error);
+            Alert.alert("Error", "Failed to send SOS alert. Please try calling 122 directly.");
+        }
+    };
+
+    const handleSOS = () => {
+        Alert.alert(
+            "🛡️ Safety & Emergency",
+            "Choose an option:",
+            [
+                {
+                    text: "📞 Call Emergency (122)",
+                    onPress: () => {
+                        const emergencyNumber = Platform.OS === 'ios' ? 'telprompt:122' : 'tel:122';
+                        Alert.alert(
+                            "Call Emergency Services?",
+                            "This will dial 122 (Egyptian Emergency Services)",
+                            [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                    text: "Call Now",
+                                    onPress: () => {
+                                        // Linking.openURL(emergencyNumber)
+                                        Alert.alert("Emergency", "Calling 122...");
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                },
+                {
+                    text: "🆘 Send SOS Alert",
+                    style: "destructive",
+                    onPress: () => {
+                        Alert.alert(
+                            "Emergency SOS",
+                            "This will send your live location to our dispatch team. Only use this in real emergencies.",
+                            [
+                                { text: "Cancel", style: "cancel" },
+                                { text: "SEND SOS", style: "destructive", onPress: triggerSOSAlert }
+                            ]
+                        );
+                    }
+                },
+                {
+                    text: "📍 Share Live Location",
+                    onPress: () => {
+                        if (location) {
+                            const locationUrl = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+                            Alert.alert(
+                                "Share Location",
+                                `Your current location:\nLat: ${location.coords.latitude.toFixed(6)}\nLng: ${location.coords.longitude.toFixed(6)}\n\n${locationUrl}`,
+                                [{ text: "OK" }]
+                            );
+                        } else {
+                            Alert.alert("Location Unavailable", "Please enable location services");
+                        }
+                    }
+                },
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                }
+            ],
+            { cancelable: true }
+        );
+    };
+
     const recenterMap = () => {
         if (location && mapRef.current) {
             mapRef.current.animateToRegion({
@@ -299,31 +425,26 @@ export default function DriverHomeScreen() {
     return (
         <View style={styles.container}>
             {/* --- MAP LAYER --- */}
-            {location ? (
-                <MapView
-                    ref={mapRef}
-                    style={styles.mapLayer}
-                    initialRegion={{
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                    }}
-                    showsUserLocation={true}
-                    userInterfaceStyle="light"
-                >
-                    <UrlTile
-                        urlTemplate="https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg"
-                        maximumZ={19}
-                        flipY={false}
-                        tileSize={256}
-                    />
-                </MapView>
-            ) : (
-                <View style={[styles.mapLayer, { backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }]}>
-                    <Text>Loading Map...</Text>
-                </View>
-            )}
+            {/* --- MAP LAYER --- */}
+            <MapView
+                ref={mapRef}
+                style={styles.mapLayer}
+                initialRegion={location ? {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                } : DEFAULT_REGION}
+                showsUserLocation={true}
+                userInterfaceStyle="light"
+            >
+                <UrlTile
+                    urlTemplate="https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg"
+                    maximumZ={19}
+                    flipY={false}
+                    tileSize={256}
+                />
+            </MapView>
 
             {/* --- UI OVERLAY --- */}
             <SafeAreaView style={styles.overlayContainer} pointerEvents="box-none">
@@ -356,7 +477,7 @@ export default function DriverHomeScreen() {
 
                 {/* Floating Controls */}
                 <View style={styles.rightControls} pointerEvents="box-none">
-                    <TouchableOpacity style={styles.iconButton}>
+                    <TouchableOpacity style={styles.iconButton} onPress={handleSOS}>
                         <Shield color="#1e1e1e" size={24} />
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.iconButton, { marginTop: 12 }]} onPress={recenterMap}>

@@ -17,6 +17,9 @@ import messageRoutes from './routes/messageRoutes';
 import pricingRoutes from './routes/pricingRoutes';
 import sosRoutes from './routes/sosRoutes';
 import walletRoutes from './routes/walletRoutes';
+import supportRoutes from './routes/supportRoutes';
+import supportAdminRoutes from './routes/supportAdminRoutes';
+import dashboardAuthRoutes from './routes/dashboardAuthRoutes';
 import { checkDatabaseConnection } from './config/database';
 import { checkRedisConnection } from './config/redis';
 import { startLocationSync } from './workers/locationSyncWorker';
@@ -61,6 +64,7 @@ app.disable('x-powered-by');
 
 // ===== Routes =====
 app.use('/api/auth', authRoutes);
+app.use('/api/dashboard/auth', dashboardAuthRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/location', locationRoutes);
@@ -71,6 +75,8 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/sos', sosRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/admin/support', supportAdminRoutes);
 
 // ===== Health Check =====
 app.get('/health', async (req, res) => {

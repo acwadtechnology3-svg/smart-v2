@@ -29,6 +29,8 @@ export default function DriverDocumentsScreen() {
         idBack: null,
         licenseFront: null,
         licenseBack: null,
+        vehicleLicenseFront: null,
+        vehicleLicenseBack: null,
         vehicleFront: null,
         vehicleBack: null,
         vehicleRight: null,
@@ -135,6 +137,8 @@ export default function DriverDocumentsScreen() {
                     id_back_url: uploadedDocs.idBack_url,
                     license_front_url: uploadedDocs.licenseFront_url,
                     license_back_url: uploadedDocs.licenseBack_url,
+                    vehicle_license_front_url: uploadedDocs.vehicleLicenseFront_url,
+                    vehicle_license_back_url: uploadedDocs.vehicleLicenseBack_url,
                     vehicle_front_url: uploadedDocs.vehicleFront_url,
                     vehicle_back_url: uploadedDocs.vehicleBack_url,
                     vehicle_right_url: uploadedDocs.vehicleRight_url,
@@ -195,6 +199,12 @@ export default function DriverDocumentsScreen() {
                 <View style={styles.grid}>
                     {renderUploadBox('licenseFront', "Front Side")}
                     {renderUploadBox('licenseBack', "Back Side")}
+                </View>
+
+                <Text style={styles.sectionTitle}>Vehicle License</Text>
+                <View style={styles.grid}>
+                    {renderUploadBox('vehicleLicenseFront', "Front Side")}
+                    {renderUploadBox('vehicleLicenseBack', "Back Side")}
                 </View>
 
                 <Text style={styles.sectionTitle}>Vehicle Photos (4 Sides)</Text>

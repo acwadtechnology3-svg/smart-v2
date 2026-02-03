@@ -8,7 +8,7 @@ declare global {
     interface Request {
       user?: {
         id: string;
-        role: 'customer' | 'driver' | 'admin';
+        role: 'customer' | 'driver' | 'admin' | 'super_admin' | 'manager' | 'viewer';
       };
     }
   }

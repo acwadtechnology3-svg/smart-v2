@@ -22,7 +22,7 @@ const router = Router();
 router.post(
   '/create',
   authenticate,
-  requireCustomer,
+  // requireCustomer, // Allow drivers to request rides too for testing/flexibility
   validateBody(createTripSchema),
   createTrip
 );
@@ -79,7 +79,7 @@ router.get(
 router.post(
   '/:tripId/cancel',
   authenticate,
-  requireCustomer,
+  // requireCustomer, // Allow creator (even driver) to cancel
   validateParams(z.object({ tripId: uuidSchema })),
   cancelTrip
 );

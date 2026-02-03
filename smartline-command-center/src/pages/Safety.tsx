@@ -1,222 +1,358 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarIcon, MapPinIcon, PhoneIcon, UserIcon, CarFront } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, PhoneIcon, UserIcon, CarFront, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface SOSAlert {
     id: string;
-    trip_id: string;
+    driver_id: string;
+    trip_id?: string;
     reporter_id?: string;
     latitude: number;
     longitude: number;
-    status: 'pending' | 'investigating' | 'resolved' | 'false_alarm';
+    status: 'pending' | 'investigating' | 'resolved' | 'false_alarm' | 'cancelled';
+    notes?: string;
     created_at: string;
     metadata?: any;
-    reporter?: {
-        name: string;
+    driver?: {
+        full_name: string;
         phone: string;
-        avatar_url?: string;
+    };
+    reporter?: {
+        full_name: string;
+        phone: string;
     };
     trip?: {
         pickup_address: string;
-        dest_address: string;
+        destination_address: string;
         status: string;
-        driver_id?: string;
         customer_id?: string;
         customer?: {
-            name: string;
+            full_name: string;
             phone: string;
-            avatar_url?: string;
-        };
-        driver?: {
-            id: string;
-            name: string;
-            phone: string;
-            avatar_url?: string;
-        };
-        vehicle?: {
-            vehicle_model: string;
-            vehicle_plate: string;
-            photo_url?: string;
         };
     };
 }
 
 export default function Safety() {
     const [alerts, setAlerts] = useState<SOSAlert[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
     const { toast } = useToast();
+
+    // Play sound notification
+    const playAlertSound = () => {
+        if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(err => console.log('Audio play failed:', err));
+        }
+    };
 
     useEffect(() => {
         fetchAlerts();
 
+        // Subscribe to real-time SOS alert changes
         const channel = supabase
-            .channel('sos_alerts')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sos_alerts' }, (payload) => {
-                toast({
-                    title: "NEW ALERT RECEIVED",
-                    variant: "destructive"
-                });
-                fetchAlerts();
-            })
-            .subscribe();
+            .channel('sos_alerts_realtime')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'sos_alerts' },
+                (payload) => {
+                    console.log('New SOS alert received:', payload);
+                    playAlertSound();
+                    toast({
+                        title: "🚨 NEW SOS ALERT RECEIVED",
+                        description: "A new emergency alert has been reported",
+                        variant: "destructive"
+                    });
+                    fetchAlerts();
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'sos_alerts' },
+                (payload) => {
+                    console.log('SOS alert updated:', payload);
+                    fetchAlerts();
+                }
+            )
+            .subscribe((status) => {
+                console.log('Realtime subscription status:', status);
+            });
 
         return () => {
-            supabase.removeChannel(channel);
+            channel.unsubscribe();
         };
     }, []);
 
     async function fetchAlerts() {
-        console.log("Fetching alerts (hybrid mode)...");
+        try {
+            setLoading(true);
+            console.log("Fetching SOS alerts...");
 
-        // 1. Fetch Raw Alerts
-        const { data: alertsData, error: alertsError } = await supabase
-            .from('sos_alerts')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (alertsError) {
-            console.error('Error fetching alerts:', alertsError);
-            return;
-        }
-
-        if (!alertsData || alertsData.length === 0) {
-            setAlerts([]);
-            return;
-        }
-
-        // 2. Collect IDs (from DB Columns OR Metadata)
-        const tripIds = new Set<string>();
-        const reporterIds = new Set<string>();
-        const potentialDriverIds = new Set<string>();
-        const potentialCustomerIds = new Set<string>();
-
-        alertsData.forEach(a => {
-            if (a.trip_id) tripIds.add(a.trip_id);
-            if (a.reporter_id) reporterIds.add(a.reporter_id);
-
-            // Check metadata snapshot for IDs if DB IDs are missing
-            const snap = a.metadata?.snapshot?.trip;
-            if (snap) {
-                if (snap.driver_id) potentialDriverIds.add(snap.driver_id);
-                if (snap.customer_id) potentialCustomerIds.add(snap.customer_id);
-            }
-        });
-
-        // 3. Fetch Real Data
-        let tripsMap: Record<string, any> = {};
-        if (tripIds.size > 0) {
-            const { data: trips } = await supabase
-                .from('trips')
+            // Fetch all SOS alerts
+            const { data: alertsData, error: alertsError } = await supabase
+                .from('sos_alerts')
                 .select('*')
-                .in('id', Array.from(tripIds));
-            (trips || []).forEach(t => tripsMap[t.id] = t);
-        }
+                .order('created_at', { ascending: false });
 
-        // Add Customer/Driver IDs from Real Trips
-        Object.values(tripsMap).forEach(t => {
-            if (t.customer_id) potentialCustomerIds.add(t.customer_id);
-            if (t.driver_id) potentialDriverIds.add(t.driver_id);
-        });
+            console.log('Alerts data:', alertsData);
+            console.log('Alerts error:', alertsError);
 
-        // 4. Fetch Profiles (Reporters + Customers + Drivers)
-        const allUserIds = new Set([...reporterIds, ...potentialCustomerIds, ...potentialDriverIds]);
-        let profilesMap: Record<string, any> = {};
-
-        // Remove 'mock' IDs if any
-        const validUserIds = Array.from(allUserIds).filter(id => id && id.length > 10 && id !== 'mock-driver-id');
-
-        if (validUserIds.length > 0) {
-            const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, name, phone, avatar_url')
-                .in('id', validUserIds);
-            (profiles || []).forEach(p => profilesMap[p.id] = p);
-        }
-
-        // 5. Fetch Vehicles
-        const validDriverIds = Array.from(potentialDriverIds).filter(id => id && id.length > 10);
-        let vehiclesMap: Record<string, any> = {};
-        if (validDriverIds.length > 0) {
-            const { data: vehicles } = await supabase
-                .from('drivers')
-                .select('id, vehicle_model, vehicle_plate, photo_url')
-                .in('id', validDriverIds);
-            (vehicles || []).forEach(v => vehiclesMap[v.id] = v);
-        }
-
-        // 6. Stitch Data Together
-        const textEnriched: SOSAlert[] = alertsData.map(alert => {
-            const enriched: SOSAlert = { ...alert };
-
-            // A. Attach Reporter
-            if (alert.reporter_id && profilesMap[alert.reporter_id]) {
-                enriched.reporter = profilesMap[alert.reporter_id];
+            if (alertsError) {
+                console.error('Error fetching alerts:', alertsError);
+                toast({
+                    title: 'Error',
+                    description: 'Failed to fetch SOS alerts: ' + alertsError.message,
+                    variant: 'destructive'
+                });
+                setAlerts([]);
+                return;
             }
 
-            // B. Attach Trip (DB or Snapshot)
-            let rawTrip = alert.trip_id ? tripsMap[alert.trip_id] : null;
-            let isSnapshot = false;
-
-            if (!rawTrip && alert.metadata?.snapshot?.trip) {
-                rawTrip = alert.metadata.snapshot.trip;
-                isSnapshot = true;
+            if (!alertsData || alertsData.length === 0) {
+                console.log('No alerts found');
+                setAlerts([]);
+                return;
             }
 
-            if (rawTrip) {
-                enriched.trip = {
-                    pickup_address: rawTrip.pickup_address,
-                    dest_address: rawTrip.dest_address,
-                    status: rawTrip.status,
-                    driver_id: rawTrip.driver_id,
-                    customer_id: rawTrip.customer_id,
+            // Collect all user IDs we need to fetch
+            const driverIds = new Set<string>();
+            const reporterIds = new Set<string>();
+            const tripIds = new Set<string>();
 
-                    // Attach Customer (Profile look up by ID)
-                    customer: (rawTrip.customer_id && profilesMap[rawTrip.customer_id])
-                        ? profilesMap[rawTrip.customer_id]
-                        : undefined,
+            alertsData.forEach(a => {
+                if (a.driver_id) driverIds.add(a.driver_id);
+                if (a.reporter_id) reporterIds.add(a.reporter_id);
+                if (a.trip_id) tripIds.add(a.trip_id);
+            });
 
-                    // Attach Driver
-                    driver: (rawTrip.driver_id && profilesMap[rawTrip.driver_id])
-                        ? profilesMap[rawTrip.driver_id]
-                        : undefined,
+            // Fetch users (drivers and reporters)
+            const allUserIds = [...new Set([...driverIds, ...reporterIds])];
+            let usersMap: Record<string, any> = {};
 
-                    // Attach Vehicle
-                    vehicle: (rawTrip.driver_id && vehiclesMap[rawTrip.driver_id])
-                        ? vehiclesMap[rawTrip.driver_id]
-                        : undefined
-                };
+            if (allUserIds.length > 0) {
+                const { data: users } = await supabase
+                    .from('users')
+                    .select('id, full_name, phone')
+                    .in('id', allUserIds);
+                (users || []).forEach(u => usersMap[u.id] = u);
+            }
 
-                // If mock trip and no real profile found, use reporter as customer
-                if (isSnapshot && !enriched.trip.customer && enriched.reporter) {
-                    enriched.trip.customer = enriched.reporter;
+            // Fetch trips
+            let tripsMap: Record<string, any> = {};
+            if (tripIds.size > 0) {
+                const { data: trips } = await supabase
+                    .from('trips')
+                    .select('id, pickup_address, destination_address, status, customer_id')
+                    .in('id', Array.from(tripIds));
+                
+                // Fetch customers for trips
+                const customerIds = new Set<string>();
+                (trips || []).forEach(t => {
+                    tripsMap[t.id] = t;
+                    if (t.customer_id) customerIds.add(t.customer_id);
+                });
+
+                // Fetch customer details
+                if (customerIds.size > 0) {
+                    const { data: customers } = await supabase
+                        .from('users')
+                        .select('id, full_name, phone')
+                        .in('id', Array.from(customerIds));
+                    
+                    (customers || []).forEach(c => {
+                        // Attach customer to their trips
+                        Object.values(tripsMap).forEach((trip: any) => {
+                            if (trip.customer_id === c.id) {
+                                trip.customer = c;
+                            }
+                        });
+                    });
                 }
             }
 
-            return enriched;
-        });
+            // Enrich alerts with user and trip data
+            const enrichedAlerts: SOSAlert[] = alertsData.map(alert => ({
+                ...alert,
+                driver: alert.driver_id ? usersMap[alert.driver_id] : undefined,
+                reporter: alert.reporter_id ? usersMap[alert.reporter_id] : undefined,
+                trip: alert.trip_id ? tripsMap[alert.trip_id] : undefined,
+            }));
 
-        setAlerts(textEnriched);
+            console.log('Enriched alerts:', enrichedAlerts);
+            setAlerts(enrichedAlerts);
+        } catch (error) {
+            console.error('Error in fetchAlerts:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to fetch SOS alerts',
+                variant: 'destructive'
+            });
+            setAlerts([]);
+        } finally {
+            setLoading(false);
+        }
     }
 
     async function updateStatus(id: string, newStatus: string) {
-        await supabase.from('sos_alerts').update({ status: newStatus }).eq('id', id);
-        fetchAlerts();
-        toast({ title: `Marked as ${newStatus}` });
+        try {
+            const { error } = await supabase
+                .from('sos_alerts')
+                .update({ 
+                    status: newStatus, 
+                    updated_at: new Date().toISOString() 
+                })
+                .eq('id', id);
+            
+            if (error) {
+                console.error('Error updating status:', error);
+                toast({ 
+                    title: 'Error', 
+                    description: 'Failed to update status: ' + error.message, 
+                    variant: 'destructive' 
+                });
+                return;
+            }
+            
+            console.log('Status updated successfully to:', newStatus);
+            toast({ 
+                title: 'Success', 
+                description: `Alert marked as ${newStatus}` 
+            });
+            
+            // Update the local state immediately
+            setAlerts(prevAlerts => 
+                prevAlerts.map(alert => 
+                    alert.id === id ? { ...alert, status: newStatus as any } : alert
+                )
+            );
+        } catch (error) {
+            console.error('Error in updateStatus:', error);
+            toast({ 
+                title: 'Error', 
+                description: 'Failed to update status', 
+                variant: 'destructive' 
+            });
+        }
     }
+
+    // Filter and search logic
+    const filteredAlerts = alerts.filter(alert => {
+        const matchesSearch = 
+            alert.driver?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            alert.driver?.phone?.includes(searchTerm) ||
+            alert.reporter?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            alert.reporter?.phone?.includes(searchTerm) ||
+            alert.trip?.pickup_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            alert.trip?.destination_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            alert.id.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = !statusFilter || alert.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    const stats = {
+        total: alerts.length,
+        pending: alerts.filter(a => a.status === 'pending').length,
+        investigating: alerts.filter(a => a.status === 'investigating').length,
+        resolved: alerts.filter(a => a.status === 'resolved').length,
+    };
 
     return (
         <DashboardLayout title="Safety Command Center">
-            <div className="grid gap-6">
-                {alerts.map((alert) => {
-                    // Logic to determine customer display (Use Trip Customer first, else Reporter)
-                    const customer = alert.trip?.customer || alert.reporter;
+            <audio
+                ref={audioRef}
+                src="/sos-43210.mp3"
+                preload="auto"
+            />
+            <div className="space-y-6">
+                {/* Search Bar */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <MapPinIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="Search by driver, reporter, location, or alert ID..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                    </div>
+                    <Button onClick={fetchAlerts} variant="outline">Refresh</Button>
+                </div>
 
-                    return (
+                {/* Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="stat-card py-4">
+                        <p className="text-sm text-muted-foreground">Total Alerts</p>
+                        <p className="text-2xl font-semibold">{stats.total}</p>
+                    </div>
+                    <div className="stat-card py-4">
+                        <p className="text-sm text-muted-foreground">Pending</p>
+                        <p className="text-2xl font-semibold text-red-600">{stats.pending}</p>
+                    </div>
+                    <div className="stat-card py-4">
+                        <p className="text-sm text-muted-foreground">Investigating</p>
+                        <p className="text-2xl font-semibold text-blue-600">{stats.investigating}</p>
+                    </div>
+                    <div className="stat-card py-4">
+                        <p className="text-sm text-muted-foreground">Resolved</p>
+                        <p className="text-2xl font-semibold text-green-600">{stats.resolved}</p>
+                    </div>
+                </div>
+
+                {/* Filter Buttons */}
+                <div className="flex gap-2 flex-wrap">
+                    <Button
+                        variant={statusFilter === null ? 'default' : 'outline'}
+                        onClick={() => setStatusFilter(null)}
+                    >
+                        All Alerts
+                    </Button>
+                    <Button
+                        variant={statusFilter === 'pending' ? 'default' : 'outline'}
+                        onClick={() => setStatusFilter('pending')}
+                        className={statusFilter === 'pending' ? 'bg-red-600 hover:bg-red-700' : ''}
+                    >
+                        Pending
+                    </Button>
+                    <Button
+                        variant={statusFilter === 'investigating' ? 'default' : 'outline'}
+                        onClick={() => setStatusFilter('investigating')}
+                        className={statusFilter === 'investigating' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                    >
+                        Investigating
+                    </Button>
+                    <Button
+                        variant={statusFilter === 'resolved' ? 'default' : 'outline'}
+                        onClick={() => setStatusFilter('resolved')}
+                        className={statusFilter === 'resolved' ? 'bg-green-600 hover:bg-green-700' : ''}
+                    >
+                        Resolved
+                    </Button>
+                </div>
+
+                {/* Alerts Grid */}
+                {loading ? (
+                    <div className="flex items-center justify-center p-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                ) : filteredAlerts.length === 0 ? (
+                    <div className="text-center py-20 text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                        {alerts.length === 0 ? 'No active alerts. The system is monitored.' : 'No alerts match your search or filter.'}
+                    </div>
+                ) : (
+                    <div className="grid gap-6">
+                        {filteredAlerts.map((alert) => (
                         <Card key={alert.id} className={`border-l-4 ${alert.status === 'pending' ? 'border-l-red-600 shadow-red-100' : 'border-l-green-500'}`}>
                             <CardHeader className="flex flex-row items-center justify-between pb-4">
                                 <div>
@@ -249,49 +385,61 @@ export default function Safety() {
                                         Live Location
                                     </h3>
                                     <div className="bg-gray-50 p-3 rounded-md text-sm font-mono">
-                                        {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
+                                        {Number(alert.latitude).toFixed(6)}, {Number(alert.longitude).toFixed(6)}
                                     </div>
                                     <Button asChild variant="link" className="pl-0 text-blue-600">
                                         <a href={`https://www.google.com/maps/search/?api=1&query=${alert.latitude},${alert.longitude}`} target="_blank" rel="noreferrer">
                                             View on Google Maps &rarr;
                                         </a>
                                     </Button>
-
-                                    {/* Debug Trip ID */}
-                                    <div className="text-xs text-gray-400 mt-2">
-                                        Trip ID: {alert.trip_id ? alert.trip_id.slice(0, 8) + '...' : (alert.trip ? "Demo Mode" : "None")}
-                                    </div>
+                                    {alert.notes && (
+                                        <div className="text-sm text-gray-600 mt-2">
+                                            <strong>Notes:</strong> {alert.notes}
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Customer Info */}
+                                {/* Reporter/Customer Info */}
                                 <div className="space-y-4 border-r pr-4">
                                     <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                                         <UserIcon className="h-5 w-5 text-gray-500" />
-                                        Customer Details
+                                        Reporter / Customer
                                     </h3>
-                                    {customer ? (
+                                    {alert.reporter ? (
                                         <div className="flex items-center gap-4">
                                             <Avatar className="h-12 w-12 border">
-                                                <AvatarImage src={customer.avatar_url || ''} />
-                                                <AvatarFallback>{customer.name ? customer.name.charAt(0) : '?'}</AvatarFallback>
+                                                <AvatarFallback>{alert.reporter.full_name?.charAt(0) || '?'}</AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <p className="font-medium">{customer.name || "Unknown Name"}</p>
+                                                <p className="font-medium">{alert.reporter.full_name || "Unknown"}</p>
                                                 <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                                                     <PhoneIcon className="h-3 w-3" />
-                                                    {customer.phone || "No Phone"}
+                                                    {alert.reporter.phone || "No Phone"}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : alert.trip?.customer ? (
+                                        <div className="flex items-center gap-4">
+                                            <Avatar className="h-12 w-12 border">
+                                                <AvatarFallback>{alert.trip.customer.full_name?.charAt(0) || '?'}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <p className="font-medium">{alert.trip.customer.full_name || "Unknown"}</p>
+                                                <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                                                    <PhoneIcon className="h-3 w-3" />
+                                                    {alert.trip.customer.phone || "No Phone"}
                                                 </div>
                                             </div>
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-muted-foreground">Unknown Customer</p>
+                                        <p className="text-sm text-muted-foreground">Unknown Reporter</p>
                                     )}
 
                                     {alert.trip && (
                                         <div className="mt-4 pt-4 border-t">
                                             <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Trip Route</p>
-                                            <p className="text-sm mb-1"><span className="text-green-600">●</span> {alert.trip.pickup_address}</p>
-                                            <p className="text-sm"><span className="text-red-600">●</span> {alert.trip.dest_address}</p>
+                                            <p className="text-sm mb-1"><span className="text-green-600">●</span> {alert.trip.pickup_address || 'N/A'}</p>
+                                            <p className="text-sm"><span className="text-red-600">●</span> {alert.trip.destination_address || 'N/A'}</p>
                                         </div>
                                     )}
                                     {!alert.trip && (
@@ -301,49 +449,32 @@ export default function Safety() {
                                     )}
                                 </div>
 
-                                {/* Driver & Vehicle Info */}
+                                {/* Driver Info */}
                                 <div className="space-y-4">
                                     <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                                         <CarFront className="h-5 w-5 text-gray-500" />
-                                        Driver & Vehicle
+                                        Driver
                                     </h3>
-                                    {alert.trip?.driver ? (
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-4">
-                                                <Avatar className="h-12 w-12 border">
-                                                    <AvatarImage src={alert.trip.driver.avatar_url || ''} />
-                                                    <AvatarFallback>D</AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <p className="font-medium">{alert.trip.driver.name}</p>
-                                                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                                                        <PhoneIcon className="h-3 w-3" />
-                                                        {alert.trip.driver.phone}
-                                                    </div>
+                                    {alert.driver ? (
+                                        <div className="flex items-center gap-4">
+                                            <Avatar className="h-12 w-12 border">
+                                                <AvatarFallback>{alert.driver.full_name?.charAt(0) || 'D'}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <p className="font-medium">{alert.driver.full_name || "Unknown Driver"}</p>
+                                                <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                                                    <PhoneIcon className="h-3 w-3" />
+                                                    {alert.driver.phone || "No Phone"}
                                                 </div>
                                             </div>
-
-                                            {alert.trip.vehicle && (
-                                                <div className="bg-gray-50 p-3 rounded-md">
-                                                    <p className="font-semibold">{alert.trip.vehicle.vehicle_model}</p>
-                                                    <p className="text-sm text-gray-600 font-mono mt-1 border px-2 py-0.5 rounded bg-white w-fit">
-                                                        {alert.trip.vehicle.vehicle_plate}
-                                                    </p>
-                                                </div>
-                                            )}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-muted-foreground">No Driver Assigned</p>
+                                        <p className="text-sm text-muted-foreground">No Driver Info</p>
                                     )}
                                 </div>
                             </CardContent>
                         </Card>
-                    );
-                })}
-
-                {alerts.length === 0 && (
-                    <div className="text-center py-20 text-gray-500 bg-gray-50 rounded-lg border border-dashed">
-                        No active alerts. The system is monitored.
+                        ))}
                     </div>
                 )}
             </div>

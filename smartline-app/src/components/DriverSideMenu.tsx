@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, 
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-    LayoutDashboard, History, CircleDollarSign, Car, Settings, Headphones,
+    Wallet, History, CircleDollarSign, Car, Settings, Headphones,
     LogOut, User, ChevronRight, RefreshCw
 } from 'lucide-react-native';
 import { RootStackParamList } from '../types/navigation';
@@ -160,7 +160,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
 
                         {/* Top Menu Items */}
                         <View style={styles.menuSection}>
-                            <MenuItem icon={<LayoutDashboard size={22} color={Colors.primary} />} label="Dashboard" onPress={() => handleNavigation('DriverHome')} />
+                            <MenuItem icon={<Wallet size={22} color={Colors.primary} />} label="Wallet" onPress={() => handleNavigation('DriverWallet')} />
                             <MenuItem icon={<History size={22} color="#F97316" />} label="Trip History" onPress={() => handleNavigation('DriverHistory')} />
                             <MenuItem icon={<CircleDollarSign size={22} color="#10B981" />} label="Earnings" onPress={() => handleNavigation('DriverEarnings')} />
                             <MenuItem icon={<Car size={22} color="#3B82F6" />} label="My Vehicle" onPress={() => handleNavigation('DriverMyVehicle')} />

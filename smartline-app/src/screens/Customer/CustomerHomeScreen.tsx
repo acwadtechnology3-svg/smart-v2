@@ -45,15 +45,19 @@ export default function CustomerHomeScreen() {
             try {
                 const history = await apiRequest<{ trips: any[] }>('/trips/passenger/history');
                 if (history.trips && history.trips.length > 0) {
-                    const lastTrip = history.trips[0];
-                    if (['requested', 'accepted', 'arrived', 'started'].includes(lastTrip.status)) {
-                        console.log("Restoring passenger trip:", lastTrip.id, lastTrip.status);
-                        if (lastTrip.status === 'requested') {
-                            navigation.navigate('SearchingDriver', { tripId: lastTrip.id });
-                        } else if (lastTrip.status === 'accepted') {
-                            navigation.navigate('DriverFound', { tripId: lastTrip.id });
-                        } else if (lastTrip.status === 'arrived' || lastTrip.status === 'started') {
-                            navigation.navigate('OnTrip', { tripId: lastTrip.id });
+                    // Search through history for any active trip
+                    const activeTrip = history.trips.find(t =>
+                        ['requested', 'accepted', 'arrived', 'started'].includes(t.status)
+                    );
+
+                    if (activeTrip) {
+                        console.log("Restoring passenger trip:", activeTrip.id, activeTrip.status);
+                        if (activeTrip.status === 'requested') {
+                            navigation.navigate('SearchingDriver', { tripId: activeTrip.id });
+                        } else if (activeTrip.status === 'accepted') {
+                            navigation.navigate('DriverFound', { tripId: activeTrip.id });
+                        } else if (activeTrip.status === 'arrived' || activeTrip.status === 'started') {
+                            navigation.navigate('OnTrip', { tripId: activeTrip.id });
                         }
                     }
                 }

@@ -7,6 +7,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { apiRequest } from '../../services/backend';
+import { tripStatusService } from '../../services/tripStatusService';
 
 const { width } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -18,6 +19,12 @@ export default function OnTripScreen() {
     const navigation = useNavigation<OnTripScreenNavigationProp>();
     const route = useRoute<OnTripScreenRouteProp>();
     const { tripId } = route.params;
+
+    useEffect(() => {
+        if (tripId) {
+            tripStatusService.startMonitoring(tripId);
+        }
+    }, [tripId]);
 
     const [trip, setTrip] = useState<any>(null);
     const [loading, setLoading] = useState(true);

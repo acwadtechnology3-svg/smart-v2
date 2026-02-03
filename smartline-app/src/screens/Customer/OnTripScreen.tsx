@@ -9,6 +9,7 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { apiRequest } from '../../services/backend';
 import { tripStatusService } from '../../services/tripStatusService';
 import { realtimeClient } from '../../services/realtimeClient';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -20,6 +21,7 @@ export default function OnTripScreen() {
     const navigation = useNavigation<OnTripScreenNavigationProp>();
     const route = useRoute<OnTripScreenRouteProp>();
     const { tripId } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [trip, setTrip] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -100,7 +102,7 @@ export default function OnTripScreen() {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.loadingText}>Loading trip...</Text>
+                <Text style={styles.loadingText}>{t('loading')}...</Text>
             </View>
         );
     }
@@ -109,7 +111,7 @@ export default function OnTripScreen() {
         <View style={styles.container}>
             <View style={styles.topBar}>
                 <TouchableOpacity style={styles.cancelBtnTop} onPress={handleCancel}>
-                    <Text style={styles.cancelTextTop}>Cancel Trip</Text>
+                    <Text style={styles.cancelTextTop}>{t('cancelTrip')}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -148,17 +150,17 @@ export default function OnTripScreen() {
             </MapView>
 
             <View style={styles.bottomSheet}>
-                <Text style={styles.title}>Trip in Progress</Text>
-                <Text style={styles.subtitle}>Your driver is taking you to your destination</Text>
+                <Text style={styles.title}>{t('tripInProgress')}</Text>
+                <Text style={styles.subtitle}>{t('takingYouToDest')}</Text>
 
                 <View style={styles.tripInfo}>
                     <View style={styles.infoRow}>
-                        <Text style={styles.label}>From:</Text>
-                        <Text style={styles.value} numberOfLines={1}>{trip.pickup_address || 'Pickup location'}</Text>
+                        <Text style={styles.label}>{t('from')}:</Text>
+                        <Text style={styles.value} numberOfLines={1}>{trip.pickup_address || t('pickupLocation')}</Text>
                     </View>
                     <View style={styles.infoRow}>
-                        <Text style={styles.label}>To:</Text>
-                        <Text style={styles.value} numberOfLines={1}>{trip.dest_address || 'Destination'}</Text>
+                        <Text style={styles.label}>{t('to')}:</Text>
+                        <Text style={styles.value} numberOfLines={1}>{trip.dest_address || t('destination')}</Text>
                     </View>
                 </View>
 
@@ -167,28 +169,28 @@ export default function OnTripScreen() {
                         <View style={styles.iconCircle}>
                             <Phone size={24} color={Colors.primary} />
                         </View>
-                        <Text style={styles.actionLabel}>Call</Text>
+                        <Text style={styles.actionLabel}>{t('call')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Chat', { driverName: 'Driver', tripId, role: 'customer' })}>
                         <View style={styles.iconCircle}>
                             <MessageSquare size={24} color={Colors.primary} />
                         </View>
-                        <Text style={styles.actionLabel}>Chat</Text>
+                        <Text style={styles.actionLabel}>{t('chat')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Safety', { tripId })}>
                         <View style={styles.iconCircle}>
                             <ShieldCheck size={24} color={Colors.primary} />
                         </View>
-                        <Text style={styles.actionLabel}>Safety</Text>
+                        <Text style={styles.actionLabel}>{t('safety')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.actionBtn} onPress={handleCancel}>
                         <View style={[styles.iconCircle, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}>
                             <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#EF4444' }}>X</Text>
                         </View>
-                        <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Cancel</Text>
+                        <Text style={[styles.actionLabel, { color: '#EF4444' }]}>{t('cancel')}</Text>
                     </TouchableOpacity>
                 </View>
             </View>

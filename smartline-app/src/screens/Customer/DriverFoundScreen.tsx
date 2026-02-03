@@ -197,7 +197,7 @@ export default function DriverFoundScreen() {
             <View style={styles.bottomSheet}>
                 <View style={styles.statusHeader}>
                     <Text style={[styles.etaText, isArrived && { color: Colors.success }]}>
-                        {isArrived ? 'Driver is here!' : `Arriving in ${displayDriver?.eta || '2 min'}`}
+                        {isArrived ? t('driverArriving') : `${t('arrivingIn')} ${displayDriver?.eta || '2 ' + t('minutes')}`}
                     </Text>
                     <Text style={styles.plateText}>{displayDriver?.plate || 'ABC 123'}</Text>
                 </View>
@@ -211,7 +211,7 @@ export default function DriverFoundScreen() {
                             />
                         </View>
                         <View style={styles.driverTexts}>
-                            <Text style={styles.driverName}>{displayDriver?.name || 'Captain'}</Text>
+                            <Text style={styles.driverName}>{displayDriver?.name || t('driver')}</Text>
                             <View style={styles.ratingRow}>
                                 <Star size={12} color="#F59E0B" fill="#F59E0B" />
                                 <Text style={styles.ratingText}>{displayDriver?.rating || '5.0'}</Text>
@@ -222,7 +222,7 @@ export default function DriverFoundScreen() {
 
                     <View style={styles.carSection}>
                         <CarFront size={28} color={Colors.primary} />
-                        <Text style={styles.carModel}>{displayDriver?.car || 'Sedan'}</Text>
+                        <Text style={styles.carModel}>{displayDriver?.car || t('vehicle')}</Text>
                         <Text style={styles.carColor}>{displayDriver?.color || 'Silver'}</Text>
                     </View>
                 </View>

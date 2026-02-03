@@ -58,7 +58,11 @@ export default function OTPVerificationScreen() {
     const handleVerify = () => {
         const code = otp.join('');
         if (code.length === 4) {
-            navigation.replace('Signup', { phone, role });
+            if (route.params.purpose === 'reset-password') {
+                navigation.replace('ResetPassword', { phone });
+            } else {
+                navigation.replace('Signup', { phone, role });
+            }
         }
     };
 

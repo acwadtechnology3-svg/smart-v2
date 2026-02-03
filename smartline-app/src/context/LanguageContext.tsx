@@ -302,6 +302,9 @@ export const translations = {
         uploadProfilePhoto: 'Upload Profile Photo',
         profilePhotoDescription: 'Please upload a clear photo of yourself. This will be shown to customers.',
         removePhoto: 'Remove Photo',
+        resetPassword: 'Reset Password',
+        newPassword: 'New Password',
+        passwordResetSuccess: 'Password has been reset successfully.',
     },
     ar: {
         // Sidebar & Menu
@@ -585,6 +588,9 @@ export const translations = {
         uploadProfilePhoto: 'رفع الصورة الشخصية',
         profilePhotoDescription: 'من فضلك ارفع صورة واضحة ليك. الصورة دي هتظهر للعملاء.',
         removePhoto: 'حذف الصورة',
+        resetPassword: 'إعادة تعيين كلمة المرور',
+        newPassword: 'كلمة المرور الجديدة',
+        passwordResetSuccess: 'تم تغيير كلمة المرور بنجاح.',
     }
 };
 

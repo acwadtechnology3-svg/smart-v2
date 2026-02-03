@@ -99,3 +99,32 @@ export const login = async (req: Request, res: Response) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const resetPassword = async (req: Request, res: Response) => {
+    const { phone, newPassword } = req.body;
+
+    try {
+        // 1. Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // 2. Update User
+        const { data, error } = await supabase
+            .from('users')
+            .update({ password_hash: hashedPassword })
+            .eq('phone', phone)
+            .select();
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({ message: 'Password updated successfully' });
+
+    } catch (error: any) {
+        console.error('Reset Password Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};

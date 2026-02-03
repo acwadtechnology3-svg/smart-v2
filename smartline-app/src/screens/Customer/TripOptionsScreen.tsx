@@ -22,11 +22,11 @@ type TripOptionsScreenNavigationProp = NativeStackNavigationProp<RootStackParamL
 type TripOptionsScreenRouteProp = RouteProp<RootStackParamList, 'TripOptions'>;
 
 const RIDE_IMAGES: any = {
-    saver: require('../../../assets/rides/ride_saver.png'),
-    comfort: require('../../../assets/rides/ride_comfort.png'),
-    vip: require('../../../assets/rides/ride_vip.png'),
-    taxi: require('../../../assets/rides/ride_taxi.png'),
-    scooter: require('../../../assets/rides/ride_taxi.png'), // Placeholder
+    saver: require('../../assets/images/saver.webp'),
+    comfort: require('../../assets/images/comfort.webp'),
+    vip: require('../../assets/images/vip.webp'),
+    taxi: require('../../assets/images/saver.webp'),
+    scooter: require('../../assets/images/scooter.webp'),
 };
 
 const BASE_RIDES = [
@@ -75,7 +75,7 @@ export default function TripOptionsScreen() {
         const initRoute = async (retryCount = 0) => {
             setRouteLoading(true);
             setRouteError(null);
-            
+
             try {
                 // 1. Get Pickup Coords
                 let pCoords = { latitude: 0, longitude: 0 };
@@ -102,7 +102,7 @@ export default function TripOptionsScreen() {
                 if (pCoords.latitude !== 0 && dCoords.latitude !== 0) {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-                    
+
                     try {
                         const routeData = await getDirections(
                             [pCoords.longitude, pCoords.latitude],
@@ -442,7 +442,6 @@ export default function TripOptionsScreen() {
                             {/* Icon Section */}
                             <View style={styles.rideIconWrapper}>
                                 <Image source={ride.image} style={styles.rideImage} resizeMode="contain" />
-                                {selectedRide === ride.id && <View style={[styles.iconBg, { backgroundColor: ride.color + '10' }]} />}
                             </View>
 
                             {/* Info Section */}
@@ -656,9 +655,8 @@ const styles = StyleSheet.create({
     },
     rideCardSelected: { borderColor: Colors.primary, backgroundColor: '#F0F9FF' },
 
-    rideIconWrapper: { width: 100, height: 60, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    rideIconWrapper: { width: 110, height: 75, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
     rideImage: { width: '100%', height: '100%' },
-    iconBg: { ...StyleSheet.absoluteFillObject, borderRadius: 8, opacity: 1, zIndex: -1 },
 
     rideInfo: { flex: 1 },
     rideName: { fontSize: 18, fontWeight: 'bold', color: '#1e1e1e' },

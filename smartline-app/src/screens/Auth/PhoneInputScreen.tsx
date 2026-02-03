@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Image as RNImage } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import axios from 'axios';
@@ -73,11 +73,16 @@ export default function PhoneInputScreen() {
                                 onPress={() => navigation.goBack()}
                                 style={{ padding: 12, borderRadius: 20, backgroundColor: '#F3F4F6' }}
                             >
-                                <ArrowLeft size={30} color="#000000" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
+                                {isRTL ? (
+                                    <ChevronRight size={32} color="#000000" />
+                                ) : (
+                                    <ChevronLeft size={32} color="#000000" />
+                                )}
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.content}>
+
                             <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>{t('enterPhoneNumber')}</Text>
                             <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('weWillSendCode')}</Text>
 
@@ -102,7 +107,15 @@ export default function PhoneInputScreen() {
                                 </View>
                             </View>
 
-                            <View style={{ flex: 1 }} />
+                            <View style={styles.imageContainer}>
+                                <RNImage
+                                    source={role === 'driver' ? require('../../assets/images/driver-phone.webp') : require('../../assets/images/customer-phone.webp')}
+                                    style={styles.headerImage}
+                                    resizeMode="contain"
+                                />
+                            </View>
+
+
 
                             <TouchableOpacity
                                 style={[styles.button, (!phone || loading) && styles.buttonDisabled]}
@@ -132,6 +145,8 @@ const styles = StyleSheet.create({
     title: { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
     subtitle: { fontSize: 16, color: Colors.textSecondary, marginBottom: 32 },
     inputContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 12 },
+    imageContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 24, width: '100%' },
+    headerImage: { width: '80%', height: '80%' },
     prefixContainer: {
         backgroundColor: '#F3F4F6',
         borderRadius: 12,

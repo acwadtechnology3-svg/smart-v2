@@ -11,7 +11,8 @@ export type RootStackParamList = {
     DriverProfilePhoto: { phone: string; name: string; nationalId: string; city: string; vehicleType: string; vehicleModel: string; vehiclePlate: string };
     DriverDocuments: { phone: string; name: string; nationalId: string; city: string; vehicleType: string; vehicleModel: string; vehiclePlate: string; profilePhoto: string };
     DriverWaiting: undefined;
-    OTPVerification: { phone: string; role: 'customer' | 'driver' };
+    OTPVerification: { phone: string; role: 'customer' | 'driver'; purpose?: 'signup' | 'reset-password' };
+    ResetPassword: { phone: string };
     SearchLocation: {
         selectedAddress?: string;
         selectedCoordinates?: { latitude: number; longitude: number };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Image as RNImage } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Car, User, Globe, ArrowLeft } from 'lucide-react-native'; // Using User as fallback for Driver if SteeringWheel not available
@@ -35,12 +35,7 @@ export default function RoleSelectionScreen() {
                         <View style={{ width: 40 }} /> // Spacer
                     )}
 
-                    <View style={{ flex: 1 }} />
 
-                    <TouchableOpacity onPress={toggleLanguage} style={styles.langButton}>
-                        <Globe size={20} color={Colors.textSecondary} />
-                        <Text style={styles.langText}>{language === 'en' ? 'العربية' : 'English'}</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.header}>
@@ -54,8 +49,12 @@ export default function RoleSelectionScreen() {
                         onPress={() => handleSelectRole('customer')}
                         activeOpacity={0.7}
                     >
-                        <View style={styles.iconBox}>
-                            <User size={40} color="#4F46E5" />
+                        <View style={styles.imageBox}>
+                            <RNImage
+                                source={require('../../assets/images/customer.webp')}
+                                style={styles.roleImage}
+                                resizeMode="contain"
+                            />
                         </View>
                         <Text style={styles.roleTitle}>{t('iNeedRide')}</Text>
                         <Text style={styles.roleDescription}>{t('bookRides')}</Text>
@@ -66,8 +65,12 @@ export default function RoleSelectionScreen() {
                         onPress={() => handleSelectRole('driver')}
                         activeOpacity={0.7}
                     >
-                        <View style={styles.iconBox}>
-                            <Car size={40} color="#4F46E5" />
+                        <View style={styles.imageBox}>
+                            <RNImage
+                                source={require('../../assets/images/driver.webp')}
+                                style={styles.roleImage}
+                                resizeMode="contain"
+                            />
                         </View>
                         <Text style={styles.roleTitle}>{t('iWantToDrive')}</Text>
                         <Text style={styles.roleDescription}>{t('earnMoney')}</Text>
@@ -75,7 +78,10 @@ export default function RoleSelectionScreen() {
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>{t('changeRoleLater')}</Text>
+                    <TouchableOpacity onPress={toggleLanguage} style={[styles.langButton, { marginTop: 16 }]}>
+                        <Globe size={20} color={Colors.textSecondary} />
+                        <Text style={styles.langText}>{language === 'en' ? 'العربية' : 'English'}</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </SafeAreaView>
@@ -146,14 +152,16 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 2,
     },
-    iconBox: {
-        width: 80,
-        height: 80,
-        borderRadius: 24,
-        backgroundColor: '#EEF2FF', // Light Indigo/Purple
+    imageBox: {
+        width: 120, // Increased size for images
+        height: 120,
+        marginBottom: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 24,
+    },
+    roleImage: {
+        width: '100%',
+        height: '100%',
     },
     roleTitle: {
         fontSize: 20,

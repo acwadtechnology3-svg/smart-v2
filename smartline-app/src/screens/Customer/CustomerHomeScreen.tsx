@@ -171,15 +171,15 @@ export default function CustomerHomeScreen() {
 
                 {/* Safety Shield - Floating */}
                 <View style={styles.floatingUI} pointerEvents="box-none">
+                    <TouchableOpacity style={styles.recenterButton}>
+                        <Navigation color="#1e1e1e" size={24} fill="#1e1e1e" />
+                    </TouchableOpacity>
+
                     <TouchableOpacity style={styles.safetyPill} onPress={() => navigation.navigate('Safety', {})}>
                         <View style={styles.shieldIconBg}>
                             <ShieldCheck color="#fff" size={14} fill="#fff" />
                         </View>
                         <Text style={styles.safetyText}>{t('safetyCenter')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.recenterButton}>
-                        <Navigation color="#1e1e1e" size={24} fill="#1e1e1e" />
                     </TouchableOpacity>
                 </View>
 
@@ -234,7 +234,7 @@ export default function CustomerHomeScreen() {
                             {/* Secondary Options Column */}
                             <View style={styles.rightColumn}>
                                 {/* Safety Box */}
-                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('Safety', {})}> 
+                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('Safety', {})}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.featureTitle}>{t('enjoy')}</Text>
                                         <Text style={styles.featureSubHighlight}>{t('safestTrips')}</Text>
@@ -243,7 +243,7 @@ export default function CustomerHomeScreen() {
                                 </TouchableOpacity>
 
                                 {/* Affordable Box */}
-                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('SearchLocation')}> 
+                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('SearchLocation')}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.featureTitle}>{t('enjoy')}</Text>
                                         <Text style={styles.featureTitle}>{t('affordable')}</Text>
@@ -343,12 +343,15 @@ const styles = StyleSheet.create({
     locationHeaderSubtitle: { fontSize: 10, color: '#6B7280' },
 
     floatingUI: {
-        // position: 'absolute', bottom: 350,
-        marginBottom: -35,                       // 👽 02-02-2026: Lowered Safety Center further (was -15)
-        width: '100%', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, alignItems: 'center',
-        zIndex: 10 // Ensure it stays on top if it overlaps
+        marginBottom: -35,
+        width: '100%',
+        height: 50,
+        zIndex: 10,
+        // No flex needed for absolute children
     },
     safetyPill: {
+        position: 'absolute',
+        left: 20, // Force Left
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: '#fff', paddingRight: 12, paddingLeft: 4, paddingVertical: 4,
         borderRadius: 20, gap: 8,
@@ -357,6 +360,8 @@ const styles = StyleSheet.create({
     shieldIconBg: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#4F46E5', alignItems: 'center', justifyContent: 'center' },
     safetyText: { fontSize: 12, fontWeight: '700', color: '#1e1e1e' },
     recenterButton: {
+        position: 'absolute',
+        right: 20, // Force Right
         width: 44, height: 44,
         backgroundColor: '#fff', borderRadius: 22,
         alignItems: 'center', justifyContent: 'center',

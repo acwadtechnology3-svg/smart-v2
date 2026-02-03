@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Image as RNImage } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
@@ -168,9 +168,18 @@ export default function PasswordScreen() {
 
                             <TouchableOpacity
                                 style={[styles.forgotPassword, { alignSelf: isRTL ? 'flex-start' : 'flex-end' }]}
+                                onPress={() => navigation.navigate('OTPVerification', { phone, role, purpose: 'reset-password' })}
                             >
                                 <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
                             </TouchableOpacity>
+
+                            <View style={styles.imageContainer}>
+                                <RNImage
+                                    source={role === 'driver' ? require('../../assets/images/driver-password.webp') : require('../../assets/images/customer-password.webp')}
+                                    style={styles.illustration}
+                                    resizeMode="contain"
+                                />
+                            </View>
                         </View>
 
                         {/* Footer / Button Section */}
@@ -223,6 +232,9 @@ const styles = StyleSheet.create({
 
     forgotPassword: { alignSelf: 'flex-end', paddingVertical: 8 },
     forgotPasswordText: { color: Colors.primary, fontWeight: '600', fontSize: 14 },
+
+    imageContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
+    illustration: { width: '80%', height: '80%' },
 
     footer: { padding: 24, paddingTop: 10 },
     button: {

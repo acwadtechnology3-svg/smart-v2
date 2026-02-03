@@ -64,11 +64,7 @@ export default function DriverActiveTripScreen() {
     // 2. Monitor Status Cancellation
     useEffect(() => {
         if (trip?.status === 'cancelled') {
-            if (navigation.canGoBack()) {
-                navigation.popToTop();
-            } else {
-                navigation.navigate('DriverHome' as any);
-            }
+            navigation.navigate('DriverHome' as any, { autoOnline: true });
             setTimeout(() => {
                 Alert.alert(t('tripCancelled'), t('passengerCancelled'));
             }, 500);
@@ -144,7 +140,7 @@ export default function DriverActiveTripScreen() {
             const latestTrip = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
             if (latestTrip.trip?.status === 'cancelled') {
                 Alert.alert(t('tripCancelled'), t('passengerCancelled'));
-                navigation.navigate('DriverHome' as any);
+                navigation.navigate('DriverHome' as any, { autoOnline: true });
                 return;
             }
 
@@ -155,7 +151,7 @@ export default function DriverActiveTripScreen() {
 
             if (response.success) {
                 if (newStatus === 'completed') {
-                    Alert.alert(t('success'), t('tripFinished'), [{ text: t('ok'), onPress: () => navigation.navigate('DriverHome') }]);
+                    Alert.alert(t('success'), t('tripFinished'), [{ text: t('ok'), onPress: () => navigation.navigate('DriverHome', { autoOnline: true }) }]);
                 } else {
                     setTrip(response.trip);
                 }

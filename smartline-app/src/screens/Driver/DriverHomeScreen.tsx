@@ -7,7 +7,7 @@ import { Colors } from '../../constants/Colors';
 import { apiRequest } from '../../services/backend';
 import { realtimeClient } from '../../services/realtimeClient';
 import { Menu, Shield, CircleDollarSign, Navigation, Siren } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import DriverSideMenu from '../../components/DriverSideMenu';
 import TripRequestModal from '../../components/TripRequestModal';
@@ -17,6 +17,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function DriverHomeScreen() {
     const navigation = useNavigation<any>();
+    const route = useRoute<any>();
     const { t, isRTL } = useLanguage();
 
     const [isOnline, setIsOnline] = useState(false);
@@ -130,6 +131,17 @@ export default function DriverHomeScreen() {
             console.log("Error checking active trip", e);
         }
     };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            if (route.params?.autoOnline) {
+                console.log("Auto-online triggered from navigation params");
+                setIsOnline(true);
+                navigation.setParams({ autoOnline: undefined });
+            }
+            checkActiveTrip();
+        }, [route.params])
+    );
 
     const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
     const [incomingTrip, setIncomingTrip] = useState<any>(null);

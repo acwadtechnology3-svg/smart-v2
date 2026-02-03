@@ -13,6 +13,7 @@ import MapView, { UrlTile, Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { getDirections } from '../../services/mapService';
 import { apiRequest } from '../../services/backend';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { width, height } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -38,6 +39,7 @@ export default function TripOptionsScreen() {
     const navigation = useNavigation<TripOptionsScreenNavigationProp>();
     const route = useRoute<TripOptionsScreenRouteProp>();
     const { pickup, destination, destinationCoordinates } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [selectedRide, setSelectedRide] = useState('comfort');
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Wallet'>('Cash');
@@ -403,7 +405,7 @@ export default function TripOptionsScreen() {
                 <View style={styles.routeInfo}>
                     <View style={styles.routeNode}>
                         <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
-                        <Text style={styles.addressText} numberOfLines={1}>{pickup || 'Current Location'}</Text>
+                        <Text style={styles.addressText} numberOfLines={1}>{pickup || t('currentLocation')}</Text>
                     </View>
                     <View style={styles.verticalLineWrapper}>
                         <View style={styles.verticalLine} />
@@ -422,7 +424,7 @@ export default function TripOptionsScreen() {
 
                 <View style={styles.divider} />
 
-                <Text style={styles.sectionTitle}>Choose a ride</Text>
+                <Text style={styles.sectionTitle}>{t('chooseRide')}</Text>
 
                 {/* Ride Options (Vertical List) */}
                 <ScrollView
@@ -486,7 +488,7 @@ export default function TripOptionsScreen() {
                             ) : (
                                 <Wallet size={20} color={Colors.primary} />
                             )}
-                            <Text style={styles.paymentText}>{paymentMethod}</Text>
+                            <Text style={styles.paymentText}>{paymentMethod === 'Cash' ? t('cash') : t('wallet')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -495,7 +497,7 @@ export default function TripOptionsScreen() {
                         >
                             <BadgePercent size={18} color={appliedPromo ? '#166534' : "#F97316"} />
                             <Text style={[styles.promoLinkText, appliedPromo ? { color: '#166534' } : null]}>
-                                {appliedPromo ? appliedPromo : "Promo"}
+                                {appliedPromo ? appliedPromo : t('promoCode')}
                             </Text>
                             {appliedPromo && (
                                 <TouchableOpacity onPress={handleRemovePromo} style={{ marginLeft: 4 }}>

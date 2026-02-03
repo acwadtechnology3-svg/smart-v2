@@ -9,6 +9,7 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { apiRequest } from '../../services/backend';
 import { realtimeClient } from '../../services/realtimeClient';
 import { tripStatusService } from '../../services/tripStatusService';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -20,6 +21,7 @@ export default function DriverFoundScreen() {
     const navigation = useNavigation<DriverFoundScreenNavigationProp>();
     const route = useRoute<DriverFoundScreenRouteProp>();
     const { tripId, driver } = route.params;
+    const { t, isRTL } = useLanguage();
 
     // Start global monitoring in case we restored state directly to this screen
     useEffect(() => {

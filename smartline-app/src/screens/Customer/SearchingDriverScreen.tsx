@@ -9,6 +9,7 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { apiRequest } from '../../services/backend';
 import { realtimeClient } from '../../services/realtimeClient';
 import { tripStatusService } from '../../services/tripStatusService';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { width, height } = Dimensions.get('window');
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
@@ -20,6 +21,7 @@ export default function SearchingDriverScreen() {
     const navigation = useNavigation<SearchingDriverScreenNavigationProp>();
     const route = useRoute<SearchingDriverScreenRouteProp>();
     const { tripId } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [isSearching, setIsSearching] = useState(true);
     const [offers, setOffers] = useState<any[]>([]);
@@ -352,11 +354,11 @@ export default function SearchingDriverScreen() {
                     </Animated.View>
                 </View>
 
-                <Text style={styles.title}>Finding Your Driver</Text>
+                <Text style={styles.title}>{t('findingYourDriver')}</Text>
                 <Text style={styles.subtitle}>
                     {offers.length > 0
-                        ? `${offers.length} driver${offers.length > 1 ? 's' : ''} interested - Choose one!`
-                        : "We're searching for the best drivers near you..."
+                        ? `${offers.length} ${t('driverOffers')}`
+                        : t('searchingNearby')
                     }
                 </Text>
 
@@ -380,20 +382,20 @@ export default function SearchingDriverScreen() {
                                             </View>
                                         )}
                                         <View style={styles.driverDetails}>
-                                            <Text style={styles.driverName}>{offer.driver?.name || 'Driver'}</Text>
+                                            <Text style={styles.driverName}>{offer.driver?.name || t('driver')}</Text>
                                             <View style={styles.ratingRow}>
                                                 <Text style={styles.ratingText}>⭐ {offer.driver?.rating || '5.0'}</Text>
                                             </View>
                                             <Text style={styles.driverCar}>
-                                                {offer.driver?.car || 'Vehicle'} • {offer.driver?.color || 'Color'}
+                                                {offer.driver?.car || t('vehicle')} • {offer.driver?.color || ''}
                                             </Text>
                                             <Text style={styles.driverPlate}>
-                                                Plate: {offer.driver?.plate || 'N/A'}
+                                                {t('plate')}: {offer.driver?.plate || 'N/A'}
                                             </Text>
                                         </View>
                                     </View>
                                     <View style={styles.priceContainer}>
-                                        <Text style={styles.priceLabel}>Offer</Text>
+                                        <Text style={styles.priceLabel}>{t('offer')}</Text>
                                         <Text style={styles.priceValue}>EGP {offer.offered_price || offer.price}</Text>
                                     </View>
                                 </View>
@@ -402,13 +404,13 @@ export default function SearchingDriverScreen() {
                                         style={styles.rejectButton}
                                         onPress={() => handleRejectOffer(offer)}
                                     >
-                                        <Text style={styles.rejectButtonText}>Reject</Text>
+                                        <Text style={styles.rejectButtonText}>{t('reject')}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={styles.acceptButton}
                                         onPress={() => handleAcceptOffer(offer)}
                                     >
-                                        <Text style={styles.acceptButtonText}>Accept Ride</Text>
+                                        <Text style={styles.acceptButtonText}>{t('acceptRide')}</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>

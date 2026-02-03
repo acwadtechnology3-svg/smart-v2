@@ -12,10 +12,13 @@ import { API_URL } from '../../config/api';
 type SignupScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Signup'>;
 type SignupScreenRouteProp = RouteProp<RootStackParamList, 'Signup'>;
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function SignupScreen() {
     const navigation = useNavigation<SignupScreenNavigationProp>();
     const route = useRoute<SignupScreenRouteProp>();
     const { phone, role } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -25,12 +28,12 @@ export default function SignupScreen() {
 
     const handleSignup = async () => {
         if (!name || !email || !password || !confirmPassword) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert(t('error'), t('pleaseFillAllFields'));
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            Alert.alert(t('error'), t('passwordsDoNotMatch'));
             return;
         }
 
@@ -56,42 +59,8 @@ export default function SignupScreen() {
 
         } catch (err: any) {
             console.error('Signup logic error:', err);
-            console.error('Error response:', err.response?.data);
             setLoading(false);
-
-            // Get detailed error message
-            const errorData = err.response?.data;
-            let errorMessage = 'Signup Failed. Please try again.';
-
-            if (errorData) {
-                // Handle validation errors (from middleware)
-                if (errorData.error && typeof errorData.error === 'object') {
-                    if (errorData.error.details && Array.isArray(errorData.error.details)) {
-                        // Validation errors
-                        const validationErrors = errorData.error.details
-                            .map((e: any) => `${e.field}: ${e.message}`)
-                            .join('\n');
-                        errorMessage = `Validation Error:\n${validationErrors}`;
-                    } else {
-                        errorMessage = errorData.error.message || 'Validation failed';
-                    }
-                }
-                // Handle simple error string
-                else if (typeof errorData.error === 'string') {
-                    errorMessage = errorData.error;
-                    if (errorData.details) {
-                        errorMessage += `\n\nDetails: ${errorData.details}`;
-                    }
-                }
-                // Handle plain string response
-                else if (typeof errorData === 'string') {
-                    errorMessage = errorData;
-                }
-            } else if (err.message) {
-                errorMessage = err.message;
-            }
-
-            Alert.alert('Signup Error', errorMessage);
+            Alert.alert(t('error'), t('signupFailed'));
         }
     };
 
@@ -109,9 +78,9 @@ export default function SignupScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <ArrowLeft size={24} color={Colors.textPrimary} />
+            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+                    <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
             </View>
 
@@ -121,13 +90,13 @@ export default function SignupScreen() {
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                        <Text style={styles.title}>Create your account</Text>
-                        <Text style={styles.subtitle}>Sign up as a {role}</Text>
+                        <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>{t('createAccount')}</Text>
+                        <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('signUpAs')} {role === 'driver' ? t('driver') : t('passenger') || 'Passenger'}</Text>
 
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Full Name</Text>
+                            <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('fullName')}</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                                 placeholder="John Doe"
                                 value={name}
                                 onChangeText={setName}
@@ -140,9 +109,9 @@ export default function SignupScreen() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Email</Text>
+                            <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('email')}</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                                 placeholder="john@example.com"
                                 value={email}
                                 onChangeText={setEmail}
@@ -157,9 +126,9 @@ export default function SignupScreen() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Password</Text>
+                            <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('password')}</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                                 placeholder="******"
                                 secureTextEntry
                                 value={password}
@@ -173,9 +142,9 @@ export default function SignupScreen() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Confirm Password</Text>
+                            <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('confirmPassword')}</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                                 placeholder="******"
                                 secureTextEntry
                                 value={confirmPassword}
@@ -196,7 +165,7 @@ export default function SignupScreen() {
                             {loading ? (
                                 <ActivityIndicator color="#fff" />
                             ) : (
-                                <Text style={styles.buttonText}>Create Account</Text>
+                                <Text style={styles.buttonText}>{t('createAccountBtn')}</Text>
                             )}
                         </TouchableOpacity>
 

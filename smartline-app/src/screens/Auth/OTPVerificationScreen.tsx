@@ -9,10 +9,13 @@ import { Colors } from '../../constants/Colors';
 type OTPVerificationScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OTPVerification'>;
 type OTPVerificationScreenRouteProp = RouteProp<RootStackParamList, 'OTPVerification'>;
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function OTPVerificationScreen() {
     const navigation = useNavigation<OTPVerificationScreenNavigationProp>();
     const route = useRoute<OTPVerificationScreenRouteProp>();
     const { phone, role } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [otp, setOtp] = useState(['', '', '', '']);
     const [timer, setTimer] = useState(30);
@@ -43,9 +46,6 @@ export default function OTPVerificationScreen() {
         if (value && index < 3) {
             inputRefs.current[index + 1]?.focus();
         }
-
-        // If last digit is filled, verify automatically (optional, but good UX)
-        // if (index === 3 && value) handleVerify(); 
     };
 
     const handleKeyPress = (e: any, index: number) => {
@@ -58,8 +58,6 @@ export default function OTPVerificationScreen() {
     const handleVerify = () => {
         const code = otp.join('');
         if (code.length === 4) {
-            // Verification logic here (mocked)
-            // If success, navigate to Signup since we are in the "New User" flow
             navigation.replace('Signup', { phone, role });
         }
     };
@@ -72,17 +70,17 @@ export default function OTPVerificationScreen() {
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={styles.inner}>
-                        <View style={styles.header}>
-                            <TouchableOpacity onPress={() => navigation.goBack()}>
-                                <ArrowLeft size={24} color={Colors.textPrimary} />
+                        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
+                            <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+                                <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.content}>
-                            <Text style={styles.title}>Verify your number</Text>
-                            <Text style={styles.subtitle}>Enter the 4-digit code sent to {phone}</Text>
+                            <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>{t('verifyNumber')}</Text>
+                            <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('enterCodeSentTo')} {phone}</Text>
 
-                            <View style={styles.otpContainer}>
+                            <View style={[styles.otpContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                 {otp.map((digit, index) => (
                                     <TextInput
                                         key={index}
@@ -106,7 +104,7 @@ export default function OTPVerificationScreen() {
 
                             <TouchableOpacity disabled={timer > 0}>
                                 <Text style={[styles.resendText, timer === 0 && styles.resendTextActive]}>
-                                    {timer > 0 ? `Resend code\nAvailable in 0:${timer.toString().padStart(2, '0')}` : 'Resend code'}
+                                    {timer > 0 ? `${t('resendCode')}\n${t('availableIn')} 0:${timer.toString().padStart(2, '0')}` : t('resendCode')}
                                 </Text>
                             </TouchableOpacity>
 
@@ -117,7 +115,7 @@ export default function OTPVerificationScreen() {
                                 onPress={handleVerify}
                                 disabled={otp.join('').length !== 4}
                             >
-                                <Text style={styles.buttonText}>Verify</Text>
+                                <Text style={styles.buttonText}>{t('verify')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

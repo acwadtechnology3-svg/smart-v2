@@ -11,17 +11,20 @@ import { API_URL } from '../../config/api';
 type PhoneInputScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'PhoneInput'>;
 type PhoneInputScreenRouteProp = RouteProp<RootStackParamList, 'PhoneInput'>;
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function PhoneInputScreen() {
     const navigation = useNavigation<PhoneInputScreenNavigationProp>();
     const route = useRoute<PhoneInputScreenRouteProp>();
     const { role } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleContinue = async () => {
         if (!phone || phone.length < 10) {
-            Alert.alert('Error', 'Please enter a valid phone number');
+            Alert.alert(t('error'), t('enterPhoneNumber')); // "Please enter valid..." -> reusing enterPhoneNumber or making new key? Let's treat as generic error for now or add key. Providing consistent feedback.
             return;
         }
 
@@ -49,36 +52,39 @@ export default function PhoneInputScreen() {
             setLoading(false);
             const serverMsg = (err as any).response?.data?.error || (err as any).message || 'Could not verify phone number.';
             const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
-            Alert.alert('Error', errorMessage);
+            Alert.alert(t('error'), errorMessage);
         }
     };
 
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : undefined} // 👽 02-02-2026: Fixed jumping on Android by removing 'height' behavior
-                // behavior={Platform.OS === "ios" ? "padding" : "height"}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
                 style={styles.keyboardAvoidingView}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={styles.inner}>
-                        <View style={styles.header}>
-                            <TouchableOpacity onPress={() => navigation.goBack()}>
-                                <ArrowLeft size={24} color={Colors.textPrimary} />
+                        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <TouchableOpacity
+                                onPress={() => navigation.goBack()}
+                                style={{ padding: 8, flexDirection: 'row', alignItems: 'center' }}
+                            >
+                                <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
+                                {/* Optional: Add text if needed, but icon should be enough if visible */}
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.content}>
-                            <Text style={styles.title}>Enter your phone number</Text>
-                            <Text style={styles.subtitle}>We'll send you a verification code</Text>
+                            <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>{t('enterPhoneNumber')}</Text>
+                            <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('weWillSendCode')}</Text>
 
-                            <View style={styles.inputContainer}>
+                            <View style={[styles.inputContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                 <View style={styles.prefixContainer}>
                                     <Text style={styles.prefixText}>EG +20</Text>
                                 </View>
                                 <View style={styles.inputWrapper}>
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                                         placeholder="100 123 4567"
                                         keyboardType="phone-pad"
                                         value={phone}
@@ -103,7 +109,7 @@ export default function PhoneInputScreen() {
                                 {loading ? (
                                     <ActivityIndicator color="#fff" />
                                 ) : (
-                                    <Text style={styles.buttonText}>Continue</Text>
+                                    <Text style={styles.buttonText}>{t('continue')}</Text>
                                 )}
                             </TouchableOpacity>
                         </View>

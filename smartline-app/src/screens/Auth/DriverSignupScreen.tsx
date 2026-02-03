@@ -17,17 +17,20 @@ const EG_CITIES = [
     'Assiut', 'Sohag', 'Qena', 'Banha', 'Kafr El Sheikh', 'Damanhur'
 ];
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function DriverSignupScreen() {
     const navigation = useNavigation<DriverSignupScreenNavigationProp>();
     const route = useRoute<DriverSignupScreenRouteProp>();
     const { phone } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [nationalId, setNationalId] = useState('');
     const [city, setCity] = useState(EG_CITIES[0]);
 
     const handleNext = () => {
         if (!nationalId || !city) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert(t('error'), t('pleaseFillAllFields'));
             return;
         }
         navigation.navigate('DriverVehicle', {
@@ -40,20 +43,20 @@ export default function DriverSignupScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={Colors.textPrimary} />
+            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+                    <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.title}>Personal Information</Text>
-                <Text style={styles.subtitle}>Step 1 of 3</Text>
+                <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>{t('personalInfo')}</Text>
+                <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('step')} 1 {t('of')} 3</Text>
 
                 <View style={styles.inputContainer}>
-                    <Text style={styles.label}>National ID Number</Text>
+                    <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('nationalIdNumber')}</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                         placeholder="14 digit ID"
                         value={nationalId}
                         onChangeText={setNationalId}
@@ -67,11 +70,12 @@ export default function DriverSignupScreen() {
                 </View>
 
                 <View style={styles.inputContainer}>
-                    <Text style={styles.label}>City</Text>
+                    <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('city')}</Text>
                     <View style={styles.pickerContainer}>
                         <Picker
                             selectedValue={city}
                             onValueChange={(itemValue: string) => setCity(itemValue)}
+                            style={{ direction: isRTL ? 'rtl' : 'ltr' }}
                         >
                             {EG_CITIES.map((c) => (
                                 <Picker.Item key={c} label={c} value={c} />
@@ -81,7 +85,7 @@ export default function DriverSignupScreen() {
                 </View>
 
                 <TouchableOpacity style={styles.button} onPress={handleNext}>
-                    <Text style={styles.buttonText}>Next: Vehicle Info</Text>
+                    <Text style={styles.buttonText}>{t('nextVehicleInfo')}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>

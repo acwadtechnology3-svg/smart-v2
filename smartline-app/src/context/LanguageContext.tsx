@@ -13,9 +13,9 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType>({
-    language: 'en',
+    language: 'ar',
     setLanguage: () => { },
-    isRTL: false,
+    isRTL: true,
     t: (key) => key,
 });
 
@@ -160,6 +160,52 @@ export const translations = {
         payment: 'Payment',
         freeWaiting: 'Free Waiting Time',
         paidWaiting: 'Paid Waiting Time',
+        // Role Selection
+        welcomeTitle: 'Welcome to SmartLine',
+        welcomeSubtitle: 'How would you like to use the app?',
+        iNeedRide: 'I need a ride',
+        bookRides: 'Book rides to your destination',
+        iWantToDrive: 'I want to drive',
+        earnMoney: 'Earn money on your schedule',
+        changeRoleLater: 'You can change this later in settings',
+
+        // Auth Flow
+        enterPhoneNumber: 'Enter your phone number',
+        weWillSendCode: "We'll send you a verification code",
+        continue: 'Continue',
+        verifyNumber: 'Verify your number',
+        enterCodeSentTo: 'Enter the 4-digit code sent to',
+        resendCode: 'Resend code',
+        availableIn: 'Available in',
+        verify: 'Verify',
+        createAccount: 'Create your account',
+        signUpAs: 'Sign up as a',
+        fullName: 'Full Name',
+        email: 'Email',
+        password: 'Password',
+        confirmPassword: 'Confirm Password',
+        createAccountBtn: 'Create Account',
+        enterPassword: 'Enter your password',
+        welcomeBack: 'Welcome Back',
+        login: 'Log In',
+        pleaseFillAllFields: 'Please fill in all fields',
+        passwordsDoNotMatch: 'Passwords do not match',
+        signupFailed: 'Signup Failed. Please try again.',
+        passenger: 'Passenger',
+        enterPasswordFor: 'Enter password for',
+        forgotPassword: 'Forgot password?',
+        pleaseEnterPassword: 'Please enter your password',
+        loginError: 'Login Error',
+        loginFailed: 'Login Failed',
+        accountNotDriver: 'This account is not registered as a Driver. Please sign up or login as Customer.',
+        personalInfo: 'Personal Information',
+        step: 'Step',
+        of: 'of',
+        nationalIdNumber: 'National ID Number',
+        city: 'City',
+        nextVehicleInfo: 'Next: Vehicle Info',
+        nextProfilePhoto: 'Next: Profile Photo',
+        nextDocuments: 'Next: Documents',
     },
     ar: {
         // Sidebar & Menu
@@ -301,13 +347,57 @@ export const translations = {
         completeTrip: 'إنهاء الرحلة',
         refreshStatus: 'تحديث الحالة',
         payment: 'الدفع',
-        freeWaiting: 'وقت انتظار مجاني',
-        paidWaiting: 'وقت انتظار مدفوع',
+        // Role Selection
+        welcomeTitle: 'أهلاً بيك في سمارت لاين',
+        welcomeSubtitle: 'تحب تستخدم التطبيق إزاي؟',
+        iNeedRide: 'عايز عربية توصلني',
+        bookRides: 'اطلب رحلة ووصل بالسلامة',
+        iWantToDrive: 'معايا عربية وعايز اشتغل',
+        earnMoney: 'زود دخلك واشتغل في الوقت اللي يناسبك',
+        changeRoleLater: 'متقلقش، ممكن تغير اختيارك ده بعدين',
+
+        // Auth Flow
+        enterPhoneNumber: 'دخل رقم موبايلك',
+        weWillSendCode: 'هبعتلك كود تأكيد في رسالة',
+        continue: 'كمل',
+        verifyNumber: 'تأكيد الرقم',
+        enterCodeSentTo: 'دخل الكود اللي وصلك على',
+        resendCode: 'إعادة إرسال الكود',
+        availableIn: 'متاح خلال',
+        verify: 'تأكيد',
+        createAccount: 'إنشاء حساب جديد',
+        signUpAs: 'تسجيل كـ',
+        fullName: 'الاسم بالكامل',
+        email: 'البريد الإلكتروني',
+        password: 'كلمة السر',
+        confirmPassword: 'تأكيد كلمة السر',
+        createAccountBtn: 'إنشاء الحساب',
+        enterPassword: 'دخل كلمة السر',
+        welcomeBack: 'أهلاً بيك تاني',
+        login: 'تسجيل الدخول',
+        pleaseFillAllFields: 'من فضلك املأ كل البيانات',
+        passwordsDoNotMatch: 'كلمة السر مش زي بعض',
+        signupFailed: 'فشل إنشاء الحساب، حاول تاني',
+        passenger: 'راكب',
+        enterPasswordFor: 'دخل كلمة السر لرقم',
+        forgotPassword: 'نسيت كلمة السر؟',
+        pleaseEnterPassword: 'من فضلك دخل كلمة السر',
+        loginError: 'خطأ في التسجيل',
+        loginFailed: 'فشل تسجيل الدخول',
+        accountNotDriver: 'الحساب ده مش متسجل كسائق. من فضلك سجل حساب جديد أو ادخل كعميل.',
+        personalInfo: 'بيانات شخصية',
+        step: 'خطوة',
+        of: 'من',
+        nationalIdNumber: 'رقم البطاقة (14 رقم)',
+        city: 'المدينة',
+        nextVehicleInfo: 'التالي: بيانات العربية',
+        nextProfilePhoto: 'التالي: الصورة الشخصية',
+        nextDocuments: 'التالي: المستندات',
     }
 };
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [language, setLanguageState] = useState<Language>('en');
+    const [language, setLanguageState] = useState<Language>('ar');
 
     useEffect(() => {
         loadLanguage();

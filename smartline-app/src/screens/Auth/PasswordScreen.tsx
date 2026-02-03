@@ -13,10 +13,13 @@ import { apiRequest } from '../../services/backend';
 type PasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Password'>;
 type PasswordScreenRouteProp = RouteProp<RootStackParamList, 'Password'>;
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function PasswordScreen() {
     const navigation = useNavigation<PasswordScreenNavigationProp>();
     const route = useRoute<PasswordScreenRouteProp>();
     const { phone, role } = route.params;
+    const { t, isRTL } = useLanguage();
 
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +27,7 @@ export default function PasswordScreen() {
 
     const handleLogin = async () => {
         if (!password) {
-            Alert.alert('Error', 'Please enter your password');
+            Alert.alert(t('error'), t('pleaseEnterPassword'));
             return;
         }
 
@@ -42,21 +45,10 @@ export default function PasswordScreen() {
 
             const { user, token } = response.data;
 
-            // 🛑 SECURITY CHECK: Use strict equality to ensure we logged into the requested account
-            // This prevents any potential confusion if the backend returned a fuzzy match (unlikely but safe)
-            if (user.phone !== cleanPhone && user.phone !== `+${cleanPhone}` && !cleanPhone.endsWith(user.phone)) {
-                // Format mismatch might occur (+20 vs 0), but if completely different:
-                // console.warn("Phone Mismatch:", cleanPhone, user.phone);
-                // Proceeding cautiously, but typically we trust the backend ID.
-            }
-
             // 🛑 ROLE CHECK: If we are in a specific role flow (e.g. Driver App Login), enforce it.
             if (role && role === 'driver' && user.role !== 'driver') {
-                throw new Error("This account is not registered as a Driver. Please sign up or login as Customer.");
+                throw new Error(t('accountNotDriver'));
             }
-            // Optional: If trying to login as customer but is driver? Usually drivers are also customers. 
-            // But if we want strict separation:
-            // if (role && role === 'customer' && user.role !== 'customer') ...
 
             // Clear any old session first to ensure no state pollution
             await AsyncStorage.removeItem('userSession');
@@ -102,40 +94,53 @@ export default function PasswordScreen() {
         } catch (err: any) {
             setLoading(false);
             console.error(err);
-            const serverMsg = (err as any).response?.data?.error || (err as any).message || 'Login Failed';
+            const serverMsg = (err as any).response?.data?.error || (err as any).message || t('loginFailed');
             const errorMessage = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : String(serverMsg);
-            Alert.alert('Login Error', errorMessage);
+
+            // If error is specifically "This account is not registered..." use translation
+            if (errorMessage.includes('not registered as a Driver')) {
+                Alert.alert(t('loginError'), t('accountNotDriver'));
+            } else {
+                Alert.alert(t('loginError'), errorMessage);
+            }
         }
     };
 
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined} // 👽 02-02-2026: Fixed jumping on Android
-                // behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={styles.keyboardView}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={styles.inner}>
                         {/* Header Section */}
                         <View style={styles.header}>
-                            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                                <ArrowLeft size={24} color={Colors.textPrimary} />
-                            </TouchableOpacity>
-                            <Text style={styles.title}>Welcome back! 👋</Text>
-                            <Text style={styles.subtitle}>
-                                Enter password for <Text style={styles.phoneHighlight}>{phone}</Text>
+                            <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start', width: '100%' }}>
+                                <TouchableOpacity
+                                    onPress={() => navigation.goBack()}
+                                    style={[
+                                        styles.backButton,
+                                        { alignSelf: isRTL ? 'flex-end' : 'flex-start', transform: [{ scaleX: isRTL ? -1 : 1 }] }
+                                    ]}
+                                >
+                                    <ArrowLeft size={28} color={Colors.textPrimary} />
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>{t('welcomeBack')} 👋</Text>
+                            <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>
+                                {t('enterPasswordFor')} <Text style={styles.phoneHighlight}>{phone}</Text>
                             </Text>
                         </View>
 
                         {/* Form Section */}
                         <View style={styles.form}>
                             <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Password</Text>
-                                <View style={[styles.passwordInputWrapper, showPassword && styles.inputActive]}>
+                                <Text style={[styles.label, { textAlign: isRTL ? 'right' : 'left' }]}>{t('password')}</Text>
+                                <View style={[styles.passwordInputWrapper, showPassword && styles.inputActive, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                     <TextInput
-                                        style={styles.input}
-                                        placeholder="Enter your password"
+                                        style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                                        placeholder={t('enterPassword')}
                                         placeholderTextColor="#9CA3AF"
                                         secureTextEntry={!showPassword}
                                         value={password}
@@ -154,10 +159,9 @@ export default function PasswordScreen() {
                             </View>
 
                             <TouchableOpacity
-                                style={styles.forgotPassword}
-                            // onPress={() => navigation.navigate('ForgotPassword')} 
+                                style={[styles.forgotPassword, { alignSelf: isRTL ? 'flex-start' : 'flex-end' }]}
                             >
-                                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                                <Text style={styles.forgotPasswordText}>{t('forgotPassword')}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -171,7 +175,7 @@ export default function PasswordScreen() {
                                 {loading ? (
                                     <ActivityIndicator color="#fff" />
                                 ) : (
-                                    <Text style={styles.buttonText}>Log In</Text>
+                                    <Text style={styles.buttonText}>{t('login')}</Text>
                                 )}
                             </TouchableOpacity>
                         </View>

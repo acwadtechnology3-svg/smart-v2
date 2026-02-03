@@ -2,26 +2,50 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Car, User } from 'lucide-react-native'; // Using User as fallback for Driver if SteeringWheel not available
+import { Car, User, Globe, ArrowLeft } from 'lucide-react-native'; // Using User as fallback for Driver if SteeringWheel not available
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
+import { useLanguage } from '../../context/LanguageContext';
 
 type RoleSelectionScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'RoleSelection'>;
 
 export default function RoleSelectionScreen() {
     const navigation = useNavigation<RoleSelectionScreenNavigationProp>();
+    const { t, language, setLanguage, isRTL } = useLanguage();
 
     const handleSelectRole = (role: 'customer' | 'driver') => {
         navigation.navigate('PhoneInput', { role });
     };
 
+    const toggleLanguage = () => {
+        setLanguage(language === 'en' ? 'ar' : 'en');
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
+                {/* Top Bar with Back Button (if applicable) and Language Switcher */}
+                <View style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row', paddingHorizontal: 0 }]}>
+                    {navigation.canGoBack() ? (
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
+                            <ArrowLeft size={24} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={{ width: 40 }} /> // Spacer
+                    )}
+
+                    <View style={{ flex: 1 }} />
+
+                    <TouchableOpacity onPress={toggleLanguage} style={styles.langButton}>
+                        <Globe size={20} color={Colors.textSecondary} />
+                        <Text style={styles.langText}>{language === 'en' ? 'العربية' : 'English'}</Text>
+                    </TouchableOpacity>
+                </View>
+
                 <View style={styles.header}>
-                    <Text style={styles.title}>Welcome to SmartLine</Text>
-                    <Text style={styles.subtitle}>How would you like to use the app?</Text>
+                    <Text style={[styles.title, { textAlign: isRTL ? 'right' : 'center' }]}>{t('welcomeTitle')}</Text>
+                    <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'center' }]}>{t('welcomeSubtitle')}</Text>
                 </View>
 
                 <View style={styles.cardsContainer}>
@@ -31,10 +55,10 @@ export default function RoleSelectionScreen() {
                         activeOpacity={0.7}
                     >
                         <View style={styles.iconBox}>
-                            <User size={32} color="#4F46E5" />
+                            <User size={40} color="#4F46E5" />
                         </View>
-                        <Text style={styles.roleTitle}>I need a ride</Text>
-                        <Text style={styles.roleDescription}>Book rides to your destination</Text>
+                        <Text style={styles.roleTitle}>{t('iNeedRide')}</Text>
+                        <Text style={styles.roleDescription}>{t('bookRides')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -43,15 +67,15 @@ export default function RoleSelectionScreen() {
                         activeOpacity={0.7}
                     >
                         <View style={styles.iconBox}>
-                            <Car size={32} color="#4F46E5" />
+                            <Car size={40} color="#4F46E5" />
                         </View>
-                        <Text style={styles.roleTitle}>I want to drive</Text>
-                        <Text style={styles.roleDescription}>Earn money on your schedule</Text>
+                        <Text style={styles.roleTitle}>{t('iWantToDrive')}</Text>
+                        <Text style={styles.roleDescription}>{t('earnMoney')}</Text>
                     </TouchableOpacity>
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>You can change this later in settings</Text>
+                    <Text style={styles.footerText}>{t('changeRoleLater')}</Text>
                 </View>
             </View>
         </SafeAreaView>
@@ -66,7 +90,30 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         padding: 24,
-        paddingTop: 60,
+        paddingTop: 10, // Adjusted top padding since we have text above
+    },
+    topBar: {
+        width: '100%',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginBottom: 20,
+        height: 40
+    },
+    langButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: Colors.surface,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.border
+    },
+    langText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.textPrimary
     },
     header: {
         marginBottom: 40,

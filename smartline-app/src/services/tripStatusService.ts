@@ -83,8 +83,8 @@ class TripStatusService {
 
         switch (status) {
             case 'accepted':
-                console.log('[TripService] ✅ Trip ACCEPTED');
-                // Will be handled by SearchingDriverScreen
+                console.log('[TripService] ✅ Trip ACCEPTED - navigating to DriverFound');
+                this.navigationRef.navigate('DriverFound', { tripId: this.activeTripId });
                 break;
 
             case 'arrived':

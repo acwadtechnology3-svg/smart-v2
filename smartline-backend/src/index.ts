@@ -1,5 +1,6 @@
 // MUST BE FIRST: Patch Redis version check for Windows compatibility
 import './config/redis-patch';
+// Force restart for env update
 
 import express from 'express';
 import http from 'http';

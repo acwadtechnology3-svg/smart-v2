@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, Image, ImageSourcePropType } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
-import { Car, Bike, Flag, ArrowLeft } from 'lucide-react-native';
+import { Flag, ArrowLeft } from 'lucide-react-native';
 
 type DriverVehicleScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DriverVehicle'>;
 type DriverVehicleScreenRouteProp = RouteProp<RootStackParamList, 'DriverVehicle'>;
@@ -38,7 +38,7 @@ export default function DriverVehicleScreen() {
         });
     };
 
-    const renderVehicleCard = (type: 'car' | 'motorcycle' | 'taxi', label: string, Icon: React.ElementType) => (
+    const renderVehicleCard = (type: 'car' | 'motorcycle' | 'taxi', label: string, imageSource: ImageSourcePropType) => (
         <TouchableOpacity
             style={[
                 styles.vehicleCard,
@@ -46,7 +46,14 @@ export default function DriverVehicleScreen() {
             ]}
             onPress={() => setVehicleType(type)}
         >
-            <Icon size={32} color={vehicleType === type ? Colors.primary : Colors.textSecondary} />
+            <Image
+                source={imageSource}
+                style={[
+                    styles.vehicleImage,
+                    vehicleType === type ? { opacity: 1 } : { opacity: 0.5 }
+                ]}
+                resizeMode="contain"
+            />
             <Text style={[
                 styles.vehicleLabel,
                 vehicleType === type && styles.vehicleLabelSelected
@@ -67,9 +74,9 @@ export default function DriverVehicleScreen() {
                 <Text style={[styles.subtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('step')} 2 {t('of')} 4</Text>
 
                 <View style={[styles.vehiclesContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    {renderVehicleCard('car', t('car'), Car)}
-                    {renderVehicleCard('motorcycle', t('motorcycle'), Bike)}
-                    {renderVehicleCard('taxi', t('taxi'), Car)}
+                    {renderVehicleCard('taxi', t('taxi'), require('../../../سمارت لاين ايقون/taxi.webp'))}
+                    {renderVehicleCard('motorcycle', t('motorcycle'), require('../../../سمارت لاين ايقون/scooter.webp'))}
+                    {renderVehicleCard('car', t('car'), require('../../../سمارت لاين ايقون/vip.webp'))}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -107,9 +114,10 @@ const styles = StyleSheet.create({
     content: { padding: 24, paddingTop: 0 },
     title: { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
     subtitle: { fontSize: 16, color: Colors.textSecondary, marginBottom: 32 },
-    vehiclesContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 },
-    vehicleCard: { flex: 1, aspectRatio: 1, backgroundColor: Colors.surface, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginHorizontal: 4, borderWidth: 1, borderColor: Colors.border },
-    vehicleCardSelected: { borderColor: Colors.primary, backgroundColor: '#EFF6FF' },
+    vehiclesContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32, gap: 10 },
+    vehicleCard: { flex: 1, height: 140, backgroundColor: Colors.surface, borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: 8, borderWidth: 1.5, borderColor: Colors.border, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+    vehicleCardSelected: { borderColor: Colors.primary, backgroundColor: '#F0F9FF', shadowOpacity: 0.1, shadowColor: Colors.primary },
+    vehicleImage: { width: 100, height: 65, marginBottom: 12 },
     vehicleLabel: { marginTop: 8, fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
     vehicleLabelSelected: { color: Colors.primary },
     inputContainer: { marginBottom: 20 },

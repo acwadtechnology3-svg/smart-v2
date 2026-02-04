@@ -250,12 +250,13 @@ export default function DriverWalletScreen() {
                     </TouchableOpacity>
 
                     {/* Hidden withdraw until tested? Or just enable for consistency */}
-                    {/* <TouchableOpacity style={styles.actionBtn} onPress={() => setWithdrawModalVisible(true)}>
+                    {/* Withdraw Button */}
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => setWithdrawModalVisible(true)}>
                         <View style={[styles.actionIconBg, { backgroundColor: '#F0FDF4' }]}>
-                            <Banknote size={24} color={Colors.success} />
+                            <Banknote size={24} color="#10B981" />
                         </View>
-                        <Text style={styles.actionText}>Withdraw</Text>
-                    </TouchableOpacity> */}
+                        <Text style={styles.actionText}>{t('withdraw') || 'Withdraw'}</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Transactions */}
@@ -311,7 +312,64 @@ export default function DriverWalletScreen() {
                 </KeyboardAvoidingView>
             </Modal>
 
-            {/* Note: Withdraw modal left out for brevity as logic is complex and might be changing, but deposit is main flow for drivers paying debt */}
+            {/* WITHDRAW MODAL */}
+            <Modal visible={withdrawModalVisible} animationType="slide" transparent>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalContent}>
+                                <View style={[styles.modalHeader, rowStyle]}>
+                                    <Text style={styles.modalTitle}>{t('withdraw') || 'Withdraw Request'}</Text>
+                                    <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
+                                        <X size={24} color="#000" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={[styles.label, textAlign]}>{t('amount') || 'Amount (EGP)'}</Text>
+                                <TextInput
+                                    style={[styles.input, textAlign]}
+                                    placeholder="e.g. 500"
+                                    keyboardType="numeric"
+                                    value={withdrawAmount}
+                                    onChangeText={setWithdrawAmount}
+                                />
+
+                                <Text style={[styles.label, textAlign]}>{t('method') || 'Method'}</Text>
+                                <View style={[styles.methodRow, rowStyle]}>
+                                    <TouchableOpacity
+                                        style={[styles.methodOption, withdrawMethod === 'instapay' && styles.methodOptionActive]}
+                                        onPress={() => setWithdrawMethod('instapay')}
+                                    >
+                                        <Text style={[styles.methodText, withdrawMethod === 'instapay' && styles.methodTextActive]}>InstaPay</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.methodOption, withdrawMethod === 'wallet' && styles.methodOptionActive]}
+                                        onPress={() => setWithdrawMethod('wallet')}
+                                    >
+                                        <Text style={[styles.methodText, withdrawMethod === 'wallet' && styles.methodTextActive]}>E-Wallet</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={[styles.label, textAlign]}>{t('accountNumber') || 'Account Number / Phone'}</Text>
+                                <TextInput
+                                    style={[styles.input, textAlign]}
+                                    placeholder="e.g. 01xxxxxxxxx or user@instapay"
+                                    value={withdrawAccount}
+                                    onChangeText={setWithdrawAccount}
+                                />
+
+                                <TouchableOpacity
+                                    style={[styles.confirmBtn, { backgroundColor: Colors.primary }]}
+                                    onPress={requestWithdrawal}
+                                    disabled={withdrawing}
+                                >
+                                    {withdrawing ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>{t('submitRequest') || 'Submit Request'}</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </KeyboardAvoidingView>
+            </Modal>
         </SafeAreaView>
     );
 }

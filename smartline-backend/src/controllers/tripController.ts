@@ -259,11 +259,21 @@ export const updateTripStatus = async (req: Request, res: Response) => {
             const platformFee = finalPrice * commissionRate;
             const driverEarnings = finalPrice - platformFee;
 
-            console.log('Financial Calculation:');
-            console.log('  Final Price:', finalPrice);
-            console.log('  Commission Rate:', commissionRate * 100, '%');
-            console.log('  Platform Fee:', platformFee);
-            console.log('  Driver Earnings:', driverEarnings);
+            console.log('\n==========================================');
+            console.log('🏁 TRIP COMPLETED: FINANCIAL SUMMARY');
+            console.log('==========================================');
+            console.log(`🆔 Trip ID:        ${tripId}`);
+            console.log(`🚗 Car Type:       ${tripData.car_type || 'N/A'}`);
+            console.log(`💳 Payment:        ${tripData.payment_method}`);
+            console.log('------------------------------------------');
+            console.log(`💰 Base/Offer Price: ${Number(tripData.price).toFixed(2)} EGP`);
+            console.log(`⏳ Waiting Fee:      ${waitingFee.toFixed(2)} EGP`);
+            console.log(`💵 FINAL TOTAL:      ${finalPrice.toFixed(2)} EGP`);
+            console.log('------------------------------------------');
+            console.log(`📉 Comm. Rate:       ${(commissionRate * 100).toFixed(0)}%`);
+            console.log(`🏦 App Revenue:      ${platformFee.toFixed(2)} EGP`);
+            console.log(`👨‍✈️ Driver Net:       ${driverEarnings.toFixed(2)} EGP`);
+            console.log('==========================================\n');
 
             // 2. Update Driver Balance
             console.log(`Processing Balance Update for Driver: ${driverId}`);

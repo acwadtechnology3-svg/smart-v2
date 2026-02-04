@@ -43,6 +43,10 @@ export default function DriverHomeScreen() {
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
+        console.log('[Mapbox] 🗺️ Map View Mounted - Consuming Raster Tiles');
+    }, []);
+
+    useEffect(() => {
         // Start pulse animation when online
         if (isOnline) {
             Animated.loop(

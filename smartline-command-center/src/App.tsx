@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { SOSNotification } from "@/components/SOSNotification";
+import { SOSAlertNotificationListener } from "@/components/SOSAlertNotification";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import DriverRequests from "./pages/DriverRequests";
@@ -82,6 +83,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           <SOSNotification />
+          <SOSAlertNotificationListener />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

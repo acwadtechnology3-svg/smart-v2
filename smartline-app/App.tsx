@@ -9,7 +9,7 @@ export default function App() {
     <LanguageProvider>
       <SafeAreaProvider>
         <AppNavigator />
-        <StatusBar style="auto" />
+        <StatusBar style="dark" translucent backgroundColor="transparent" />
       </SafeAreaProvider>
     </LanguageProvider>
   );

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { ArrowLeft, Tag, Copy, Check } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { Tag } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest } from '../../services/backend';
 import { useLanguage } from '../../context/LanguageContext';
+import AppHeader from '../../components/AppHeader';
+
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../types/navigation';
 
 export default function DiscountsScreen() {
-    const navigation = useNavigation();
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
     const { t, isRTL } = useLanguage();
     const [promoCode, setPromoCode] = useState('');
     const [loading, setLoading] = useState(false);
@@ -77,14 +81,8 @@ export default function DiscountsScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <ArrowLeft size={24} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('promoCodes') || 'Promo Codes'}</Text>
-                <View style={{ width: 24 }} />
-            </View>
+        <View style={styles.container}>
+            <AppHeader title={t('promoCodes') || 'Promo Codes'} showBack={true} />
 
             <View style={styles.content}>
                 <View style={[styles.inputContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -117,14 +115,12 @@ export default function DiscountsScreen() {
                     />
                 )}
             </View>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 60 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
     content: { flex: 1, padding: 16 },
     inputContainer: { flexDirection: 'row', marginBottom: 24 },
     input: { flex: 1, height: 50, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 16, backgroundColor: Colors.surface, marginRight: 12 },

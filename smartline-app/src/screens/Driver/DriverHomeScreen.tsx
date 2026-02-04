@@ -12,6 +12,7 @@ import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/nativ
 import Constants from 'expo-constants';
 import DriverSideMenu from '../../components/DriverSideMenu';
 import TripRequestModal from '../../components/TripRequestModal';
+import SafetyModal from '../../components/SafetyModal';
 import { useLanguage } from '../../context/LanguageContext';
 import { CachedImage } from '../../components/CachedImage';
 import PopupNotification from '../../components/PopupNotification';
@@ -35,6 +36,7 @@ export default function DriverHomeScreen() {
     const [incomingTrip, setIncomingTrip] = useState<any>(null);
     const [ignoredTripIds, setIgnoredTripIds] = useState<Set<string>>(new Set());
     const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
+    const [safetyModalVisible, setSafetyModalVisible] = useState(false);
 
     // Prevent duplicate handling of accepted trips
     const processedAcceptedTrips = useRef(new Set<string>()); // Added this line
@@ -489,64 +491,47 @@ export default function DriverHomeScreen() {
     };
 
     const handleSOS = () => {
+        setSafetyModalVisible(true);
+    };
+
+    const handleCallEmergency = () => {
         Alert.alert(
-            t('safetyEmergency'),
-            t('chooseOption'), // This key might not be in Translations yet, I'll assume "Choose Option"
+            "Call Emergency Services?",
+            "This will dial 122 (Egyptian Emergency Services)",
             [
+                { text: t('cancel'), style: "cancel" },
                 {
-                    text: t('callEmergency'),
+                    text: "Call Now",
                     onPress: () => {
-                        Alert.alert(
-                            "Call Emergency Services?",
-                            "This will dial 122 (Egyptian Emergency Services)",
-                            [
-                                { text: t('cancel'), style: "cancel" },
-                                {
-                                    text: "Call Now",
-                                    onPress: () => {
-                                        Alert.alert("Emergency", "Calling 122...");
-                                    }
-                                }
-                            ]
-                        );
+                        Alert.alert("Emergency", "Calling 122...");
                     }
-                },
-                {
-                    text: t('sendSOS'),
-                    style: "destructive",
-                    onPress: () => {
-                        Alert.alert(
-                            "Emergency SOS",
-                            "This will send your live location to our dispatch team. Only use this in real emergencies.",
-                            [
-                                { text: t('cancel'), style: "cancel" },
-                                { text: "SEND SOS", style: "destructive", onPress: triggerSOSAlert }
-                            ]
-                        );
-                    }
-                },
-                {
-                    text: t('shareLocation'),
-                    onPress: () => {
-                        if (location) {
-                            const locationUrl = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
-                            Alert.alert(
-                                t('shareLocation'),
-                                `Your current location:\nLat: ${location.coords.latitude.toFixed(6)}\nLng: ${location.coords.longitude.toFixed(6)}\n\n${locationUrl}`,
-                                [{ text: t('ok') }]
-                            );
-                        } else {
-                            Alert.alert(t('error'), t('locationPermissionRequired'));
-                        }
-                    }
-                },
-                {
-                    text: t('cancel'),
-                    style: "cancel"
                 }
-            ],
-            { cancelable: true }
+            ]
         );
+    };
+
+    const handleSendSOS = () => {
+        Alert.alert(
+            "Emergency SOS",
+            "This will send your live location to our dispatch team. Only use this in real emergencies.",
+            [
+                { text: t('cancel'), style: "cancel" },
+                { text: "SEND SOS", style: "destructive", onPress: triggerSOSAlert }
+            ]
+        );
+    };
+
+    const handleShareLocation = () => {
+        if (location) {
+            const locationUrl = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+            Alert.alert(
+                t('shareLocation'),
+                `Your current location:\nLat: ${location.coords.latitude.toFixed(6)}\nLng: ${location.coords.longitude.toFixed(6)}\n\n${locationUrl}`,
+                [{ text: t('ok') }]
+            );
+        } else {
+            Alert.alert(t('error'), t('locationPermissionRequired'));
+        }
     };
 
     const recenterMap = () => {
@@ -656,6 +641,14 @@ export default function DriverHomeScreen() {
                 visible={isSideMenuVisible}
                 onClose={() => setSideMenuVisible(false)}
                 initialProfile={driverProfile}
+            />
+
+            <SafetyModal
+                visible={safetyModalVisible}
+                onClose={() => setSafetyModalVisible(false)}
+                onCallEmergency={handleCallEmergency}
+                onSendSOS={handleSendSOS}
+                onShareLocation={handleShareLocation}
             />
 
             <TripRequestModal

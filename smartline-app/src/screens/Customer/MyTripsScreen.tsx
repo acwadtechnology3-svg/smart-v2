@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
-import { ArrowLeft, Clock } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { Clock } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../../constants/Colors';
+import AppHeader from '../../components/AppHeader';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function MyTripsScreen() {
     const navigation = useNavigation();
+    const { t, isRTL } = useLanguage();
     const [activeTab, setActiveTab] = useState<'active' | 'past'>('past');
 
     const PAST_TRIPS = [
@@ -14,21 +17,15 @@ export default function MyTripsScreen() {
     ];
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <ArrowLeft size={24} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>My Trips</Text>
-                <View style={{ width: 24 }} />
-            </View>
+        <View style={styles.container}>
+            <AppHeader title={t('myTrips') || 'My Trips'} showBack={true} />
 
-            <View style={styles.tabs}>
+            <View style={[styles.tabs, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity style={[styles.tab, activeTab === 'active' && styles.activeTab]} onPress={() => setActiveTab('active')}>
-                    <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Active</Text>
+                    <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>{t('active') || 'Active'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.tab, activeTab === 'past' && styles.activeTab]} onPress={() => setActiveTab('past')}>
-                    <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>Past</Text>
+                    <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>{t('past') || 'Past'}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -36,7 +33,7 @@ export default function MyTripsScreen() {
                 {activeTab === 'active' ? (
                     <View style={styles.emptyState}>
                         <Clock size={48} color={Colors.textSecondary} />
-                        <Text style={styles.emptyText}>No active trips</Text>
+                        <Text style={styles.emptyText}>{t('noActiveTrips') || 'No active trips'}</Text>
                     </View>
                 ) : (
                     <FlatList
@@ -44,39 +41,37 @@ export default function MyTripsScreen() {
                         keyExtractor={item => item.id}
                         renderItem={({ item }) => (
                             <View style={styles.tripCard}>
-                                <View style={styles.tripHeader}>
+                                <View style={[styles.tripHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                     <Text style={styles.tripDate}>{item.date}</Text>
                                     <View style={[styles.statusBadge, { backgroundColor: item.status === 'completed' ? '#DCFCE7' : '#FEE2E2' }]}>
                                         <Text style={[styles.statusText, { color: item.status === 'completed' ? Colors.success : Colors.danger }]}>
-                                            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                                            {item.status === 'completed' ? (t('completed') || 'Completed') : (t('cancelled') || 'Cancelled')}
                                         </Text>
                                     </View>
                                 </View>
-                                <View style={styles.tripRoute}>
-                                    <View style={styles.dot} />
-                                    <Text style={styles.address}>{item.from}</Text>
+                                <View style={[styles.tripRoute, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                    <View style={[styles.dot, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]} />
+                                    <Text style={[styles.address, { textAlign: isRTL ? 'right' : 'left' }]}>{item.from}</Text>
                                 </View>
-                                <View style={styles.line} />
-                                <View style={styles.tripRoute}>
-                                    <View style={styles.square} />
-                                    <Text style={styles.address}>{item.to}</Text>
+                                <View style={[styles.line, { marginLeft: isRTL ? 0 : 3.5, marginRight: isRTL ? 3.5 : 0 }]} />
+                                <View style={[styles.tripRoute, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                    <View style={[styles.square, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]} />
+                                    <Text style={[styles.address, { textAlign: isRTL ? 'right' : 'left' }]}>{item.to}</Text>
                                 </View>
                                 <View style={styles.divider} />
-                                <Text style={styles.price}>EGP {item.price}</Text>
+                                <Text style={[styles.price, { textAlign: isRTL ? 'left' : 'right' }]}>{t('currency') || 'EGP'} {item.price}</Text>
                             </View>
                         )}
                     />
                 )}
             </View>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
-    tabs: { flexDirection: 'row', padding: 16, backgroundColor: '#fff' },
+    tabs: { flexDirection: 'row', paddingHorizontal: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border },
     tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
     activeTab: { borderBottomColor: Colors.primary },
     tabText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
@@ -95,5 +90,5 @@ const styles = StyleSheet.create({
     address: { fontSize: 14, color: Colors.textPrimary },
     line: { width: 1, height: 12, backgroundColor: Colors.border, marginLeft: 3.5, marginBottom: 8 },
     divider: { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
-    price: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary, textAlign: 'right' },
+    price: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary },
 });

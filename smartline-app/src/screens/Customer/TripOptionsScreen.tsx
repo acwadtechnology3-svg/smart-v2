@@ -25,7 +25,7 @@ const RIDE_IMAGES: any = {
     saver: require('../../assets/images/saver.webp'),
     comfort: require('../../assets/images/comfort.webp'),
     vip: require('../../assets/images/vip.webp'),
-    taxi: require('../../assets/images/saver.webp'),
+    taxi: require('../../assets/images/taxi.webp'),
     scooter: require('../../assets/images/scooter.webp'),
 };
 
@@ -411,7 +411,7 @@ export default function TripOptionsScreen() {
                         }
                     }}
                 >
-                    <ArrowLeft size={24} color="#1e1e1e" />
+                    <ArrowLeft size={24} color="#000" strokeWidth={3} />
                 </TouchableOpacity>
             </View>
 
@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
     promoLinkText: { fontSize: 16, fontWeight: '600', color: Colors.primary },
 
     requestButton: { borderRadius: 16, overflow: 'hidden' },
-    gradientBtn: { paddingVertical: 18, alignItems: 'center', justifyContent: 'center' },
+    gradientBtn: { height: 56, alignItems: 'center', justifyContent: 'center' },
     requestButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold', letterSpacing: 0.5 },
 
     // Modal

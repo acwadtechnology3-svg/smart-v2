@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking, I18nManager } from 'react-native';
-import { ArrowLeft, ShieldAlert, PhoneCall, ChevronRight, AlertTriangle } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
+import { ShieldAlert, PhoneCall, ChevronRight, AlertTriangle } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { apiRequest } from '../../services/backend';
 import { tripStatusService } from '../../services/tripStatusService';
 import { useLanguage } from '../../context/LanguageContext';
+import AppHeader from '../../components/AppHeader';
 
 type SafetyScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Safety'>;
 type SafetyScreenRouteProp = RouteProp<RootStackParamList, 'Safety'>;
@@ -139,13 +140,8 @@ export default function SafetyScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color="#1e1e1e" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('safetyCenter') || 'Safety Center'}</Text>
-            </View>
+        <View style={styles.container}>
+            <AppHeader title={t('safetyCenter') || 'Safety Center'} showBack={true} />
 
             <ScrollView contentContainerStyle={styles.content}>
                 {/* Hero Status */}
@@ -188,23 +184,19 @@ export default function SafetyScreen() {
                 </TouchableOpacity>
 
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 60 }, // 👽 02-02-2026: Increased top padding for header
-    backBtn: { marginRight: 16 },
-    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
     content: { padding: 20 },
     statusCard: { padding: 24, borderRadius: 16, alignItems: 'center', marginBottom: 24 },
     statusTitle: { fontSize: 22, fontWeight: 'bold', color: '#1E3A8A', marginTop: 12, marginBottom: 8 },
-    statusDesc: { textAlign: 'center', color: '#60A5FA', lineHeight: 20 },
+    statusDesc: { textAlign: 'center', color: '#3B82F6', lineHeight: 20, opacity: 0.8 },
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 },
     actionBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 12, backgroundColor: '#fff' },
     iconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-    btnTextConfig: { flex: 1 },
     btnTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
     btnSub: { fontSize: 13, color: '#6B7280' },
 });

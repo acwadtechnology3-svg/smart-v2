@@ -20,6 +20,7 @@ import walletRoutes from './routes/walletRoutes';
 import supportRoutes from './routes/supportRoutes';
 import supportAdminRoutes from './routes/supportAdminRoutes';
 import dashboardAuthRoutes from './routes/dashboardAuthRoutes';
+import driverPreferenceRoutes from './routes/driverPreferenceRoutes';
 import { checkDatabaseConnection } from './config/database';
 import { checkRedisConnection } from './config/redis';
 import { startLocationSync } from './workers/locationSyncWorker';
@@ -77,6 +78,7 @@ app.use('/api/sos', sosRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/admin/support', supportAdminRoutes);
+app.use('/api/drivers/preferences', driverPreferenceRoutes);
 
 // ===== Health Check =====
 app.get('/health', async (req, res) => {

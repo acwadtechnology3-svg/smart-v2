@@ -91,6 +91,23 @@ export const translations = {
         accountDeleted: 'Your account has been deleted successfully.',
         deleteAccountFailed: 'Failed to delete account. Please try again.',
 
+        // Destination Preferences
+        preferredDestinations: 'Preferred Destinations',
+        destinationPreferenceInfo: 'When enabled, you will only receive trip requests heading toward your preferred destinations or along the route to them.',
+        enableDestinationMode: 'Enable Destination Mode',
+        yourDestinations: 'Your Destinations',
+        noDestinationsSet: 'No destinations set. Add up to 3 preferred destinations.',
+        addDestination: 'Add Destination',
+        deleteDestination: 'Delete Destination',
+        confirmDeleteDestination: 'Are you sure you want to remove this destination?',
+        destinationName: 'Destination Name',
+        maxDestinationsReached: 'Maximum 3 destinations allowed. Delete one first.',
+        radius: 'Radius',
+        invalidInput: 'Please enter valid name and coordinates.',
+        loadingFailed: 'Failed to load preferences.',
+        addFailed: 'Failed to add destination.',
+        deleteFailed: 'Failed to delete destination.',
+
         // Trip Request
         newRequest: 'New Trip Request',
         accept: 'Accept',
@@ -374,6 +391,23 @@ export const translations = {
         delete: 'حذف',
         accountDeleted: 'تم حذف حسابك بنجاح.',
         deleteAccountFailed: 'فشل حذف الحساب. يرجى المحاولة مرة أخرى.',
+
+        // Destination Preferences
+        preferredDestinations: 'الوجهات المفضلة',
+        destinationPreferenceInfo: 'عند التفعيل، ستحصل فقط على طلبات الرحلات المتجهة نحو وجهاتك المفضلة أو على طريق إليها.',
+        enableDestinationMode: 'تفعيل وضع الوجهة',
+        yourDestinations: 'وجهاتك',
+        noDestinationsSet: 'لم يتم تحديد وجهات. أضف حتى 3 وجهات مفضلة.',
+        addDestination: 'إضافة وجهة',
+        deleteDestination: 'حذف الوجهة',
+        confirmDeleteDestination: 'هل أنت متأكد من حذف هذه الوجهة؟',
+        destinationName: 'اسم الوجهة',
+        maxDestinationsReached: 'الحد الأقصى 3 وجهات. احذف واحدة أولاً.',
+        radius: 'نطاق',
+        invalidInput: 'يرجى إدخال اسم وإحداثيات صحيحة.',
+        loadingFailed: 'فشل تحميل الإعدادات.',
+        addFailed: 'فشل إضافة الوجهة.',
+        deleteFailed: 'فشل حذف الوجهة.',
 
         // Trip Request
         newRequest: 'طلب رحلة جديد',

@@ -44,4 +44,5 @@ export type RootStackParamList = {
     DriverWallet: undefined;
     DriverChangeVehicle: undefined;
     SupportChat: { ticketId?: string; subject?: string };
+    DriverDestinations: undefined;
 };

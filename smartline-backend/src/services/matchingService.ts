@@ -1,8 +1,21 @@
 import { locationCache, NearbyDriver } from './locationCache';
 import { driverPresence } from './driverPresence';
 import { DriverRepository } from '../repositories/DriverRepository';
+import { supabase } from '../config/supabase';
 
 const driverRepo = new DriverRepository();
+
+// Haversine distance calculation (meters)
+function getDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Earth radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
 
 export interface TripRequest {
   customerId: string;
@@ -214,10 +227,114 @@ export class MatchingService {
       return false;
     }
 
+    // Check destination preference mode
+    const destMatch = await this.checkDestinationMatch(driverData.id, tripRequest);
+    if (!destMatch) {
+      return false;
+    }
+
     // Vehicle type must match or be higher tier
     // TODO: Implement vehicle tier hierarchy (economy < comfort < premium)
 
     return true;
+  }
+
+  /**
+   * Check if driver's destination preferences match the trip
+   * Returns true if:
+   * - Driver doesn't have preference mode enabled
+   * - Trip destination is within radius of any preferred destination
+   * - Trip destination is within deviation corridor of route to preferred destination
+   */
+  private async checkDestinationMatch(
+    driverId: string,
+    tripRequest: TripRequest
+  ): Promise<boolean> {
+    try {
+      // Quick check using drivers table column (avoids extra query if disabled)
+      const { data: driver } = await supabase
+        .from('drivers')
+        .select('dest_preference_enabled')
+        .eq('id', driverId)
+        .single();
+
+      if (!driver || !driver.dest_preference_enabled) {
+        return true; // Preference mode not enabled
+      }
+
+      // Get preference settings and destinations
+      const { data: prefs } = await supabase
+        .from('driver_destination_preferences')
+        .select('id, max_deviation_meters')
+        .eq('driver_id', driverId)
+        .single();
+
+      if (!prefs) {
+        return true; // No preferences record, treat as disabled
+      }
+
+      const { data: destinations } = await supabase
+        .from('driver_preferred_destinations')
+        .select('*')
+        .eq('preference_id', prefs.id);
+
+      if (!destinations || destinations.length === 0) {
+        return true; // No destinations set, treat as disabled
+      }
+
+      // Check if trip destination matches any preferred destination
+      for (const dest of destinations) {
+        // Check 1: Trip destination within radius of preferred destination
+        const distanceToDest = getDistanceMeters(
+          tripRequest.destLat,
+          tripRequest.destLng,
+          dest.lat,
+          dest.lng
+        );
+
+        if (distanceToDest <= dest.radius_meters) {
+          return true; // Trip ends near preferred destination
+        }
+
+        // Check 2: Trip destination along route (deviation check)
+        // Simple check: distance from pickup to preferred dest vs pickup to trip dest + trip dest to preferred dest
+        const pickupToPreferred = getDistanceMeters(
+          tripRequest.pickupLat,
+          tripRequest.pickupLng,
+          dest.lat,
+          dest.lng
+        );
+
+        const pickupToTrip = getDistanceMeters(
+          tripRequest.pickupLat,
+          tripRequest.pickupLng,
+          tripRequest.destLat,
+          tripRequest.destLng
+        );
+
+        const tripToPreferred = getDistanceMeters(
+          tripRequest.destLat,
+          tripRequest.destLng,
+          dest.lat,
+          dest.lng
+        );
+
+        // If going to trip dest then to preferred dest is not much longer than going directly
+        const viaTripDistance = pickupToTrip + tripToPreferred;
+        const directDistance = pickupToPreferred;
+        const extraDistance = viaTripDistance - directDistance;
+
+        if (extraDistance <= prefs.max_deviation_meters) {
+          return true; // Trip is along the way
+        }
+      }
+
+      // No match found
+      return false;
+    } catch (err) {
+      console.error('[MatchingService] Destination match check error:', err);
+      return true; // Fail open - don't block on errors
+    }
   }
 
   /**

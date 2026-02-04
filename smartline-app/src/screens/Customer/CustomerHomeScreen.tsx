@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Dimensions, Animated, Easing, I18nManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, I18nManager } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Menu, Scan, ShieldCheck, Search, MapPin, Gift, CarFront, Navigation } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';

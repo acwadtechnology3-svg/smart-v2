@@ -89,7 +89,7 @@ export const updateDestinationPreferences = async (req: Request, res: Response) 
     const { error: updateError } = await supabase
       .from('driver_destination_preferences')
       .update(updates)
-      .eq('id', prefs.id);
+      .eq('id', prefs!.id);
 
     if (updateError) {
       return res.status(500).json({ error: 'Failed to update preferences' });
@@ -136,7 +136,7 @@ export const addPreferredDestination = async (req: Request, res: Response) => {
     const { count, error: countError } = await supabase
       .from('driver_preferred_destinations')
       .select('*', { count: 'exact', head: true })
-      .eq('preference_id', prefs.id);
+      .eq('preference_id', prefs!.id);
 
     if (countError) {
       return res.status(500).json({ error: 'Failed to check destination count' });
@@ -150,7 +150,7 @@ export const addPreferredDestination = async (req: Request, res: Response) => {
     const { data: destination, error: insertError } = await supabase
       .from('driver_preferred_destinations')
       .insert({
-        preference_id: prefs.id,
+        preference_id: prefs!.id,
         name,
         lat,
         lng,
@@ -193,7 +193,7 @@ export const deletePreferredDestination = async (req: Request, res: Response) =>
       .from('driver_preferred_destinations')
       .delete()
       .eq('id', destinationId)
-      .eq('preference_id', prefs.id);
+      .eq('preference_id', prefs!.id);
 
     if (deleteError) {
       return res.status(500).json({ error: 'Failed to delete destination' });

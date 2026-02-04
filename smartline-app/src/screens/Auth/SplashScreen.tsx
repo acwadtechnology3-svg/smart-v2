@@ -22,7 +22,7 @@ export default function SplashScreen() {
     const textSlideAnim = useRef(new Animated.Value(50)).current;
 
     useEffect(() => {
-        // Animation Sequence
+        // Animation Sequence (1200ms approx)
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -49,37 +49,43 @@ export default function SplashScreen() {
             })
         ]).start();
 
-        const checkSession = async () => {
-            try {
-                // Wait for animation a bit
-                await new Promise(resolve => setTimeout(resolve, 2000));
+        const initializeApp = async () => {
+            const minDelayPromise = new Promise(resolve => setTimeout(resolve, 1500));
 
-                const sessionStr = await AsyncStorage.getItem('userSession');
-                if (!sessionStr) {
-                    navigation.replace('RoleSelection');
-                    return;
-                }
+            // Check session in parallel
+            const sessionLoadPromise = async () => {
+                try {
+                    const sessionStr = await AsyncStorage.getItem('userSession');
+                    if (!sessionStr) return 'RoleSelection';
 
-                const { user } = JSON.parse(sessionStr);
-                if (user?.role === 'driver') {
-                    const data = await apiRequest<{ status: 'pending' | 'approved' | 'rejected' }>('/drivers/status');
-                    if (data.status === 'approved') {
-                        navigation.reset({ index: 0, routes: [{ name: 'DriverHome' }] });
-                    } else {
-                        navigation.reset({ index: 0, routes: [{ name: 'DriverWaiting' }] });
+                    const { user } = JSON.parse(sessionStr);
+                    if (user?.role === 'driver') {
+                        const data = await apiRequest<{ status: 'pending' | 'approved' | 'rejected' }>('/drivers/status');
+                        return data.status === 'approved' ? 'DriverHome' : 'DriverWaiting';
+                    } else if (user?.role === 'customer') {
+                        return 'CustomerHome';
                     }
-                } else if (user?.role === 'customer') {
-                    navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
-                } else {
-                    navigation.replace('RoleSelection');
+                    return 'RoleSelection';
+                } catch (e) {
+                    return 'RoleSelection';
                 }
-            } catch (e) {
-                // If anything fails, go to login
+            };
+
+            // Wait for both
+            const [_, nextRoute] = await Promise.all([minDelayPromise, sessionLoadPromise()]);
+
+            if (nextRoute === 'DriverHome') {
+                navigation.reset({ index: 0, routes: [{ name: 'DriverHome' }] });
+            } else if (nextRoute === 'CustomerHome') {
+                navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
+            } else if (nextRoute === 'DriverWaiting') {
+                navigation.reset({ index: 0, routes: [{ name: 'DriverWaiting' }] });
+            } else {
                 navigation.replace('RoleSelection');
             }
         };
 
-        checkSession();
+        initializeApp();
     }, [navigation]);
 
     return (

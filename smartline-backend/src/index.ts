@@ -20,12 +20,9 @@ import walletRoutes from './routes/walletRoutes';
 import supportRoutes from './routes/supportRoutes';
 import supportAdminRoutes from './routes/supportAdminRoutes';
 import dashboardAuthRoutes from './routes/dashboardAuthRoutes';
-<<<<<<< HEAD
 import popupRoutes from './routes/popupRoutes';
 import surgeRoutes from './routes/surgeRoutes';
-=======
 import driverPreferenceRoutes from './routes/driverPreferenceRoutes';
->>>>>>> f0b39f553b0cb350fc91f9a32385947ceef429de
 import { checkDatabaseConnection } from './config/database';
 import { checkRedisConnection } from './config/redis';
 import { startLocationSync } from './workers/locationSyncWorker';
@@ -83,12 +80,9 @@ app.use('/api/sos', sosRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/admin/support', supportAdminRoutes);
-<<<<<<< HEAD
 app.use('/api/popups', popupRoutes);
 app.use('/api/surge', surgeRoutes);
-=======
 app.use('/api/drivers/preferences', driverPreferenceRoutes);
->>>>>>> f0b39f553b0cb350fc91f9a32385947ceef429de
 
 // ===== Health Check =====
 app.get('/health', async (req, res) => {

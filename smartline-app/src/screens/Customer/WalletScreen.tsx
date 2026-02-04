@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Linking, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Linking, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronRight, CreditCard, Banknote, PlusCircle, Wallet as WalletIcon, Check, X, ArrowDownLeft, Wallet } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../../constants/Colors';
@@ -31,17 +32,7 @@ export default function WalletScreen() {
     const [userId, setUserId] = useState<string | null>(null);
     const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('cash');
 
-    // Modals
-    const [showTopUp, setShowTopUp] = useState(false);
-    const [showAddCard, setShowAddCard] = useState(false);
-    const [topUpAmount, setTopUpAmount] = useState('');
 
-    // Mock Card Data
-    const [cardNumber, setCardNumber] = useState('');
-    const [cardExpiry, setCardExpiry] = useState('');
-    const [cardCVC, setCardCVC] = useState('');
-
-    // Modals
     const [showTopUp, setShowTopUp] = useState(false);
     const [showAddCard, setShowAddCard] = useState(false);
     const [topUpAmount, setTopUpAmount] = useState('');

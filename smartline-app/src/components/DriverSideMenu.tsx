@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
     Wallet, History, CircleDollarSign, Car, Settings, Headphones,
-    LogOut, User, ChevronRight, RefreshCw
+    LogOut, User, ChevronRight, RefreshCw, MapPin
 } from 'lucide-react-native';
 import { RootStackParamList } from '../types/navigation';
 import { Colors } from '../constants/Colors';
@@ -176,6 +176,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
                             <MenuItem icon={<History size={22} color="#F97316" />} label={t('tripHistory')} onPress={() => handleNavigation('DriverHistory')} isRTL={isRTL} />
                             <MenuItem icon={<CircleDollarSign size={22} color="#10B981" />} label={t('earnings')} onPress={() => handleNavigation('DriverEarnings')} isRTL={isRTL} />
                             <MenuItem icon={<Car size={22} color="#3B82F6" />} label={t('myVehicle')} onPress={() => handleNavigation('DriverMyVehicle')} isRTL={isRTL} />
+                            <MenuItem icon={<MapPin size={22} color="#8B5CF6" />} label={t('preferredDestinations')} onPress={() => handleNavigation('DriverDestinations')} isRTL={isRTL} />
                         </View>
 
                         <View style={styles.divider} />

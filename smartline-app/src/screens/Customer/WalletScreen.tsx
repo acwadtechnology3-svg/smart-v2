@@ -1,14 +1,34 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Modal, TextInput, Alert, ScrollView } from 'react-native';
-import { ArrowLeft, ChevronRight, CreditCard, Banknote, PlusCircle, Wallet as WalletIcon, Check, X } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Linking, RefreshControl } from 'react-native';
+import { ArrowLeft, ChevronRight, CreditCard, Banknote, PlusCircle, Wallet as WalletIcon, Check, X, ArrowDownLeft, Wallet } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../../constants/Colors';
+import { apiRequest } from '../../services/backend';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 type PaymentMethod = 'balance' | 'cash' | 'card';
 
+const BACKEND_URL = Constants.expoConfig?.hostUri
+    ? `http://${Constants.expoConfig.hostUri.split(':').shift()}:3000/api`
+    : 'http://192.168.1.10:3000/api';
+
+interface Transaction {
+    id: string;
+    type: string;
+    amount: number;
+    status: string;
+    created_at: string;
+    description?: string;
+}
+
 export default function WalletScreen() {
     const navigation = useNavigation();
-    const [balance, setBalance] = useState(150.00); // Mock initial balance
+    const [balance, setBalance] = useState<number | null>(null);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
     const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('cash');
 
     // Modals
@@ -21,16 +41,88 @@ export default function WalletScreen() {
     const [cardExpiry, setCardExpiry] = useState('');
     const [cardCVC, setCardCVC] = useState('');
 
-    const handleTopUp = () => {
-        const amount = parseFloat(topUpAmount);
-        if (isNaN(amount) || amount <= 0) {
-            Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+    // Modals
+    const [showTopUp, setShowTopUp] = useState(false);
+    const [showAddCard, setShowAddCard] = useState(false);
+    const [topUpAmount, setTopUpAmount] = useState('');
+    const [toppingUp, setToppingUp] = useState(false);
+
+    // Mock Card Data
+    const [cardNumber, setCardNumber] = useState('');
+    const [cardExpiry, setCardExpiry] = useState('');
+    const [cardCVC, setCardCVC] = useState('');
+
+    useEffect(() => {
+        loadCachedData();
+        fetchWalletData();
+    }, []);
+
+    const loadCachedData = async () => {
+        try {
+            const cached = await AsyncStorage.getItem('customer_wallet_data');
+            if (cached) {
+                const { balance: cachedBalance, transactions: cachedTxs } = JSON.parse(cached);
+                setBalance(cachedBalance);
+                setTransactions(cachedTxs);
+            }
+        } catch (error) {
+            console.error('Error loading cached wallet data:', error);
+        }
+    };
+
+    const fetchWalletData = async (isRefresh = false) => {
+        try {
+            if (isRefresh) setRefreshing(true);
+            else setLoading(true);
+
+            const session = await AsyncStorage.getItem('userSession');
+            if (!session) return;
+            const { user } = JSON.parse(session);
+            setUserId(user.id);
+
+            const data = await apiRequest<{ balance: number; transactions: Transaction[] }>('/wallet/summary');
+            setBalance(data.balance || 0);
+            setTransactions(data.transactions || []);
+
+            await AsyncStorage.setItem('customer_wallet_data', JSON.stringify({
+                balance: data.balance || 0,
+                transactions: data.transactions || []
+            }));
+
+        } catch (error) {
+            console.error('Error fetching wallet data:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const handleTopUp = async () => {
+        if (!topUpAmount || isNaN(parseFloat(topUpAmount)) || parseFloat(topUpAmount) <= 0) {
+            Alert.alert('Invalid Amount', 'Please enter a valid positive amount.');
             return;
         }
-        setBalance(prev => prev + amount);
-        setTopUpAmount('');
-        setShowTopUp(false);
-        Alert.alert('Success', `Successfully added EGP ${amount.toFixed(2)} to your wallet.`);
+
+        setToppingUp(true);
+        try {
+            const data = await apiRequest<{ paymentUrl: string; orderId: string }>('/payment/deposit/init', {
+                method: 'POST',
+                body: JSON.stringify({ userId, amount: parseFloat(topUpAmount) })
+            });
+
+            if (data.paymentUrl) {
+                Linking.openURL(data.paymentUrl);
+                setShowTopUp(false);
+                setTopUpAmount('');
+                Alert.alert('Success', 'Complete payment in your browser. Your balance will update shortly.');
+                setTimeout(() => fetchWalletData(), 3000);
+            }
+        } catch (error: any) {
+            console.error('Top up error:', error);
+            Alert.alert('Error', error.message || 'Failed to initiate top up');
+        } finally {
+            setToppingUp(false);
+        }
     };
 
     const handleAddCard = () => {
@@ -56,7 +148,16 @@ export default function WalletScreen() {
                 <View style={{ width: 24 }} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => fetchWalletData(true)}
+                        colors={[Colors.primary]}
+                    />
+                }
+            >
 
                 {/* Balance Section - Click to Top Up */}
                 <View style={styles.balanceSection}>
@@ -64,7 +165,11 @@ export default function WalletScreen() {
                     <TouchableOpacity style={styles.balanceRow} onPress={() => setShowTopUp(true)}>
                         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
                             <Text style={styles.currency}>EGP</Text>
-                            <Text style={styles.amount}>{balance.toFixed(2)}</Text>
+                            {loading ? (
+                                <ActivityIndicator color={Colors.textPrimary} />
+                            ) : (
+                                <Text style={styles.amount}>{(balance ?? 0).toFixed(2)}</Text>
+                            )}
                         </View>
                         <View style={styles.topUpBadge}>
                             <PlusCircle size={14} color="#fff" />
@@ -123,6 +228,40 @@ export default function WalletScreen() {
                         <ChevronRight size={20} color={Colors.border} />
                     </TouchableOpacity>
                 </View>
+
+                {/* Transaction History */}
+                <Text style={styles.sectionHeader}>Recent Transactions</Text>
+                {transactions.length === 0 ? (
+                    <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>No transactions yet</Text>
+                ) : (
+                    transactions.slice(0, 10).map((tx) => (
+                        <View key={tx.id} style={styles.txCard}>
+                            <View style={styles.txIcon}>
+                                {tx.type === 'deposit' ? (
+                                    <ArrowDownLeft size={20} color="#10B981" />
+                                ) : (
+                                    <Wallet size={20} color={Colors.primary} />
+                                )}
+                            </View>
+                            <View style={styles.txInfo}>
+                                <Text style={styles.txTitle}>
+                                    {tx.type === 'deposit' ? 'Deposit' : tx.type === 'payment' ? 'Payment' : 'Transaction'}
+                                </Text>
+                                <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={[styles.txAmount, { color: tx.amount > 0 ? '#10B981' : '#111827' }]}>
+                                    {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)} EGP
+                                </Text>
+                                <View style={[styles.statusBadge, { backgroundColor: (tx.status === 'completed' ? '#10B981' : tx.status === 'pending' ? '#F59E0B' : '#EF4444') + '20' }]}>
+                                    <Text style={[styles.statusText, { color: tx.status === 'completed' ? '#10B981' : tx.status === 'pending' ? '#F59E0B' : '#EF4444' }]}>
+                                        {tx.status}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    ))
+                )}
             </ScrollView>
 
             {/* --- TOP UP MODAL --- */}
@@ -144,8 +283,16 @@ export default function WalletScreen() {
                             onChangeText={setTopUpAmount}
                             autoFocus
                         />
-                        <TouchableOpacity style={styles.modalButton} onPress={handleTopUp}>
-                            <Text style={styles.modalButtonText}>Confirm Top Up</Text>
+                        <TouchableOpacity
+                            style={[styles.modalButton, toppingUp && { opacity: 0.7 }]}
+                            onPress={handleTopUp}
+                            disabled={toppingUp}
+                        >
+                            {toppingUp ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.modalButtonText}>Confirm Top Up</Text>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -245,6 +392,22 @@ const styles = StyleSheet.create({
     selectedItemTitle: { color: Colors.primary },
     itemSubtitle: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
     listDivider: { height: 1, backgroundColor: '#F1F5F9', marginLeft: 60 },
+
+    // Transaction Styles
+    txCard: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 8
+    },
+    txIcon: {
+        width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6',
+        alignItems: 'center', justifyContent: 'center', marginRight: 12
+    },
+    txInfo: { flex: 1 },
+    txTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
+    txDate: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+    txAmount: { fontSize: 16, fontWeight: 'bold' },
+    statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, marginTop: 4 },
+    statusText: { fontSize: 10, fontWeight: 'bold', textTransform: 'capitalize' },
 
     // Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

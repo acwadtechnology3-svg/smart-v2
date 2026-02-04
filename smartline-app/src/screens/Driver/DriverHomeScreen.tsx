@@ -376,6 +376,18 @@ export default function DriverHomeScreen() {
         const unsubOfferUpdates = await realtimeClient.subscribe(
             { channel: 'driver:offer-updates' },
             (payload) => {
+                // Optimized Fast-Track: Receive Full Trip Object
+                if (payload.event === 'TRIP_ACCEPTED' && payload.new) {
+                    const trip = payload.new;
+                    console.log(`[Realtime] 🚀 TRIP ACCEPTED (Direct)! Navigating to ${trip.id}`);
+
+                    if (processedAcceptedTrips.current.has(trip.id)) return;
+                    processedAcceptedTrips.current.add(trip.id);
+
+                    navigation.navigate('DriverActiveTrip', { tripId: trip.id, initialTripData: trip });
+                    return;
+                }
+
                 const tripId = payload.new?.trip_id;
                 if (payload.new?.driver_id === driverId && payload.new?.status === 'accepted' && tripId) {
 

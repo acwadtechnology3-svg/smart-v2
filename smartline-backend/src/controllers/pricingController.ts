@@ -43,7 +43,34 @@ export const getPromoCode = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Promo code usage limit reached' });
     }
 
+    // ... existing codes
     res.json({ promo: data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getAvailablePromos = async (req: Request, res: Response) => {
+  try {
+    const now = new Date().toISOString();
+
+    // Fetch active promos that haven't expired
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .eq('is_active', true)
+      .gt('valid_until', now)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Filter out used up promos locally or in query if possible
+    // (PostgREST doesn't support col comparison easily without raw sql or rpc, so filtering locally for simple cases)
+    const validPromos = (data || []).filter(p =>
+      !p.max_uses || (p.current_uses < p.max_uses)
+    );
+
+    res.json({ promos: validPromos });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

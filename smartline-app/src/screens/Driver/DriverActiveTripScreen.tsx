@@ -17,11 +17,11 @@ const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIw
 export default function DriverActiveTripScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<RootStackParamList, 'DriverActiveTrip'>>();
-    const { tripId } = route.params;
+    const { tripId, initialTripData } = route.params as any;
     const { t, isRTL } = useLanguage();
 
-    const [trip, setTrip] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [trip, setTrip] = useState<any>(initialTripData || null);
+    const [loading, setLoading] = useState(!initialTripData);
     const [driverLoc, setDriverLoc] = useState<any>(null);
     const [routeCoords, setRouteCoords] = useState<any[]>([]);
     const [waitingTime, setWaitingTime] = useState<string>('5:00');

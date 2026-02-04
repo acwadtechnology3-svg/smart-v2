@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     locationHeaderSubtitle: { fontSize: 10, color: '#6B7280' },
 
     floatingUI: {
-        marginBottom: -35,
+        marginBottom: -5, // Moved up another 15px (Total 30px up)
         width: '100%',
         height: 50,
         zIndex: 10,

@@ -187,23 +187,19 @@ export default function TripOptionsScreen() {
         const dist = routeInfo ? routeInfo.distance : 5; // km
         const dur = routeInfo ? routeInfo.duration : 10; // min
 
-        // Default valid definitions if DB is empty or loading
+        // Localized Definitions
         const Definitions = [
-            { id: 'saver', name: 'Saver', image: RIDE_IMAGES.saver, color: '#10B981', promo: 'Best Value', etaMult: 1.2 },
-            { id: 'comfort', name: 'Comfort', image: RIDE_IMAGES.comfort, color: Colors.primary, promo: 'Recommended', etaMult: 1.0 },
-            { id: 'vip', name: 'VIP', image: RIDE_IMAGES.vip, color: '#1e1e1e', promo: null, etaMult: 1.0 },
-            { id: 'scooter', name: 'Scooter', image: RIDE_IMAGES.scooter, color: '#F59E0B', promo: 'Fastest', etaMult: 0.8 },
-            { id: 'taxi', name: 'Taxi', image: RIDE_IMAGES.taxi, color: '#FBBF24', promo: null, etaMult: 1.1 },
+            { id: 'saver', name: t('rideSaver') || 'Saver', image: RIDE_IMAGES.saver, color: '#10B981', promo: t('bestValue') || 'Best Value', etaMult: 1.2 },
+            { id: 'comfort', name: t('rideComfort') || 'Comfort', image: RIDE_IMAGES.comfort, color: Colors.primary, promo: t('recommended') || 'Recommended', etaMult: 1.0 },
+            { id: 'vip', name: t('rideVIP') || 'VIP', image: RIDE_IMAGES.vip, color: '#1e1e1e', promo: null, etaMult: 1.0 },
+            { id: 'scooter', name: t('rideScooter') || 'Scooter', image: RIDE_IMAGES.scooter, color: '#F59E0B', promo: t('fastest') || 'Fastest', etaMult: 0.8 },
+            { id: 'taxi', name: t('rideTaxi') || 'Taxi', image: RIDE_IMAGES.taxi, color: '#FBBF24', promo: null, etaMult: 1.1 },
         ];
 
         // Filter definitions based on what we have in pricingConfig
-        // If pricingConfig is empty, show nothing or default?
-        // Let's map over Definitions and try to find matching config.
         return Definitions.map(def => {
             const config = pricingConfig.find(p => p.service_tier === def.id);
 
-            // Use config or defaults
-            // If pricingConfig is loaded, we ideally shouldn't see defaults relative to what admin set
             const base = config ? config.base_fare : 10;
             const perKm = config ? config.per_km_rate : 3;
             const perMin = config ? config.per_min_rate : 0.5;
@@ -211,9 +207,6 @@ export default function TripOptionsScreen() {
 
             let rawPrice = base + (dist * perKm) + (dur * perMin);
             if (rawPrice < minPrice) rawPrice = minPrice;
-
-            // DEBUG LOG
-            if (def.id === 'taxi') console.log(`[Taxi Calc] Base:${base} + Dist(${dist.toFixed(1)} * ${perKm}) + Time(${dur.toFixed(0)} * ${perMin}) = ${rawPrice}`);
 
             let finalPrice = rawPrice;
             const eta = Math.ceil(dur * def.etaMult);
@@ -234,20 +227,20 @@ export default function TripOptionsScreen() {
                 }
 
                 finalPrice = finalPrice - discountAmount;
-                promoText = `${promoDiscount}% OFF`;
-                if (promoMaxDiscount) promoText += ` (Max ${promoMaxDiscount} LE)`;
+                promoText = `${promoDiscount}% ${t('off') || 'OFF'}`;
+                if (promoMaxDiscount) promoText += ` (${t('max') || 'Max'} ${promoMaxDiscount} ${t('currency') || 'EGP'})`;
             }
 
             return {
                 ...def,
                 price: parseFloat(finalPrice.toFixed(2)),
                 oldPrice: oldPrice,
-                eta: `${eta} min`,
+                eta: `${eta} ${t('min') || 'min'}`,
                 promo: promoText,
                 isValid: !!config
             };
         }).filter(r => r.isValid || pricingConfig.length === 0);
-    }, [appliedPromo, routeInfo, pricingConfig, promoDiscount, promoMaxDiscount]);
+    }, [appliedPromo, routeInfo, pricingConfig, promoDiscount, promoMaxDiscount, t]);
 
 
 
@@ -283,6 +276,27 @@ export default function TripOptionsScreen() {
 
     const [requesting, setRequesting] = useState(false);
 
+    // ...
+    // Auto-load selected promo from storage
+    useEffect(() => {
+        const loadSelectedPromo = async () => {
+            const storedPromo = await AsyncStorage.getItem('selected_promo');
+            if (storedPromo) {
+                const promo = JSON.parse(storedPromo);
+                // Apply it
+                setAppliedPromo(promo.code);
+                setPromoDiscount(promo.discount_percent);
+                setPromoMaxDiscount(promo.discount_max);
+                setPromoInput(promo.code); // Sync input
+            }
+        };
+        loadSelectedPromo();
+    }, []);
+
+
+
+    // ...
+
     const handleRequest = async () => {
         if (!pickupCoords || !destCoords || !routeInfo) {
             Alert.alert('Error', 'Route not calculated yet.');
@@ -316,7 +330,8 @@ export default function TripOptionsScreen() {
                 distance: routeInfo.distance,
                 duration: routeInfo.duration,
                 car_type: selectedRide,
-                payment_method: paymentMethod.toLowerCase()
+                payment_method: paymentMethod.toLowerCase(),
+                promo_code: appliedPromo // Send the promo code!
             };
 
             const response = await apiRequest<{ trip: any }>('/trips/create', {
@@ -325,6 +340,8 @@ export default function TripOptionsScreen() {
             });
 
             if (response.trip) {
+                // Clear the used promo from storage
+                await AsyncStorage.removeItem('selected_promo');
                 navigation.navigate('SearchingDriver', { tripId: response.trip.id });
             }
 
@@ -402,29 +419,30 @@ export default function TripOptionsScreen() {
             <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: slideUp }] }]}>
 
                 {/* Route Header */}
-                <View style={styles.routeInfo}>
-                    <View style={styles.routeNode}>
-                        <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
-                        <Text style={styles.addressText} numberOfLines={1}>{pickup || t('currentLocation')}</Text>
+                <View style={[styles.routeInfo, { flexDirection: isRTL ? 'row-reverse' : 'column' }]}>
+                    <View style={[styles.routeNode, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.dot, { backgroundColor: '#10B981', marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]} />
+                        <Text style={[styles.addressText, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>{pickup || t('currentLocation')}</Text>
                     </View>
-                    <View style={styles.verticalLineWrapper}>
+                    {/* Vertical Line - Hard to RTL perfectly without flex column/row flip on wrapper. Let's keep it simple for now or hide line in RTL? No, line connects dots. */}
+                    <View style={[styles.verticalLineWrapper, { alignItems: isRTL ? 'flex-end' : 'flex-start', paddingRight: isRTL ? 7.5 : 0, paddingLeft: isRTL ? 0 : 4.5 }]}>
                         <View style={styles.verticalLine} />
                     </View>
-                    <View style={styles.routeNode}>
-                        <View style={[styles.dot, { backgroundColor: '#EF4444' }]} />
-                        <Text style={styles.addressText} numberOfLines={1}>{destination}</Text>
+                    <View style={[styles.routeNode, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.dot, { backgroundColor: '#EF4444', marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]} />
+                        <Text style={[styles.addressText, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>{destination}</Text>
                     </View>
                 </View>
 
                 {routeInfo && (
                     <View style={styles.tripStats}>
-                        <Text style={styles.tripStatsText}>{routeInfo.distance.toFixed(1)} km  •  {Math.ceil(routeInfo.duration)} min</Text>
+                        <Text style={styles.tripStatsText}>{routeInfo.distance.toFixed(1)} {t('km') || 'km'}  •  {Math.ceil(routeInfo.duration)} {t('min') || 'min'}</Text>
                     </View>
                 )}
 
                 <View style={styles.divider} />
 
-                <Text style={styles.sectionTitle}>{t('chooseRide')}</Text>
+                <Text style={[styles.sectionTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('chooseRide') || 'Choose a ride'}</Text>
 
                 {/* Ride Options (Vertical List) */}
                 <ScrollView
@@ -435,18 +453,22 @@ export default function TripOptionsScreen() {
                     {ridesData.map((ride) => (
                         <TouchableOpacity
                             key={ride.id}
-                            style={[styles.rideCard, selectedRide === ride.id && styles.rideCardSelected]}
+                            style={[
+                                styles.rideCard,
+                                selectedRide === ride.id && styles.rideCardSelected,
+                                { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                            ]}
                             onPress={() => setSelectedRide(ride.id)}
                             activeOpacity={0.9}
                         >
                             {/* Icon Section */}
-                            <View style={styles.rideIconWrapper}>
+                            <View style={[styles.rideIconWrapper, { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>
                                 <Image source={ride.image} style={styles.rideImage} resizeMode="contain" />
                             </View>
 
                             {/* Info Section */}
-                            <View style={styles.rideInfo}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={[styles.rideInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
                                     <Text style={styles.rideName}>{ride.name}</Text>
                                     <View style={styles.personRow}>
                                         <Text style={styles.personText}>4</Text>
@@ -462,13 +484,13 @@ export default function TripOptionsScreen() {
                             </View>
 
                             {/* Price Section */}
-                            <View style={styles.priceSection}>
-                                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                                    <Text style={styles.currency}>EGP</Text>
+                            <View style={[styles.priceSection, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}>
+                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'baseline' }}>
+                                    <Text style={[styles.currency, { marginRight: isRTL ? 0 : 2, marginLeft: isRTL ? 2 : 0 }]}>{t('currency') || 'EGP'}</Text>
                                     <Text style={styles.price}>{ride.price.toFixed(2)}</Text>
                                 </View>
                                 {ride.oldPrice && (
-                                    <Text style={styles.oldPrice}>EGP {ride.oldPrice.toFixed(2)}</Text>
+                                    <Text style={styles.oldPrice}>{t('currency') || 'EGP'} {ride.oldPrice.toFixed(2)}</Text>
                                 )}
                             </View>
                         </TouchableOpacity>
@@ -477,9 +499,9 @@ export default function TripOptionsScreen() {
 
                 {/* Footer Action */}
                 <View style={styles.footer}>
-                    <View style={styles.paymentRow}>
+                    <View style={[styles.paymentRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <TouchableOpacity
-                            style={styles.paymentSelect}
+                            style={[styles.paymentSelect, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                             onPress={() => setShowPaymentModal(true)}
                         >
                             {paymentMethod === 'Cash' ? (
@@ -487,16 +509,16 @@ export default function TripOptionsScreen() {
                             ) : (
                                 <Wallet size={20} color={Colors.primary} />
                             )}
-                            <Text style={styles.paymentText}>{paymentMethod === 'Cash' ? t('cash') : t('wallet')}</Text>
+                            <Text style={styles.paymentText}>{paymentMethod === 'Cash' ? (t('cash') || 'Cash') : (t('wallet') || 'Wallet')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.promoSelect, appliedPromo ? { backgroundColor: '#DCFCE7' } : null]}
+                            style={[styles.promoSelect, appliedPromo ? { backgroundColor: '#DCFCE7' } : null, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                             onPress={() => setShowPromoModal(true)}
                         >
                             <BadgePercent size={18} color={appliedPromo ? '#166534' : "#F97316"} />
                             <Text style={[styles.promoLinkText, appliedPromo ? { color: '#166534' } : null]}>
-                                {appliedPromo ? appliedPromo : t('promoCode')}
+                                {appliedPromo ? appliedPromo : (t('promoCode') || 'Promo Code')}
                             </Text>
                             {appliedPromo && (
                                 <TouchableOpacity onPress={handleRemovePromo} style={{ marginLeft: 4 }}>
@@ -519,7 +541,7 @@ export default function TripOptionsScreen() {
                             {requesting ? (
                                 <ActivityIndicator color="#fff" />
                             ) : (
-                                <Text style={styles.requestButtonText}>Select {ridesData.find(r => r.id === selectedRide)?.name}</Text>
+                                <Text style={styles.requestButtonText}>{t('select') || 'Select'} {ridesData.find(r => r.id === selectedRide)?.name}</Text>
                             )}
                         </LinearGradient>
                     </TouchableOpacity>
@@ -538,27 +560,27 @@ export default function TripOptionsScreen() {
                     <View style={styles.modalOverlay}>
                         <TouchableWithoutFeedback>
                             <View style={styles.modalContent}>
-                                <Text style={styles.modalTitle}>Select Payment Method</Text>
+                                <Text style={[styles.modalTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('selectPaymentMethod') || 'Select Payment Method'}</Text>
 
                                 <TouchableOpacity
-                                    style={[styles.paymentOption, paymentMethod === 'Cash' && styles.paymentOptionSelected]}
+                                    style={[styles.paymentOption, paymentMethod === 'Cash' && styles.paymentOptionSelected, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                                     onPress={() => { setPaymentMethod('Cash'); setShowPaymentModal(false); }}
                                 >
-                                    <View style={styles.optionIcon}>
+                                    <View style={[styles.optionIcon, { marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
                                         <CreditCard size={24} color="#1e1e1e" />
                                     </View>
-                                    <Text style={styles.optionText}>Cash</Text>
+                                    <Text style={[styles.optionText, { textAlign: isRTL ? 'right' : 'left' }]}>{t('cash') || 'Cash'}</Text>
                                     {paymentMethod === 'Cash' && <View style={styles.selectedDot} />}
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    style={[styles.paymentOption, paymentMethod === 'Wallet' && styles.paymentOptionSelected]}
+                                    style={[styles.paymentOption, paymentMethod === 'Wallet' && styles.paymentOptionSelected, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                                     onPress={() => { setPaymentMethod('Wallet'); setShowPaymentModal(false); }}
                                 >
-                                    <View style={styles.optionIcon}>
+                                    <View style={[styles.optionIcon, { marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
                                         <Wallet size={24} color="#1e1e1e" />
                                     </View>
-                                    <Text style={styles.optionText}>Wallet</Text>
+                                    <Text style={[styles.optionText, { textAlign: isRTL ? 'right' : 'left' }]}>{t('wallet') || 'Wallet'}</Text>
                                     {paymentMethod === 'Wallet' && <View style={styles.selectedDot} />}
                                 </TouchableOpacity>
                             </View>
@@ -578,13 +600,13 @@ export default function TripOptionsScreen() {
                     <TouchableWithoutFeedback onPress={() => setShowPromoModal(false)}>
                         <View style={styles.modalOverlay}>
                             <TouchableWithoutFeedback>
-                                <View style={styles.modalContent}>
-                                    <Text style={styles.modalTitle}>Enter Promo Code</Text>
-                                    <Text style={styles.modalSubtitle}>Have a discount code? Enter it below.</Text>
+                                <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+                                    <Text style={[styles.modalTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('enterPromoCode') || "Enter Promo Code"}</Text>
+                                    <Text style={[styles.modalSubtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('promoSubtitle') || "Have a discount code? Enter it below."}</Text>
 
                                     <TextInput
-                                        style={styles.promoInput}
-                                        placeholder="e.g. SMART50"
+                                        style={[styles.promoInput, { textAlign: isRTL ? 'right' : 'left' }]}
+                                        placeholder={t('promoPlaceholder') || "e.g. SMART50"}
                                         placeholderTextColor="#9CA3AF"
                                         value={promoInput}
                                         onChangeText={setPromoInput}
@@ -592,11 +614,21 @@ export default function TripOptionsScreen() {
                                     />
 
                                     <TouchableOpacity style={styles.applyButton} onPress={handleApplyPromo}>
-                                        <Text style={styles.applyButtonText}>Apply Code</Text>
+                                        <Text style={styles.applyButtonText}>{t('applyCode') || "Apply Code"}</Text>
                                     </TouchableOpacity>
 
+                                    {/* Available Promos List */}
+                                    <View style={{ width: '100%', marginTop: 16 }}>
+                                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#374151', marginBottom: 8, textAlign: isRTL ? 'right' : 'left' }}>{t('availablePromotions') || "Available Promotions"}</Text>
+                                        <PromoList
+                                            onSelect={(code) => {
+                                                setPromoInput(code);
+                                            }}
+                                        />
+                                    </View>
+
                                     <TouchableOpacity style={styles.cancelButton} onPress={() => setShowPromoModal(false)}>
-                                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                                        <Text style={styles.cancelButtonText}>{t('close') || "Close"}</Text>
                                     </TouchableOpacity>
                                 </View>
                             </TouchableWithoutFeedback>
@@ -607,6 +639,51 @@ export default function TripOptionsScreen() {
         </View>
     );
 }
+
+// Sub-component to fetch and list promos
+const PromoList = ({ onSelect }: { onSelect: (code: string) => void }) => {
+    const [promos, setPromos] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetch = async () => {
+            try {
+                const data = await apiRequest<{ promos: any[] }>('/pricing/available', { auth: false }); // auth false because promos might be public? Actually backend allows user info
+                if (data.promos) setPromos(data.promos);
+            } catch (e) {
+                console.log("Failed to load promos in modal", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetch();
+    }, []);
+
+    if (loading) return <ActivityIndicator color={Colors.primary} />;
+
+    if (promos.length === 0) return <Text style={{ color: '#9CA3AF', fontSize: 12 }}>No active promotions found.</Text>;
+
+    return (
+        <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+            {promos.map(p => (
+                <TouchableOpacity
+                    key={p.id}
+                    style={{
+                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                        padding: 12, backgroundColor: '#EFF6FF', borderRadius: 8, marginBottom: 8
+                    }}
+                    onPress={() => onSelect(p.code)}
+                >
+                    <View>
+                        <Text style={{ fontWeight: 'bold', color: '#1E40AF' }}>{p.code}</Text>
+                        <Text style={{ fontSize: 10, color: '#60A5FA' }}>{p.discount_percent}% OFF</Text>
+                    </View>
+                    <Ticket size={16} color="#3B82F6" />
+                </TouchableOpacity>
+            ))}
+        </ScrollView>
+    );
+};
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#fff' },

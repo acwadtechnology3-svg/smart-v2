@@ -25,6 +25,8 @@ async function assertTripParticipant(tripId: string, userId: string) {
     return data;
 }
 
+// ... imports
+
 export const createTrip = async (req: Request, res: Response) => {
     try {
         const {
@@ -36,13 +38,49 @@ export const createTrip = async (req: Request, res: Response) => {
             distance,
             duration,
             car_type,
-            payment_method
+            payment_method,
+            promo_code // New field
         } = req.body;
 
         // Validation
         const customerId = req.user?.id || customer_id;
         if (!customerId || !pickup_lat || !dest_lat || !price) {
             return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        let promoId = null;
+        let discountAmount = 0;
+
+        // Promo Code Logic
+        if (promo_code) {
+            const { data: promo, error: promoError } = await supabase
+                .from('promo_codes')
+                .select('*')
+                .eq('code', promo_code)
+                .single();
+
+            if (promo && promo.is_active) {
+                // Check validity
+                const now = new Date();
+                const validUntil = promo.valid_until ? new Date(promo.valid_until) : null;
+                const limitReached = promo.max_uses && promo.current_uses >= promo.max_uses;
+
+                if (!limitReached && (!validUntil || validUntil > now)) {
+                    promoId = promo.id;
+
+                    // Increment usage
+                    await supabase
+                        .from('promo_codes')
+                        .update({ current_uses: (promo.current_uses || 0) + 1 })
+                        .eq('id', promo.id);
+
+                    console.log(`[Trip] Applied promo ${promo_code} (ID: ${promoId})`);
+                } else {
+                    console.warn(`[Trip] Promo ${promo_code} is invalid or expired.`);
+                }
+            } else {
+                console.warn(`[Trip] Promo ${promo_code} not found or inactive.`);
+            }
         }
 
         const { data, error } = await supabase
@@ -55,12 +93,14 @@ export const createTrip = async (req: Request, res: Response) => {
                 dest_lng,
                 pickup_address,
                 dest_address,
-                price,
+                price, // This is the discounted price passed from frontend
                 distance,
                 duration,
                 car_type,
                 payment_method,
-                status: 'requested'
+                status: 'requested',
+                promo_code: promoId ? promo_code : null, // Store if valid
+                promo_id: promoId
             })
             .select()
             .single();
@@ -71,8 +111,7 @@ export const createTrip = async (req: Request, res: Response) => {
         }
 
         console.log(`[Trip Created] Trip ${data.id} created with status: ${data.status}`);
-        console.log(`[Trip Created] Pickup: ${pickup_address}, Dest: ${dest_address}`);
-        console.log(`[Trip Created] Car type: ${car_type}, Price: ${price}`);
+        console.log(`[Trip Created] Price: ${price} (Promo: ${promo_code || 'None'})`);
 
         // Broadcast to all connected drivers
         broadcastToDrivers('INSERT', data);
@@ -168,8 +207,10 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
 
         // MANUAL BROADCAST TO DRIVER
         // This ensures they get the 'accepted' event even if Postgres Realtime lags or fails
-        if (acceptedOffer) {
-            notifyDriver(driverId, 'UPDATE', acceptedOffer);
+        if (updatedTrip) {
+            console.log(`[TripAccepted] Notifying driver ${driverId} with full trip details`);
+            // Send full trip object so frontend can start immediately without fetch
+            notifyDriver(driverId, 'TRIP_ACCEPTED', updatedTrip);
         }
 
         res.json({ success: true, trip: updatedTrip });

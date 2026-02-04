@@ -193,7 +193,7 @@ export default function OnTripScreen() {
                         <Text style={styles.actionLabel}>{t('chat')}</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Safety', { tripId })}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Safety', { tripId, trip })}>
                         <View style={styles.iconCircle}>
                             <ShieldCheck size={24} color={Colors.primary} />
                         </View>

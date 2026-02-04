@@ -18,7 +18,8 @@ const createSOSSchema = z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
     trip_id: z.string().uuid().optional(),
-    notes: z.string().max(500).optional()
+    notes: z.string().max(500).optional(),
+    metadata: z.record(z.string(), z.any()).optional()
 });
 
 const resolveSOSSchema = z.object({
@@ -29,7 +30,6 @@ const resolveSOSSchema = z.object({
 router.post(
     '/create',
     authenticate,
-    requireDriver,
     validateBody(createSOSSchema),
     createSOSAlert
 );

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { ArrowLeft, ShieldAlert, PhoneCall, Share2, UserCheck, ChevronRight, AlertTriangle } from 'lucide-react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking, I18nManager } from 'react-native';
+import { ArrowLeft, ShieldAlert, PhoneCall, ChevronRight, AlertTriangle } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { RootStackParamList } from '../../types/navigation';
 import { apiRequest } from '../../services/backend';
+import { tripStatusService } from '../../services/tripStatusService';
+import { useLanguage } from '../../context/LanguageContext';
 
 type SafetyScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Safety'>;
 type SafetyScreenRouteProp = RouteProp<RootStackParamList, 'Safety'>;
@@ -15,6 +17,7 @@ export default function SafetyScreen() {
     const navigation = useNavigation<SafetyScreenNavigationProp>();
     const route = useRoute<SafetyScreenRouteProp>();
     const { tripId } = route.params || {};
+    const { t, isRTL } = useLanguage();
 
     const [sending, setSending] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
@@ -23,7 +26,7 @@ export default function SafetyScreen() {
         (async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission to access location was denied');
+                Alert.alert(t('permissionDenied') || 'Permission denied');
                 return;
             }
 
@@ -34,12 +37,12 @@ export default function SafetyScreen() {
 
     const handleSOS = () => {
         Alert.alert(
-            "Send SOS Alert?",
-            "This will instantly notify our Safety Team and share your live location and trip details.",
+            t('sendSosAlert') || "Send SOS Alert?",
+            t('sosAlertDescription') || "This will instantly notify our Safety Team and share your live location and trip details.",
             [
-                { text: "Cancel", style: "cancel" },
+                { text: t('cancel') || "Cancel", style: "cancel" },
                 {
-                    text: "SEND ALERT",
+                    text: t('sendAlert') || "SEND ALERT",
                     style: "destructive",
                     onPress: confirmSOS
                 }
@@ -50,7 +53,7 @@ export default function SafetyScreen() {
     const confirmSOS = async () => {
         let currentLocation = location;
         if (!currentLocation) {
-            Alert.alert("Error", "We cannot detect your location yet. Please wait a moment.");
+            Alert.alert(t('error') || "Error", t('detectingLocation') || "We cannot detect your location yet. Please wait a moment.");
             const loc = await Location.getCurrentPositionAsync({});
             setLocation(loc);
             currentLocation = loc;
@@ -60,18 +63,25 @@ export default function SafetyScreen() {
         setSending(true);
 
         try {
-            // 1. Find Trip ID if missing
+            // 1. Find Trip ID and Snapshot
             let activeTripId = tripId;
-            let tripSnapshot: any = null;
+            let tripSnapshot: any = (route.params as any).trip;
 
-            if (activeTripId) {
+            if (!activeTripId && tripStatusService.isMonitoring()) {
+                activeTripId = tripStatusService.getCurrentTripId() || undefined;
+            }
+
+            // If we have tripId but no snapshot (e.g. from deep link or missing params), fetch it
+            if (activeTripId && !tripSnapshot) {
                 try {
                     const data = await apiRequest<{ trip: any }>(`/trips/${activeTripId}`);
                     tripSnapshot = data.trip;
                 } catch {
                     // ignore
                 }
-            } else {
+            }
+            // If completely missing trip info, try to fetch active trip
+            else if (!activeTripId) {
                 try {
                     const data = await apiRequest<{ trip: any }>('/trips/active');
                     activeTripId = data.trip?.id;
@@ -82,7 +92,7 @@ export default function SafetyScreen() {
             }
 
             if (!activeTripId) {
-                Alert.alert("No Active Trip", "We couldn't find an active trip to attach this SOS alert.");
+                Alert.alert(t('noActiveTrip') || "No Active Trip", t('noActiveTripDesc') || "We couldn't find an active trip to attach this SOS alert.");
                 return;
             }
 
@@ -99,97 +109,84 @@ export default function SafetyScreen() {
                 }
             };
 
-            await apiRequest('/sos', {
+            await apiRequest('/sos/create', {
                 method: 'POST',
                 body: JSON.stringify({
-                    tripId: activeTripId,
+                    trip_id: activeTripId,
                     latitude: currentLocation.coords.latitude,
                     longitude: currentLocation.coords.longitude,
+                    notes: "SOS from Customer App",
                     metadata
                 })
             });
 
             Alert.alert(
-                "SOS Alert Sent",
-                "Our team has been notified and is tracking your location. Stay calm.",
+                t('sosSent') || "SOS Alert Sent",
+                t('sosSentDesc') || "Our team has been notified and is tracking your location. Stay calm.",
                 [{ text: "OK" }]
             );
 
         } catch (error: any) {
             console.error("SOS Error:", error);
-            Alert.alert("Failed", "Could not send alert. Please call police directly.");
+            Alert.alert(t('failed') || "Failed", t('sosFailed') || "Could not send alert. Please call police directly.");
         } finally {
             setSending(false);
         }
     };
 
+    const handleCallPolice = () => {
+        Linking.openURL('tel:122');
+    };
+
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color="#1e1e1e" />
+                    <ArrowLeft size={24} color="#1e1e1e" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Safety Center</Text>
+                <Text style={styles.headerTitle}>{t('safetyCenter') || 'Safety Center'}</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
                 {/* Hero Status */}
                 <LinearGradient colors={['#EFF6FF', '#DBEAFE']} style={styles.statusCard}>
                     <ShieldAlert size={48} color="#3B82F6" />
-                    <Text style={styles.statusTitle}>Safety Toolkit</Text>
-                    <Text style={styles.statusDesc}>Your safety is our top priority. Access these tools anytime during your trip.</Text>
+                    <Text style={styles.statusTitle}>{t('safetyToolkit') || 'Safety Toolkit'}</Text>
+                    <Text style={styles.statusDesc}>{t('safetyToolkitDesc') || 'Your safety is our top priority. Access these tools anytime during your trip.'}</Text>
                 </LinearGradient>
 
-                <Text style={styles.sectionTitle}>Emergency Assistance</Text>
+                <Text style={[styles.sectionTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('emergencyAssistance') || 'Emergency Assistance'}</Text>
 
                 {/* SOS Button */}
                 <TouchableOpacity
-                    style={[styles.actionBtn, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
+                    style={[styles.actionBtn, { borderColor: '#FECACA', backgroundColor: '#FEF2F2', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     onPress={handleSOS}
                     disabled={sending}
                 >
-                    <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
+                    <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2', marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
                         {sending ? <ActivityIndicator color="#EF4444" /> : <AlertTriangle size={24} color="#EF4444" />}
                     </View>
-                    <View style={styles.btnTextConfig}>
-                        <Text style={[styles.btnTitle, { color: '#EF4444' }]}>SOS Emergency Alert</Text>
-                        <Text style={styles.btnSub}>Instantly notify support team</Text>
+                    <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                        <Text style={[styles.btnTitle, { color: '#EF4444' }]}>{t('sosEmergency') || 'SOS Emergency Alert'}</Text>
+                        <Text style={styles.btnSub}>{t('sosEmergencySub') || 'Instantly notify support team'}</Text>
                     </View>
-                    <ChevronRight size={20} color="#FCA5A5" />
+                    <ChevronRight size={20} color="#FCA5A5" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.actionBtn, { borderColor: '#E5E7EB', backgroundColor: '#fff' }]}>
-                    <View style={[styles.iconCircle]}>
+                <TouchableOpacity
+                    style={[styles.actionBtn, { borderColor: '#E5E7EB', backgroundColor: '#fff', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                    onPress={handleCallPolice}
+                >
+                    <View style={[styles.iconCircle, { marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
                         <PhoneCall size={24} color="#111827" />
                     </View>
-                    <View style={styles.btnTextConfig}>
-                        <Text style={styles.btnTitle}>Call Police</Text>
-                        <Text style={styles.btnSub}>Direct line to 122</Text>
+                    <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                        <Text style={styles.btnTitle}>{t('callPolice') || 'Call Police'}</Text>
+                        <Text style={styles.btnSub}>{t('callPoliceSub') || 'Direct line to 122'}</Text>
                     </View>
-                    <ChevronRight size={20} color="#D1D5DB" />
+                    <ChevronRight size={20} color="#D1D5DB" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.actionBtn}>
-                    <View style={styles.iconCircle}>
-                        <Share2 size={24} color="#3B82F6" />
-                    </View>
-                    <View style={styles.btnTextConfig}>
-                        <Text style={styles.btnTitle}>Share Trip Details</Text>
-                        <Text style={styles.btnSub}>Send location to trusted contacts</Text>
-                    </View>
-                    <ChevronRight size={20} color="#D1D5DB" />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.actionBtn}>
-                    <View style={styles.iconCircle}>
-                        <UserCheck size={24} color="#10B981" />
-                    </View>
-                    <View style={styles.btnTextConfig}>
-                        <Text style={styles.btnTitle}>Trusted Contacts</Text>
-                        <Text style={styles.btnSub}>Manage your emergency contacts</Text>
-                    </View>
-                    <ChevronRight size={20} color="#D1D5DB" />
-                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );

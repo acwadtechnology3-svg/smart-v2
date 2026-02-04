@@ -7,20 +7,46 @@ import { supabase } from '../config/supabase';
  */
 export const createSOSAlert = async (req: Request, res: Response) => {
   try {
-    const driverId = req.user!.id;
-    const { latitude, longitude, trip_id, notes } = req.body;
+    const reporterId = req.user!.id;
+    const { latitude, longitude, trip_id, notes, metadata } = req.body;
+
+    let driverId = reporterId;
+
+    // Logic: 
+    // 1. If trip_id is provided, the driver of that trip is the primary "driver_id" for the alert.
+    // 2. We prioritize this over the reporter_id (even if reporter is a driver, if they report on a trip, it's that trip's driver).
+    // 3. Fallback: If no trip driver found, we use reporterId (to satisfy NOT NULL constraint), assuming the reporter is the one in trouble.
+
+    if (trip_id) {
+      const { data: trip, error: tripError } = await supabase
+        .from('trips')
+        .select('driver_id')
+        .eq('id', trip_id)
+        .single();
+
+      if (tripError) {
+        console.warn(`[SOS] Error fetching trip ${trip_id}:`, tripError);
+      }
+
+      if (trip?.driver_id) {
+        driverId = trip.driver_id;
+      }
+    }
+
+    console.log(`[SOS] Creating alert. Reporter: ${reporterId}, Driver: ${driverId}, Trip: ${trip_id}`);
 
     // Create SOS alert
     const { data: alert, error } = await supabase
       .from('sos_alerts')
       .insert({
         driver_id: driverId,
-        reporter_id: driverId, // Driver is the reporter
+        reporter_id: reporterId,
         trip_id: trip_id || null,
         latitude,
         longitude,
         notes,
-        status: 'pending' // Dashboard expects 'pending'
+        metadata: metadata || {},
+        status: 'pending'
       })
       .select()
       .single();

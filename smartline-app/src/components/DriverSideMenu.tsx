@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Modal, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Modal, TouchableWithoutFeedback, I18nManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -124,9 +124,9 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
         });
     };
 
-    const flexDirection = isRTL ? 'row-reverse' : 'row';
+    const flexDirection = (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse';
     const textAlign = isRTL ? 'right' : 'left';
-    const itemFlexDirection = isRTL ? 'row-reverse' : 'row';
+    const itemFlexDirection = (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse';
 
     return (
         <Modal transparent visible={modalVisible} onRequestClose={onClose} animationType="none">

@@ -9,6 +9,7 @@ import {
   getTripParticipants,
   getDriverTripHistory,
   getActiveTrip,
+  getRequestedTrips,
 } from '../controllers/tripController';
 import { authenticate } from '../middleware/auth';
 import { requireCustomer, requireDriver } from '../middleware/rbac';
@@ -57,6 +58,14 @@ router.get(
   '/active',
   authenticate,
   getActiveTrip
+);
+
+// Requested trips nearby (for drivers)
+router.get(
+  '/requested',
+  authenticate,
+  requireDriver,
+  getRequestedTrips
 );
 
 // Trip detail (includes customer info)

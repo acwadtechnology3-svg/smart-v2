@@ -51,7 +51,7 @@ export default function RoleSelectionScreen() {
                     >
                         <View style={styles.imageBox}>
                             <RNImage
-                                source={require('../../assets/images/customer.webp')}
+                                source={require('../../assets/images/customer_role.webp')}
                                 style={styles.roleImage}
                                 resizeMode="contain"
                             />
@@ -67,7 +67,7 @@ export default function RoleSelectionScreen() {
                     >
                         <View style={styles.imageBox}>
                             <RNImage
-                                source={require('../../assets/images/driver.webp')}
+                                source={require('../../assets/images/driver_role.webp')}
                                 style={styles.roleImage}
                                 resizeMode="contain"
                             />

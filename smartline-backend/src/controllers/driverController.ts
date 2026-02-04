@@ -230,15 +230,39 @@ export const getDriverPublic = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
-    const { data: driver, error } = await supabase
+    // 1. Fetch Driver Profile
+    const { data: driverData, error: driverError } = await supabase
       .from('drivers')
-      .select('id, vehicle_model, vehicle_plate, vehicle_color, rating, profile_photo_url, current_lat, current_lng, users!inner(full_name, phone)')
+      .select('id, vehicle_model, vehicle_plate, rating, profile_photo_url, current_lat, current_lng')
       .eq('id', driverId)
       .single();
 
-    if (error || !driver) {
-      return res.status(404).json({ error: 'Driver not found' });
+    if (driverError) {
+      console.error('Error fetching driver profile:', driverError);
+      return res.status(404).json({ error: 'Driver profile fetch failed: ' + driverError.message });
     }
+
+    if (!driverData) {
+      return res.status(404).json({ error: 'Driver not found in DB' });
+    }
+
+    // 2. Fetch User Details (Name, Phone)
+    // We do this separately to avoid issues if the FK relationship is not correctly configured in Supabase
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('full_name, phone')
+      .eq('id', driverId)
+      .single();
+
+    if (userError) {
+      console.warn('Error fetching user details for driver:', userError);
+      // Don't fail completely, just return what we have (or defaults)
+    }
+
+    const driver = {
+      ...driverData,
+      users: userData || { full_name: 'Driver', phone: '' }
+    };
 
     res.json({ driver });
   } catch (err: any) {

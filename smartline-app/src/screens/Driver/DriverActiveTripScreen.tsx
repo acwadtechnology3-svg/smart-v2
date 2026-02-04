@@ -237,8 +237,53 @@ export default function DriverActiveTripScreen() {
         }
     };
 
+    const openNavigationApp = () => {
+        let destLat: number, destLng: number;
+        let label = '';
+
+        if (currentStatus === 'accepted' || currentStatus === 'arrived') {
+            destLat = trip.pickup_lat;
+            destLng = trip.pickup_lng;
+            label = 'Pickup';
+        } else {
+            destLat = trip.dest_lat;
+            destLng = trip.dest_lng;
+            label = 'Destination';
+        }
+
+        Alert.alert(
+            t('navigate'),
+            t('chooseMapApp'),
+            [
+                {
+                    text: 'Google Maps',
+                    onPress: () => {
+                        const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
+                        Linking.openURL(url);
+                    }
+                },
+                {
+                    text: 'Waze',
+                    onPress: () => {
+                        const url = `https://waze.com/ul?ll=${destLat},${destLng}&navigate=yes`;
+                        Linking.openURL(url);
+                    }
+                },
+                {
+                    text: t('cancel'),
+                    style: 'cancel'
+                }
+            ]
+        );
+    };
+
     return (
         <View style={styles.container}>
+            <View style={styles.navigationButtonContainer}>
+                <TouchableOpacity style={styles.navigationButton} onPress={openNavigationApp}>
+                    <Navigation size={28} color="#fff" fill="#fff" />
+                </TouchableOpacity>
+            </View>
             <MapView
                 ref={mapRef}
                 style={styles.map}
@@ -370,4 +415,25 @@ const styles = StyleSheet.create({
     timerContainer: { alignItems: 'center', marginBottom: 16, backgroundColor: '#F3F4F6', padding: 12, borderRadius: 12 },
     timerLabel: { fontSize: 14, color: '#6B7280', marginBottom: 4 },
     timerValue: { fontSize: 24, fontWeight: 'bold', color: '#10B981', fontFamily: 'monospace' },
+
+    // External Navigation Button
+    navigationButtonContainer: {
+        position: 'absolute',
+        right: 20,
+        bottom: width * 0.9, // Adjust height to be above bottom sheet roughly
+        zIndex: 50,
+    },
+    navigationButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: Colors.primary, // Using primary color (blue)
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 10,
+    },
 });

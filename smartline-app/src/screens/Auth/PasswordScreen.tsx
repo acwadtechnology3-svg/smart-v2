@@ -99,13 +99,16 @@ export default function PasswordScreen() {
 
             // Handle specific Known Errors
             const rawMessage = err?.response?.data?.error || err.message || '';
+            const status = err?.response?.status;
 
             if (rawMessage === t('accountNotDriver') || (typeof rawMessage === 'string' && rawMessage.includes('not registered'))) {
                 message = t('accountNotDriver');
             } else if (typeof rawMessage === 'string' && (rawMessage.includes('Network Error') || rawMessage.includes('fetch failed'))) {
                 message = t('connectionError');
-            } else if (err?.response?.status === 401) {
-                message = t('loginFailed'); // Likely wrong password
+            } else if (status === 401) {
+                message = t('incorrectPassword'); // Password not correct
+            } else if (status === 404) {
+                message = t('incorrectNumber'); // Phone not correct
             } else {
                 message = t('genericError');
             }

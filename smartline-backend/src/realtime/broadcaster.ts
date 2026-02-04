@@ -54,6 +54,27 @@ export function broadcastToDrivers(event: string, payload: any) {
   console.log(`[Broadcaster] Sent to ${sentCount} subscriptions`);
 }
 
+export function notifyDriver(driverId: string, event: string, payload: any) {
+  const driver = connectedDrivers.get(driverId);
+  if (driver && driver.ws.readyState === WebSocket.OPEN) {
+    console.log(`[Broadcaster] Direct notification to driver ${driverId} [${event}]`);
+
+    // Notify on all subscriptions, or specifically 'driver:offer-updates' if we tracked channels better.
+    // For now, sending to all their subs ensures they get it.
+    for (const subscriptionId of driver.subscriptionIds) {
+      driver.ws.send(JSON.stringify({
+        type: 'event',
+        subscriptionId,
+        payload: { new: payload, event } // Mimic Supabase structure
+      }));
+    }
+    return true;
+  } else {
+    console.log(`[Broadcaster] Driver ${driverId} not connected or not found.`);
+    return false;
+  }
+}
+
 export function getConnectedDriversCount() {
   return connectedDrivers.size;
 }

@@ -290,6 +290,8 @@ export const translations = {
         loginError: 'Login Error',
         loginFailed: 'Login Failed',
         accountNotDriver: 'This account is not registered as a Driver. Please sign up or login as Customer.',
+        incorrectNumber: 'Phone number incorrect or not registered',
+        incorrectPassword: 'Incorrect password',
         personalInfo: 'Personal Information',
         step: 'Step',
         of: 'of',
@@ -305,6 +307,17 @@ export const translations = {
         resetPassword: 'Reset Password',
         newPassword: 'New Password',
         passwordResetSuccess: 'Password has been reset successfully.',
+        securityLogin: 'Security & Login',
+        notifications: 'Notifications',
+        darkMode: 'Dark Mode',
+        version: 'Version',
+        // SideMenu
+        editPersonalInfo: 'Edit Personal Info',
+        messages: 'Messages',
+        inviteFriends: 'Invite Friends',
+        driveWithUs: 'Drive with Us',
+        discounts: 'Discounts',
+        scan: 'Scan',
     },
     ar: {
         // Sidebar & Menu
@@ -576,6 +589,8 @@ export const translations = {
         loginError: 'خطأ في التسجيل',
         loginFailed: 'فشل تسجيل الدخول',
         accountNotDriver: 'الحساب ده مش متسجل كسائق. من فضلك سجل حساب جديد أو ادخل كعميل.',
+        incorrectNumber: 'رقم الموبايل غلط أو مش متسجل',
+        incorrectPassword: 'كلمة السر غلط',
         personalInfo: 'بيانات شخصية',
         step: 'خطوة',
         of: 'من',
@@ -591,6 +606,17 @@ export const translations = {
         resetPassword: 'إعادة تعيين كلمة المرور',
         newPassword: 'كلمة المرور الجديدة',
         passwordResetSuccess: 'تم تغيير كلمة المرور بنجاح.',
+        securityLogin: 'الأمان وتسجيل الدخول',
+        notifications: 'الإشعارات',
+        darkMode: 'الوضع الداكن',
+        version: 'الإصدار',
+        // SideMenu
+        editPersonalInfo: 'تعديل البيانات',
+        messages: 'الرسائل',
+        inviteFriends: 'دعوة أصدقاء',
+        driveWithUs: 'انضم كسائق',
+        discounts: 'الخصومات',
+        scan: 'مسح الكود',
     }
 };
 

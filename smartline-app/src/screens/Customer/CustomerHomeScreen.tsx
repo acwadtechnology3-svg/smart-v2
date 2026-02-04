@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Dimensions, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Dimensions, Animated, Easing, I18nManager } from 'react-native';
 import { Menu, Scan, ShieldCheck, Search, MapPin, Gift, CarFront, Navigation } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,6 +8,7 @@ import MapView, { UrlTile } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
+import PopupNotification from '../../components/PopupNotification';
 import SideMenu from '../../components/SideMenu';
 import { apiRequest } from '../../services/backend';
 
@@ -45,27 +46,31 @@ export default function CustomerHomeScreen() {
             setLocation(location);
 
             // Check for active trip
+            // Check for active trip
             try {
-                const history = await apiRequest<{ trips: any[] }>('/trips/passenger/history');
-                if (history.trips && history.trips.length > 0) {
-                    // Search through history for any active trip
-                    const activeTrip = history.trips.find(t =>
-                        ['requested', 'accepted', 'arrived', 'started'].includes(t.status)
-                    );
+                // Use the dedicated endpoint for active trips
+                const response = await apiRequest<{ trip: any }>('/trips/active');
 
-                    if (activeTrip) {
-                        console.log("Restoring passenger trip:", activeTrip.id, activeTrip.status);
-                        if (activeTrip.status === 'requested') {
-                            navigation.navigate('SearchingDriver', { tripId: activeTrip.id });
-                        } else if (activeTrip.status === 'accepted') {
-                            navigation.navigate('DriverFound', { tripId: activeTrip.id });
-                        } else if (activeTrip.status === 'arrived' || activeTrip.status === 'started') {
-                            navigation.navigate('OnTrip', { tripId: activeTrip.id });
-                        }
+                if (response.trip) {
+                    const activeTrip = response.trip;
+                    console.log("Restoring passenger trip:", activeTrip.id, activeTrip.status);
+
+                    if (activeTrip.status === 'requested') {
+                        navigation.navigate('SearchingDriver', { tripId: activeTrip.id });
+                    } else if (activeTrip.status === 'accepted' || activeTrip.status === 'arrived') {
+                        // DriverFound handles both accepted and arrived states
+                        // If accepted, we might generally have driver info in the trip object, 
+                        // but DriverFound fetches it again.
+                        navigation.navigate('DriverFound', { tripId: activeTrip.id, driver: null });
+                    } else if (activeTrip.status === 'started') {
+                        navigation.navigate('OnTrip', { tripId: activeTrip.id });
                     }
                 }
-            } catch (e) {
-                console.log("Error checking passenger active trip", e);
+            } catch (e: any) {
+                // Ignore 404 (no active trip)
+                if (e.status !== 404) {
+                    console.log("Error checking passenger active trip", e);
+                }
             }
 
             // 👽 02-02-2026: Added Reverse Geocoding to get real address
@@ -190,15 +195,15 @@ export default function CustomerHomeScreen() {
                         <View style={styles.dragHandle} />
 
                         {/* Search Component */}
-                        <TouchableOpacity style={styles.searchCard} onPress={handleWhereToPress}>
+                        <TouchableOpacity style={[styles.searchCard, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={handleWhereToPress}>
                             <View style={styles.searchIconBubble} />
-                            <Text style={styles.searchPlaceholder}>{t('where_to')}</Text>
+                            <Text style={[styles.searchPlaceholder, { textAlign: isRTL ? 'right' : 'left' }]}>{t('whereTo')}</Text>
                         </TouchableOpacity>
 
                         {/* Location Pin Row */}
-                        <View style={styles.addressRow}>
+                        <View style={[styles.addressRow, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]}>
                             <View style={styles.pinDot} />
-                            <Text style={styles.addressText} numberOfLines={1}>
+                            <Text style={[styles.addressText, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                                 {currentAddress ? `${currentAddress.title}, ${currentAddress.subtitle}` : t('fetchingLocation')}
                             </Text>
                         </View>
@@ -236,8 +241,8 @@ export default function CustomerHomeScreen() {
                                 {/* Safety Box */}
                                 <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('Safety', {})}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.featureTitle}>{t('enjoy')}</Text>
-                                        <Text style={styles.featureSubHighlight}>{t('safestTrips')}</Text>
+                                        <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('enjoy')}</Text>
+                                        <Text style={[styles.featureSubHighlight, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={2}>{t('safestTrips')}</Text>
                                     </View>
                                     <ShieldCheck size={24} color="#4F46E5" fill="#fff" style={styles.featureIcon} />
                                 </TouchableOpacity>
@@ -245,20 +250,21 @@ export default function CustomerHomeScreen() {
                                 {/* Affordable Box */}
                                 <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('SearchLocation')}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.featureTitle}>{t('enjoy')}</Text>
-                                        <Text style={styles.featureTitle}>{t('affordable')}</Text>
-                                        <Text style={styles.featureTitle}>{t('tripsWithUs')}</Text>
+                                        <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('enjoy')}</Text>
+                                        <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('affordable')}</Text>
+                                        <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('tripsWithUs')}</Text>
                                     </View>
                                     <CarFront size={24} color="#4F46E5" fill="#E0E7FF" style={styles.featureIcon} />
                                 </TouchableOpacity>
                             </View>
                         </View>
-
                     </View>
+
                 </View>
             </SafeAreaView>
 
             {/* Side Menu Component */}
+            <PopupNotification role="customer" />
             <SideMenu visible={isSideMenuVisible} onClose={() => setSideMenuVisible(false)} />
         </View>
     );
@@ -442,11 +448,18 @@ const styles = StyleSheet.create({
     featureCard: {
         flex: 1, backgroundColor: '#fff',
         borderRadius: 20, padding: 14,
-        justifyContent: 'space-between',
-        borderWidth: 1, borderColor: '#F3F4F6',
-        shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2
+        flexDirection: 'row', // 👽 Switch to Row to prevent vertical overlap
+        // justifyContent: 'space-between', // Content handles spacing
+        borderWidth: 1, borderColor: '#FBFBFB',
+        shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 5, elevation: 2,
+        overflow: 'hidden'
     },
-    featureIcon: { alignSelf: 'flex-end', marginTop: 'auto' },
-    featureTitle: { fontSize: 15, fontWeight: 'bold', color: '#1e1e1e' },
-    featureSubHighlight: { fontSize: 13, color: '#4F46E5', fontWeight: '500', marginTop: 2 }, // Purple text
+    featureIcon: {
+        alignSelf: 'flex-end', // Aligns at bottom in Row (cross axis)? No. 
+        // In Row, cross axis is Vertical. alignSelf: 'flex-end' -> Bottom. Correct.
+        marginBottom: 0,
+        marginLeft: 8 // Space from text
+    },
+    featureTitle: { fontSize: 15, fontWeight: 'bold', color: '#1e1e1e', writingDirection: 'auto' },
+    featureSubHighlight: { fontSize: 13, color: '#4F46E5', fontWeight: '500', marginTop: 4, writingDirection: 'auto' }, // Purple text
 });

@@ -13,7 +13,15 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to find nearby trips and navigate.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to track rides even when the app is in the background.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      },
+      "bundleIdentifier": "com.smartline.app"
     },
     "android": {
       "adaptiveIcon": {

@@ -20,17 +20,19 @@ import Support from "./pages/Support";
 import Safety from "./pages/Safety";
 import Settings from "./pages/Settings";
 import Members from "./pages/Members";
+import AppPopups from "./pages/AppPopups";
+import SurgeZones from "./pages/SurgeZones";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 // Wrapper for protected pages with permission check
-const ProtectedPage = ({ 
-  children, 
+const ProtectedPage = ({
+  children,
   page,
-  requiredRoles 
-}: { 
-  children: React.ReactNode; 
+  requiredRoles
+}: {
+  children: React.ReactNode;
   page: string;
   requiredRoles?: ('super_admin' | 'admin' | 'manager' | 'viewer')[];
 }) => (
@@ -49,7 +51,7 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
-            
+
             {/* Protected routes */}
             <Route path="/" element={<ProtectedPage page="dashboard"><Dashboard /></ProtectedPage>} />
             <Route path="/drivers" element={<ProtectedPage page="drivers"><Drivers /></ProtectedPage>} />
@@ -60,20 +62,22 @@ const App = () => (
             <Route path="/wallet" element={<ProtectedPage page="wallet"><Wallet /></ProtectedPage>} />
             <Route path="/withdrawal-requests" element={<ProtectedPage page="withdrawal_requests"><WithdrawalRequests /></ProtectedPage>} />
             <Route path="/promos" element={<ProtectedPage page="promos"><Promos /></ProtectedPage>} />
+            <Route path="/popups" element={<ProtectedPage page="popups" requiredRoles={['super_admin', 'admin']}><AppPopups /></ProtectedPage>} />
+            <Route path="/surge-zones" element={<ProtectedPage page="surge_zones" requiredRoles={['super_admin', 'admin']}><SurgeZones /></ProtectedPage>} />
             <Route path="/support" element={<ProtectedPage page="support"><Support /></ProtectedPage>} />
             <Route path="/safety" element={<ProtectedPage page="safety"><Safety /></ProtectedPage>} />
             <Route path="/settings" element={<ProtectedPage page="settings"><Settings /></ProtectedPage>} />
-            
+
             {/* Super Admin only routes */}
-            <Route 
-              path="/members" 
+            <Route
+              path="/members"
               element={
                 <ProtectedRoute requiredRoles={['super_admin']}>
                   <Members />
                 </ProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>

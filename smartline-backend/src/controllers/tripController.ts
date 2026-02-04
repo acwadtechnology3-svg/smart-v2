@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
-import { broadcastToDrivers } from '../realtime/broadcaster';
+import { broadcastToDrivers, notifyDriver } from '../realtime/broadcaster';
 
 async function getTripById(tripId: string) {
     const { data, error } = await supabase
@@ -147,10 +147,17 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
         }
 
         // 2. Update the accepted offer
-        await supabase
+        const { data: acceptedOffer, error: offerError } = await supabase
             .from('trip_offers')
             .update({ status: 'accepted' })
-            .eq('id', offerId);
+            .eq('id', offerId)
+            .select() // Select return data to send in notification
+            .single();
+
+        if (offerError) {
+            console.error('Failed to update offer status:', offerError);
+            // We continue anyway as trip is updated, but notification might fail via distinct path
+        }
 
         // 3. Mark all other offers as 'rejected'
         await supabase
@@ -158,6 +165,12 @@ export const acceptTripOffer = async (req: Request, res: Response) => {
             .update({ status: 'rejected' })
             .eq('trip_id', tripId)
             .neq('id', offerId);
+
+        // MANUAL BROADCAST TO DRIVER
+        // This ensures they get the 'accepted' event even if Postgres Realtime lags or fails
+        if (acceptedOffer) {
+            notifyDriver(driverId, 'UPDATE', acceptedOffer);
+        }
 
         res.json({ success: true, trip: updatedTrip });
 
@@ -406,6 +419,7 @@ export const getDriverTripHistory = async (req: Request, res: Response) => {
     }
 };
 
+
 export const getActiveTrip = async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
@@ -423,6 +437,27 @@ export const getActiveTrip = async (req: Request, res: Response) => {
         }
 
         res.json({ trip: data });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const getRequestedTrips = async (req: Request, res: Response) => {
+    try {
+        // Simple fetch for all requested trips.
+        // In production, add geospatial filtering (PostGIS) or simple lat/lng box query.
+        // For now, fetch latest 10 requested trips.
+        const { data, error } = await supabase
+            .from('trips')
+            .select('*')
+            .eq('status', 'requested')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) throw error;
+
+        res.json({ trips: data || [] });
+
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

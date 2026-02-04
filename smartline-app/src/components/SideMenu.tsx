@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Modal, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Modal, TouchableWithoutFeedback, I18nManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -9,6 +9,7 @@ import {
 import { RootStackParamList } from '../types/navigation';
 import { Colors } from '../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage } from '../context/LanguageContext';
 
 const { width, height } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
@@ -22,12 +23,21 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function SideMenu({ visible, onClose }: SideMenuProps) {
     const [modalVisible, setModalVisible] = React.useState(false);
-    const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+    const { t, isRTL } = useLanguage();
+
+    // Define hidden values based on direction
+    const hiddenValue = isRTL ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH;
+
+    // Use hiddenValue as initial value to avoid jump on reload/lang change
+    const slideAnim = useRef(new Animated.Value(hiddenValue)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
+
     const navigation = useNavigation<NavigationProp>();
 
     useEffect(() => {
         if (visible) {
+            // Reset position before showing (in case language changed while closed)
+            slideAnim.setValue(hiddenValue);
             setModalVisible(true);
             Animated.parallel([
                 Animated.timing(slideAnim, {
@@ -44,7 +54,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
         } else {
             Animated.parallel([
                 Animated.timing(slideAnim, {
-                    toValue: -SIDEBAR_WIDTH,
+                    toValue: hiddenValue,
                     duration: 300,
                     useNativeDriver: true,
                 }),
@@ -57,7 +67,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
                 setModalVisible(false);
             });
         }
-    }, [visible]);
+    }, [visible, hiddenValue]); // Include hiddenValue dependency
 
     if (!modalVisible) return null;
 
@@ -71,7 +81,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
 
     const handleSignOut = async () => {
         onClose();
-        await AsyncStorage.removeItem('userSession');
+        await AsyncStorage.multiRemove(['userSession', 'token']);
         navigation.reset({
             index: 0,
             routes: [{ name: 'SplashScreen' }],
@@ -80,7 +90,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
 
     return (
         <Modal transparent visible={modalVisible} onRequestClose={onClose} animationType="none">
-            <View style={styles.overlay}>
+            <View style={[styles.overlay, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]}>
                 {/* Backdrop / Click outside to close */}
                 <TouchableWithoutFeedback onPress={onClose}>
                     <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} />
@@ -90,15 +100,17 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
                 <Animated.View style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}>
                     <View style={styles.safeArea}>
                         {/* Header */}
-                        <View style={styles.header}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.userName}>salah ezzat</Text>
-                                <TouchableOpacity style={styles.editProfileRow} onPress={() => { /* Navigate to Profile Edit */ }}>
-                                    <Text style={styles.editProfileText}>Edit Personal Info</Text>
-                                    <ChevronRight size={14} color="#6B7280" />
+                        <View style={[styles.header, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]}>
+                            <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                                <Text style={styles.userName}>Salah Ezzat</Text>
+                                <TouchableOpacity style={[styles.editProfileRow, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={() => { /* Navigate to Profile Edit */ }}>
+                                    <Text style={[styles.editProfileText, { marginRight: isRTL ? 0 : 2, marginLeft: isRTL ? 2 : 0 }]}>{t('editPersonalInfo')}</Text>
+                                    <View style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }}>
+                                        <ChevronRight size={14} color="#6B7280" />
+                                    </View>
                                 </TouchableOpacity>
                             </View>
-                            <View style={styles.avatarContainer}>
+                            <View style={[styles.avatarContainer, { marginLeft: isRTL ? 0 : 0, marginRight: isRTL ? 0 : 0 }]}>
                                 {/* Using icon as placeholder if no image, user can replace later */}
                                 <User size={30} color="#fff" />
                             </View>
@@ -106,29 +118,29 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
 
                         {/* Top Menu Items */}
                         <View style={styles.menuSection}>
-                            <MenuItem icon={<BookOpen size={22} color="#F97316" />} label="My Trips" onPress={() => handleNavigation('MyTrips')} />
-                            <MenuItem icon={<CreditCard size={22} color="#10B981" />} label="Payment" onPress={() => handleNavigation('Wallet')} />
-                            <MenuItem icon={<Headphones size={22} color="#3B82F6" />} label="Help" onPress={() => handleNavigation('Help')} />
-                            <MenuItem icon={<MessageSquare size={22} color="#14B8A6" />} label="Messages" onPress={() => handleNavigation('Messages')} />
-                            <MenuItem icon={<ShieldCheck size={22} color="#3B82F6" />} label="Safety Center" onPress={() => handleNavigation('Safety')} />
-                            <MenuItem icon={<Settings size={22} color="#3B82F6" />} label="Settings" onPress={() => handleNavigation('Settings')} />
+                            <MenuItem icon={<BookOpen size={22} color="#F97316" />} label={t('myTrips')} onPress={() => handleNavigation('MyTrips')} isRTL={isRTL} />
+                            <MenuItem icon={<CreditCard size={22} color="#10B981" />} label={t('wallet')} onPress={() => handleNavigation('Wallet')} isRTL={isRTL} />
+                            <MenuItem icon={<Headphones size={22} color="#3B82F6" />} label={t('support')} onPress={() => handleNavigation('Help')} isRTL={isRTL} />
+                            <MenuItem icon={<MessageSquare size={22} color="#14B8A6" />} label={t('messages')} onPress={() => handleNavigation('Messages')} isRTL={isRTL} />
+                            <MenuItem icon={<ShieldCheck size={22} color="#3B82F6" />} label={t('safetyCenter')} onPress={() => handleNavigation('Safety')} isRTL={isRTL} />
+                            <MenuItem icon={<Settings size={22} color="#3B82F6" />} label={t('settings')} onPress={() => handleNavigation('Settings')} isRTL={isRTL} />
                         </View>
 
                         <View style={styles.divider} />
 
                         {/* Bottom Menu Items */}
                         <View style={styles.menuSection}>
-                            <MenuItem icon={<Gift size={22} color="#F97316" />} label="Invite Friends" onPress={() => handleNavigation('InviteFriends')} />
-                            <MenuItem icon={<CarFront size={22} color="#F97316" />} label="Drive with Us" onPress={() => handleNavigation('RoleSelection')} />
-                            <MenuItem icon={<Tag size={22} color="#14B8A6" />} label="Discounts" onPress={() => handleNavigation('Discounts')} />
-                            <MenuItem icon={<Scan size={22} color="#F97316" />} label="Scan" onPress={() => handleNavigation('Scan')} />
+                            <MenuItem icon={<Gift size={22} color="#F97316" />} label={t('inviteFriends')} onPress={() => handleNavigation('InviteFriends')} isRTL={isRTL} />
+                            <MenuItem icon={<CarFront size={22} color="#F97316" />} label={t('driveWithUs')} onPress={() => handleNavigation('RoleSelection')} isRTL={isRTL} />
+                            <MenuItem icon={<Tag size={22} color="#14B8A6" />} label={t('discounts')} onPress={() => handleNavigation('Discounts')} isRTL={isRTL} />
+                            <MenuItem icon={<Scan size={22} color="#F97316" />} label={t('scan')} onPress={() => handleNavigation('Scan')} isRTL={isRTL} />
 
                             {/* Sign Out */}
-                            <TouchableOpacity style={[styles.menuItem, { marginTop: 12 }]} onPress={handleSignOut}>
+                            <TouchableOpacity style={[styles.menuItem, { marginTop: 12, flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={handleSignOut}>
                                 <View style={styles.iconBox}>
                                     <LogOut size={22} color={Colors.danger} />
                                 </View>
-                                <Text style={[styles.menuLabel, { color: Colors.danger }]}>Sign Out</Text>
+                                <Text style={[styles.menuLabel, { color: Colors.danger, textAlign: isRTL ? 'right' : 'left' }]}>{t('signOut')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -138,19 +150,19 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
     );
 }
 
-const MenuItem = ({ icon, label, onPress }: { icon: React.ReactNode, label: string, onPress: () => void }) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+const MenuItem = ({ icon, label, onPress, isRTL }: { icon: React.ReactNode, label: string, onPress: () => void, isRTL: boolean }) => (
+    <TouchableOpacity style={[styles.menuItem, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={onPress}>
         <View style={styles.iconBox}>
             {icon}
         </View>
-        <Text style={styles.menuLabel}>{label}</Text>
+        <Text style={[styles.menuLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
     </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        flexDirection: 'row',
+        // flexDirection set dynamically
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
@@ -173,10 +185,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
     },
     header: {
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 40,
+        // flexDirection set dynamically
     },
     userName: {
         fontSize: 22,
@@ -185,13 +197,13 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     editProfileRow: {
-        flexDirection: 'row',
         alignItems: 'center',
+        // flexDirection set dynamically
     },
     editProfileText: {
         fontSize: 14,
         color: '#6B7280',
-        marginRight: 2,
+        // margin set dynamically
     },
     avatarContainer: {
         width: 60,
@@ -206,9 +218,9 @@ const styles = StyleSheet.create({
         gap: 24,
     },
     menuItem: {
-        flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
+        // flexDirection set dynamically
     },
     iconBox: {
         width: 24,

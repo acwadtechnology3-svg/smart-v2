@@ -169,6 +169,10 @@ export function startRealtimeServer(server: Server) {
           }
           case 'driver:offer-updates': {
             if (ctx.role !== 'driver') throw new Error('Drivers only');
+
+            // Register for direct broadcasts (fix for manual notifications)
+            registerDriver(ctx.userId, ws, subscriptionId);
+
             supaChannel = supabase
               .channel(`driver-offers-${ctx.userId}-${subscriptionId}`)
               .on(

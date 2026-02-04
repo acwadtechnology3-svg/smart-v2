@@ -69,3 +69,75 @@ export const rejectTripOffer = async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+export const getTripOffers = async (req: Request, res: Response) => {
+  try {
+    const tripId = req.query.tripId as string;
+    if (!tripId) {
+      return res.status(400).json({ error: 'Missing tripId' });
+    }
+
+    // 1. Verify Authorization (User must be the Customer of the trip)
+    const { data: trip, error: tripError } = await supabase
+      .from('trips')
+      .select('customer_id')
+      .eq('id', tripId)
+      .single();
+
+    if (tripError || !trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+
+    if (trip.customer_id !== req.user!.id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // 2. Fetch Offers with Driver Details
+    const { data: offers, error: offersError } = await supabase
+      .from('trip_offers')
+      .select(`
+                *,
+                driver:drivers!inner (
+                    id,
+                    vehicle_model,
+                    vehicle_plate,
+                    rating,
+                    profile_photo_url,
+                    users!inner (
+                        full_name,
+                        phone
+                    )
+                )
+            `)
+      .eq('trip_id', tripId)
+      .eq('status', 'pending');
+
+    if (offersError) throw offersError;
+
+    // 3. Format Response for Frontend
+    const formattedOffers = offers.map((offer: any) => ({
+      id: offer.id,
+      trip_id: offer.trip_id,
+      driver_id: offer.driver_id,
+      offer_price: offer.offer_price,
+      status: offer.status,
+      created_at: offer.created_at,
+      driver: {
+        id: offer.driver.id,
+        name: offer.driver.users?.full_name || 'Driver',
+        phone: offer.driver.users?.phone,
+        rating: offer.driver.rating || '5.0',
+        image: offer.driver.profile_photo_url,
+        car: offer.driver.vehicle_model,
+        plate: offer.driver.vehicle_plate,
+        color: '' // Field does not exist in DB
+      }
+    }));
+
+    res.json({ offers: formattedOffers });
+
+  } catch (err: any) {
+    console.error('Get Trip Offers Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};

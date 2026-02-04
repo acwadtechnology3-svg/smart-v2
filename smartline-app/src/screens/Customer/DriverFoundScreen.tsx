@@ -121,43 +121,60 @@ export default function DriverFoundScreen() {
 
     // Listen for driver location and "arrived" status only
     // Global service handles all navigation
+    // Listen for driver location and status changes
     useEffect(() => {
-        if (!driver?.id || !tripId) return;
+        const idToMonitor = driverInfo?.id || driver?.id;
+        if (!idToMonitor || !tripId) return;
 
-        console.log("[DriverFound] Setting up listeners");
+        console.log("[DriverFound] Setting up listeners with Driver ID:", idToMonitor);
 
         let unsubLocation: (() => void) | null = null;
         let unsubStatus: (() => void) | null = null;
 
         (async () => {
+            // 1. Driver Location Subscription
             unsubLocation = await realtimeClient.subscribe(
-                { channel: 'driver:location', tripId, driverId: driver.id },
+                { channel: 'driver:location', tripId, driverId: idToMonitor },
                 (payload) => {
                     const lat = payload?.new?.current_lat;
                     const lng = payload?.new?.current_lng;
                     if (typeof lat === 'number' && typeof lng === 'number') {
                         const newPos = { latitude: lat, longitude: lng };
                         setDriverLoc(newPos);
-                        mapRef.current?.animateToRegion({ ...newPos, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 1000);
+                        // Animate marker slightly
+                        if (mapRef.current) {
+                            // mapRef.current.animateCamera({ center: newPos, heading: payload?.new?.heading || 0 }); 
+                        }
                     }
                 }
             );
 
+            // 2. Trip Status Subscription
             unsubStatus = await realtimeClient.subscribe(
                 { channel: 'trip:status', tripId },
                 (payload) => {
                     const status = payload?.new?.status;
-                    console.log("[DriverFound] Status:", status);
+                    console.log("[DriverFound] Realtime Status Update:", status);
 
-                    // Only handle "arrived" alert - global service handles navigation
                     if (status === 'arrived' && !arrivedRef.current) {
                         arrivedRef.current = true;
                         setIsArrived(true);
                         Alert.alert(
-                            "Driver Arrived!",
-                            "Your captain has reached the pickup location.",
+                            t('driverArrived'),
+                            t('captainReached'),
                             [{ text: "OK" }]
                         );
+                    } else if (status === 'started') {
+                        console.log("Trip Started! Navigating to OnTrip...");
+                        navigation.replace('OnTrip', { tripId });
+                    } else if (status === 'completed') {
+                        console.log("Trip Completed! Navigating to Home...");
+                        // Or Rating Screen
+                        Alert.alert(t('tripFinished'), t('hopeYouEnjoyed'));
+                        navigation.navigate('CustomerHome');
+                    } else if (status === 'cancelled') {
+                        Alert.alert(t('tripCancelled'), t('driverCancelled'));
+                        navigation.navigate('CustomerHome');
                     }
                 }
             );
@@ -167,7 +184,7 @@ export default function DriverFoundScreen() {
             if (unsubLocation) unsubLocation();
             if (unsubStatus) unsubStatus();
         };
-    }, [driver?.id, tripId]);
+    }, [driverInfo?.id, driver?.id, tripId]);
 
     return (
         <View style={styles.container}>
@@ -275,9 +292,16 @@ export default function DriverFoundScreen() {
 
                                             // 2. Navigate Back
                                             navigation.popToTop();
-                                        } catch (e) {
+                                        } catch (e: any) {
                                             console.error("Cancellation Error", e);
-                                            Alert.alert("Error", "Network error while cancelling.");
+
+                                            // 👽 Optimization: If trip is already completed, just exit
+                                            if (e.message?.includes('completed') || e.error?.includes('completed')) {
+                                                Alert.alert(t('tripFinished'), t('tripCompleted'));
+                                                navigation.navigate('CustomerHome');
+                                            } else {
+                                                Alert.alert(t('error'), t('genericError'));
+                                            }
                                         }
                                     }
                                 }

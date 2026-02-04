@@ -13,6 +13,8 @@ import DriverSideMenu from '../../components/DriverSideMenu';
 import TripRequestModal from '../../components/TripRequestModal';
 import { useLanguage } from '../../context/LanguageContext';
 import { CachedImage } from '../../components/CachedImage';
+import PopupNotification from '../../components/PopupNotification';
+import SurgeMapLayer from '../../components/SurgeMapLayer';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,6 +28,15 @@ export default function DriverHomeScreen() {
     const [driverProfile, setDriverProfile] = useState<any>(null);
     const [isSideMenuVisible, setSideMenuVisible] = useState(false);
     const mapRef = useRef<MapView>(null);
+    const sideMenuAnim = useRef(new Animated.Value(-width * 0.75)).current; // Added this line
+    const [dailyEarnings, setDailyEarnings] = useState(0);
+    const [walletBalance, setWalletBalance] = useState(0);
+    const [incomingTrip, setIncomingTrip] = useState<any>(null);
+    const [ignoredTripIds, setIgnoredTripIds] = useState<Set<string>>(new Set());
+    const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
+
+    // Prevent duplicate handling of accepted trips
+    const processedAcceptedTrips = useRef(new Set<string>()); // Added this line
 
     // Animation for "Finding Trips" pulse
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -44,15 +55,31 @@ export default function DriverHomeScreen() {
         }
     }, [isOnline]);
 
-    const [dailyEarnings, setDailyEarnings] = useState(0);
-    const [walletBalance, setWalletBalance] = useState(0);
-
     // Default to Cairo if location not yet found
     const DEFAULT_REGION = {
         latitude: 30.0444,
         longitude: 31.2357,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
+    };
+
+    const checkActiveTrip = async () => {
+        try {
+            // Check history for any trip that is active
+            const history = await apiRequest<{ trips: any[] }>('/trips/driver/history');
+            const activeTrip = history.trips?.find((t: any) =>
+                ['accepted', 'arrived', 'started'].includes(t.status)
+            );
+
+            if (activeTrip) {
+                console.log("Restoring active trip:", activeTrip.id);
+                navigation.navigate('DriverActiveTrip', { tripId: activeTrip.id });
+                // Also ensure we are online if we have an active trip
+                setIsOnline(true);
+            }
+        } catch (e) {
+            console.log("Error checking active trip", e);
+        }
     };
 
     // Initial Data Fetch
@@ -114,23 +141,73 @@ export default function DriverHomeScreen() {
         })();
     }, []);
 
-    const checkActiveTrip = async () => {
-        try {
-            // Check history for any trip that is active
-            const history = await apiRequest<{ trips: any[] }>('/trips/driver/history');
-            const activeTrip = history.trips?.find((t: any) =>
-                ['accepted', 'arrived', 'started'].includes(t.status)
-            );
+    // Polling for available trips (Backup for Realtime)
+    useEffect(() => {
+        let pollInterval: NodeJS.Timeout;
 
-            if (activeTrip) {
-                console.log("Restoring active trip:", activeTrip.id);
-                navigation.navigate('DriverActiveTrip', { tripId: activeTrip.id });
-                // Also ensure we are online if we have an active trip
-                setIsOnline(true);
-            }
-        } catch (e) {
-            console.log("Error checking active trip", e);
+        if (isOnline && location && driverProfile) {
+            pollInterval = setInterval(async () => {
+                try {
+                    // If we have an incoming trip, verify it is still valid
+                    if (incomingTrip) {
+                        try {
+                            const { trip } = await apiRequest<{ trip: any }>(`/trips/${incomingTrip.id}?t=${Date.now()}`);
+                            if (trip.status !== 'requested') {
+                                console.log(`[DriverPolling] Trip ${incomingTrip.id} is no longer requested (Status: ${trip.status}). Removing.`);
+                                Alert.alert("Trip Unavailable", "The trip has been cancelled or taken.");
+                                setIncomingTrip(null);
+                            }
+                        } catch (e: any) {
+                            // Only clear if explicitly not found or bad request
+                            if (e.status === 404 || e.status === 400) {
+                                setIncomingTrip(null);
+                            }
+                            // Network/Server errors: keep showing trip and retry next poll
+                        }
+                        return; // Skip searching
+                    }
+
+                    // Otherwise, search for new trips
+                    const { trips } = await apiRequest<{ trips: any[] }>(`/trips/requested?t=${Date.now()}`);
+
+                    if (trips && trips.length > 0) {
+                        const validTrips = trips.filter(trip => {
+                            if (ignoredTripIds.has(trip.id)) return false;
+                            if (!trip.pickup_lat) return false;
+
+                            const dist = getDistanceFromLatLonInKm(
+                                location.coords.latitude, location.coords.longitude,
+                                trip.pickup_lat, trip.pickup_lng
+                            );
+                            return dist <= 50;
+                        });
+
+                        if (validTrips.length > 0) {
+                            validTrips.sort((a, b) => {
+                                const distA = getDistanceFromLatLonInKm(location.coords.latitude, location.coords.longitude, a.pickup_lat, a.pickup_lng);
+                                const distB = getDistanceFromLatLonInKm(location.coords.latitude, location.coords.longitude, b.pickup_lat, b.pickup_lng);
+                                return distA - distB;
+                            });
+
+                            const trip = validTrips[0];
+                            console.log(`[DriverPolling] Found trip via poll: ${trip.id}`);
+                            setIncomingTrip(trip);
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }, 4000);
         }
+
+        return () => clearInterval(pollInterval);
+    }, [isOnline, location, incomingTrip, ignoredTripIds, driverProfile]);
+
+    const handleDeclineTrip = () => {
+        if (incomingTrip) {
+            setIgnoredTripIds(prev => new Set(prev).add(incomingTrip.id));
+        }
+        setIncomingTrip(null);
     };
 
     useFocusEffect(
@@ -143,9 +220,6 @@ export default function DriverHomeScreen() {
             checkActiveTrip();
         }, [route.params])
     );
-
-    const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
-    const [incomingTrip, setIncomingTrip] = useState<any>(null);
 
     // Toggle Online Status
     const toggleOnline = async () => {
@@ -297,10 +371,17 @@ export default function DriverHomeScreen() {
         const unsubOfferUpdates = await realtimeClient.subscribe(
             { channel: 'driver:offer-updates' },
             (payload) => {
-                if (payload.new?.driver_id === driverId && payload.new?.status === 'accepted') {
-                    Alert.alert(t('success'), "Customer accepted your offer!", [
-                        { text: t('ok'), onPress: () => navigation.navigate('DriverActiveTrip', { tripId: payload.new.trip_id }) }
-                    ]);
+                const tripId = payload.new?.trip_id;
+                if (payload.new?.driver_id === driverId && payload.new?.status === 'accepted' && tripId) {
+
+                    if (processedAcceptedTrips.current.has(tripId)) {
+                        console.log(`[DriverHome] Already processed acceptance for ${tripId}`);
+                        return;
+                    }
+                    processedAcceptedTrips.current.add(tripId);
+
+                    console.log(`[DriverHome] Offer accepted for ${tripId}. Navigating...`);
+                    navigation.navigate('DriverActiveTrip', { tripId });
                 }
             }
         );
@@ -328,6 +409,10 @@ export default function DriverHomeScreen() {
             });
 
             console.log("Offer Inserted Successfully:", tripId, amount);
+
+            // Ignore this trip so it doesn't reappear in polling
+            setIgnoredTripIds(prev => new Set(prev).add(tripId));
+
             Alert.alert("Offer Sent", "Waiting for customer to accept...");
             setIncomingTrip(null);
         } catch (err: any) {
@@ -479,6 +564,7 @@ export default function DriverHomeScreen() {
                     flipY={false}
                     tileSize={256}
                 />
+                <SurgeMapLayer />
             </MapView>
 
             {/* --- UI OVERLAY --- */}
@@ -548,6 +634,7 @@ export default function DriverHomeScreen() {
             </SafeAreaView>
 
             {/* Side Menu Component */}
+            <PopupNotification role="driver" />
             <DriverSideMenu
                 visible={isSideMenuVisible}
                 onClose={() => setSideMenuVisible(false)}

@@ -151,13 +151,13 @@ export default function SettingsScreen() {
                 {/* Note: In a real implementation we would translate 'Personal Information' etc too */}
                 <SettingItem
                     icon={<User size={20} color="#4B5563" />}
-                    label="Personal Information" // Keep untranslated if not in context, or add to context
+                    label={t('personalInfo')}
                     onPress={() => navigation.navigate('PersonalInformation' as never)}
                     isRTL={isRTL}
                 />
                 <SettingItem
                     icon={<Lock size={20} color="#4B5563" />}
-                    label="Security & Login" // Keep untranslated if not in context
+                    label={t('securityLogin')}
                     onPress={() => navigation.navigate('ChangePassword' as never)}
                     isRTL={isRTL}
                 />
@@ -169,7 +169,7 @@ export default function SettingsScreen() {
                         <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
                             <Bell size={20} color="#4B5563" />
                         </View>
-                        <Text style={styles.label}>Notifications</Text>
+                        <Text style={styles.label}>{t('notifications')}</Text>
                     </View>
                     <Switch
                         value={notificationsEnabled}
@@ -191,7 +191,7 @@ export default function SettingsScreen() {
                         <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
                             <Moon size={20} color="#4B5563" />
                         </View>
-                        <Text style={styles.label}>Dark Mode</Text>
+                        <Text style={styles.label}>{t('darkMode')}</Text>
                     </View>
                     <Switch
                         value={darkMode}
@@ -216,7 +216,7 @@ export default function SettingsScreen() {
                     <Text style={styles.deleteText}>{t('deleteAccount')}</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.versionText}>Version 1.0.0</Text>
+                <Text style={styles.versionText}>{t('version')} 1.0.0</Text>
             </ScrollView>
         </SafeAreaView>
     );

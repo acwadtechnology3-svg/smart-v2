@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Alert, Image, ScrollView } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { X, MapPin, Navigation as NavigationIcon } from 'lucide-react-native';
+import { X, MapPin, Navigation as NavigationIcon, Car, Star, User, Palette } from 'lucide-react-native';
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
@@ -101,11 +101,26 @@ export default function SearchingDriverScreen() {
         pollInterval = setInterval(async () => {
             if (isNavigating) return;
             try {
-                const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                const data = await apiRequest<{ trip: any }>(`/trips/${tripId}?t=${Date.now()}`);
                 if (data.trip?.status === 'accepted' && data.trip?.driver_id && !isNavigating) {
                     console.log('[SearchingDriver] Poll detected accepted trip, navigating...');
                     isNavigating = true;
                     navigation.replace('DriverFound', { tripId });
+                } else {
+                    // Poll for offers if not accepted yet
+                    try {
+                        const offersData = await apiRequest<{ offers: any[] }>(`/trip-offers?tripId=${tripId}&t=${Date.now()}`);
+                        if (offersData.offers && offersData.offers.length > 0) {
+                            setOffers(prev => {
+                                const existingIds = new Set(prev.map(o => o.id));
+                                const newOffers = offersData.offers.filter(o => !existingIds.has(o.id));
+                                if (newOffers.length === 0) return prev;
+                                return [...prev, ...newOffers];
+                            });
+                        }
+                    } catch (offerErr) {
+                        console.log('Poll offers error:', offerErr);
+                    }
                 }
             } catch (e) {
                 // ignore polling errors
@@ -367,48 +382,71 @@ export default function SearchingDriverScreen() {
                     <ScrollView style={styles.offersListContainer} showsVerticalScrollIndicator={false}>
                         {offers.map((offer, index) => (
                             <View key={offer.id || index} style={styles.offerCard}>
+                                {/* Header: Driver Info & Price */}
                                 <View style={styles.offerHeader}>
                                     <View style={styles.driverInfo}>
-                                        {offer.driver?.image ? (
-                                            <Image
-                                                source={{ uri: offer.driver.image }}
-                                                style={styles.driverImage}
-                                            />
-                                        ) : (
-                                            <View style={styles.driverAvatar}>
-                                                <Text style={styles.avatarText}>
-                                                    {offer.driver?.name?.charAt(0) || 'D'}
-                                                </Text>
+                                        <View style={styles.driverAvatarContainer}>
+                                            {offer.driver?.image ? (
+                                                <Image
+                                                    source={{ uri: offer.driver.image }}
+                                                    style={styles.driverImage}
+                                                />
+                                            ) : (
+                                                <View style={styles.driverAvatarFallback}>
+                                                    <User size={24} color="#FFF" />
+                                                </View>
+                                            )}
+                                            <View style={styles.ratingBadge}>
+                                                <Star size={10} color="#FFF" fill="#FFF" />
+                                                <Text style={styles.ratingTextSmall}>{offer.driver?.rating || '5.0'}</Text>
                                             </View>
-                                        )}
+                                        </View>
+
                                         <View style={styles.driverDetails}>
                                             <Text style={styles.driverName}>{offer.driver?.name || t('driver')}</Text>
-                                            <View style={styles.ratingRow}>
-                                                <Text style={styles.ratingText}>⭐ {offer.driver?.rating || '5.0'}</Text>
+                                            <View style={styles.carInfoRow}>
+                                                <Car size={14} color={Colors.textSecondary} />
+                                                <Text style={styles.carText}>
+                                                    {offer.driver?.car || t('vehicle')}
+                                                    {offer.driver?.color ? ` • ${offer.driver.color}` : ''}
+                                                </Text>
                                             </View>
-                                            <Text style={styles.driverCar}>
-                                                {offer.driver?.car || t('vehicle')} • {offer.driver?.color || ''}
-                                            </Text>
-                                            <Text style={styles.driverPlate}>
-                                                {t('plate')}: {offer.driver?.plate || 'N/A'}
-                                            </Text>
                                         </View>
                                     </View>
+
                                     <View style={styles.priceContainer}>
                                         <Text style={styles.priceLabel}>{t('offer')}</Text>
-                                        <Text style={styles.priceValue}>EGP {offer.offered_price || offer.price}</Text>
+                                        <Text style={styles.priceValue}>EGP {Math.round(offer.offer_price || offer.offered_price || offer.price)}</Text>
                                     </View>
                                 </View>
+
+                                {/* Vehicle Plate & Extras (Divider) */}
+                                <View style={styles.divider} />
+
+                                <View style={styles.offerExtras}>
+                                    <View style={styles.plateContainer}>
+                                        <Text style={styles.plateLabel}>EGY</Text>
+                                        <Text style={styles.plateNumber}>{offer.driver?.plate || '---'}</Text>
+                                    </View>
+                                    <View style={styles.etaContainer}>
+                                        <Text style={styles.etaText}>~ {offer.driver?.eta || '5 min'}</Text>
+                                    </View>
+                                </View>
+
+                                {/* Action Buttons */}
                                 <View style={styles.offerActions}>
                                     <TouchableOpacity
                                         style={styles.rejectButton}
                                         onPress={() => handleRejectOffer(offer)}
+                                        activeOpacity={0.7}
                                     >
+                                        <X size={20} color="#EF4444" />
                                         <Text style={styles.rejectButtonText}>{t('reject')}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={styles.acceptButton}
                                         onPress={() => handleAcceptOffer(offer)}
+                                        activeOpacity={0.7}
                                     >
                                         <Text style={styles.acceptButtonText}>{t('acceptRide')}</Text>
                                     </TouchableOpacity>
@@ -613,19 +651,19 @@ const styles = StyleSheet.create({
     // Driver Offer Styles
     offersListContainer: {
         width: '100%',
-        maxHeight: 280,
+        maxHeight: 320,
         marginBottom: 16,
     },
     offerCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        padding: 18,
+        padding: 16,
         marginBottom: 16,
-        borderWidth: 2,
-        borderColor: Colors.primary + '30',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.08,
         shadowRadius: 4,
         elevation: 3,
     },
@@ -639,104 +677,169 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
         marginRight: 12,
     },
-    driverAvatar: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: Colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
+    driverAvatarContainer: {
+        position: 'relative',
+        marginRight: 12,
     },
-    avatarText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    driverName: {
-        fontSize: 17,
-        fontWeight: 'bold',
-        color: Colors.textPrimary,
-        marginBottom: 4,
-    },
-    driverCar: {
-        fontSize: 13,
-        color: Colors.textSecondary,
-        marginTop: 4,
-    },
-    priceContainer: {
-        alignItems: 'flex-end',
-        minWidth: 80,
-    },
-    priceLabel: {
-        fontSize: 11,
-        color: Colors.textSecondary,
-        marginBottom: 2,
-    },
-    priceValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: Colors.success,
-    },
-    acceptButton: {
-        flex: 1,
-        backgroundColor: Colors.primary,
-        paddingVertical: 12,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginLeft: 8,
-    },
-    acceptButtonText: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
-    // New styles for enhanced offer cards
     driverImage: {
         width: 56,
         height: 56,
         borderRadius: 28,
         borderWidth: 2,
-        borderColor: Colors.primary,
+        borderColor: '#E5E7EB',
+    },
+    driverAvatarFallback: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#D1D5DB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+    },
+    ratingBadge: {
+        position: 'absolute',
+        bottom: -4,
+        alignSelf: 'center',
+        backgroundColor: '#F59E0B',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#FFF',
+    },
+    ratingTextSmall: {
+        color: '#FFF',
+        fontSize: 10,
+        fontWeight: 'bold',
+        marginLeft: 2,
     },
     driverDetails: {
         flex: 1,
-        marginLeft: 12,
+        justifyContent: 'center',
     },
-    ratingRow: {
+    driverName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: Colors.textPrimary,
+        marginBottom: 4,
+        textAlign: 'left',
+    },
+    carInfoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 2,
     },
-    ratingText: {
-        fontSize: 14,
-        color: '#F59E0B',
-        fontWeight: '600',
-    },
-    driverPlate: {
-        fontSize: 12,
+    carText: {
+        fontSize: 13,
         color: Colors.textSecondary,
-        marginTop: 4,
-        fontWeight: '500',
+        marginLeft: 6,
+    },
+    priceContainer: {
+        backgroundColor: '#ECFDF5', // Light Green
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        alignItems: 'flex-end',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    priceLabel: {
+        fontSize: 10,
+        color: '#059669',
+        fontWeight: '600',
+        marginBottom: 0,
+    },
+    priceValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#059669',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F3F4F6',
+        marginVertical: 12,
+    },
+    offerExtras: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    plateContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    plateLabel: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#1F2937',
+        marginRight: 6,
+        letterSpacing: 1,
+    },
+    plateNumber: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#374151',
+        letterSpacing: 2,
+    },
+    etaContainer: {
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    etaText: {
+        fontSize: 12,
+        color: '#2563EB',
+        fontWeight: '600',
     },
     offerActions: {
         flexDirection: 'row',
-        gap: 8,
-        marginTop: 12,
+        gap: 12,
     },
     rejectButton: {
         flex: 1,
-        backgroundColor: '#FEE2E2',
+        flexDirection: 'row',
+        backgroundColor: '#FEF2F2',
         paddingVertical: 12,
         borderRadius: 12,
+        justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#FCA5A5',
+        borderColor: '#FECACA',
     },
     rejectButtonText: {
-        color: '#EF4444',
+        color: '#DC2626',
+        fontSize: 15,
+        fontWeight: 'bold',
+        marginLeft: 6,
+    },
+    acceptButton: {
+        flex: 2,
+        backgroundColor: Colors.primary,
+        paddingVertical: 12,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    acceptButtonText: {
+        color: '#fff',
         fontSize: 15,
         fontWeight: 'bold',
     },

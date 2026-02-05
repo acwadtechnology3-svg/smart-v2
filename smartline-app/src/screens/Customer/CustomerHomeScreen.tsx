@@ -14,6 +14,8 @@ import SideMenu from '../../components/SideMenu';
 import { apiRequest } from '../../services/backend';
 
 import { useLanguage } from '../../context/LanguageContext';
+import ChatBotButton from '../../components/ChatBot/ChatBotButton';
+import ChatBotModal from '../../components/ChatBot/ChatBotModal';
 
 type CustomerHomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CustomerHome'>;
 
@@ -35,6 +37,7 @@ export default function CustomerHomeScreen() {
     const [isSideMenuVisible, setSideMenuVisible] = useState(false);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [currentAddress, setCurrentAddress] = useState<{ title: string, subtitle: string } | null>(null);
+    const [isChatBotVisible, setChatBotVisible] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -267,6 +270,10 @@ export default function CustomerHomeScreen() {
             {/* Side Menu Component */}
             <PopupNotification role="customer" />
             <SideMenu visible={isSideMenuVisible} onClose={() => setSideMenuVisible(false)} />
+
+            {/* AI Chatbot */}
+            <ChatBotButton onPress={() => setChatBotVisible(true)} />
+            <ChatBotModal visible={isChatBotVisible} onClose={() => setChatBotVisible(false)} />
         </View>
     );
 }

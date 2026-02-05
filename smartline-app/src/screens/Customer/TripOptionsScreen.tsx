@@ -38,7 +38,7 @@ const BASE_RIDES = [
 export default function TripOptionsScreen() {
     const navigation = useNavigation<TripOptionsScreenNavigationProp>();
     const route = useRoute<TripOptionsScreenRouteProp>();
-    const { pickup, destination, destinationCoordinates } = route.params;
+    const { pickup, destination, destinationCoordinates, autoRequest, pickupCoordinates } = route.params;
     const { t, isRTL } = useLanguage();
 
     const [selectedRide, setSelectedRide] = useState('comfort');
@@ -70,6 +70,13 @@ export default function TripOptionsScreen() {
         }).start();
     }, []);
 
+    // Auto-Request Logic
+    useEffect(() => {
+        if (autoRequest && routeInfo && !routeLoading && routeCoords.length > 0) {
+            handleRequest();
+        }
+    }, [autoRequest, routeInfo, routeLoading, routeCoords]);
+
     // 1. Resolve Coords & Fetch Route
     useEffect(() => {
         const initRoute = async (retryCount = 0) => {
@@ -78,16 +85,32 @@ export default function TripOptionsScreen() {
 
             try {
                 // 1. Get Pickup Coords
+                // 1. Get Pickup Coords
                 let pCoords = { latitude: 0, longitude: 0 };
-                if (pickup === 'Current Location' || !pickup) {
+
+                if (pickupCoordinates) {
+                    pCoords = { latitude: pickupCoordinates[1], longitude: pickupCoordinates[0] };
+                } else if (pickup === 'Current Location' || !pickup) {
                     const { status } = await Location.requestForegroundPermissionsAsync();
                     if (status === 'granted') {
                         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
                         pCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
                     }
                 } else {
-                    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-                    pCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+                    // Try to geocode the address string if no coords provided
+                    try {
+                        const geocoded = await Location.geocodeAsync(pickup);
+                        if (geocoded.length > 0) {
+                            pCoords = { latitude: geocoded[0].latitude, longitude: geocoded[0].longitude };
+                        } else {
+                            // Fallback to current location if geocoding fails
+                            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                            pCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+                        }
+                    } catch (e) {
+                        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                        pCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+                    }
                 }
                 setPickupCoords(pCoords);
 

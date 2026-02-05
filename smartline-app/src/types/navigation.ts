@@ -19,7 +19,7 @@ export type RootStackParamList = {
         field?: 'pickup' | 'destination';
     } | undefined;
     LocationPicker: { field: 'pickup' | 'destination' };
-    TripOptions: { pickup: string; destination: string; destinationCoordinates?: [number, number] };
+    TripOptions: { pickup: string; destination: string; destinationCoordinates?: [number, number]; preselectedRide?: string; pickupCoordinates?: [number, number]; autoRequest?: boolean };
     SearchingDriver: { tripId: string };
     DriverFound: { tripId: string; driver?: any };
     OnTrip: { tripId: string };

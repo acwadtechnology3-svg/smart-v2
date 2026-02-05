@@ -19,6 +19,7 @@ type SearchingDriverScreenRouteProp = RouteProp<RootStackParamList, 'SearchingDr
 
 export default function SearchingDriverScreen() {
     const navigation = useNavigation<SearchingDriverScreenNavigationProp>();
+    const mapRef = useRef<MapView>(null);
     const route = useRoute<SearchingDriverScreenRouteProp>();
     const { tripId } = route.params;
     const { t, isRTL } = useLanguage();
@@ -80,7 +81,20 @@ export default function SearchingDriverScreen() {
         const fetchTrip = async () => {
             try {
                 const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
-                if (data.trip) setTrip(data.trip);
+                if (data.trip) {
+                    setTrip(data.trip);
+
+                    // Fit map to markers
+                    setTimeout(() => {
+                        mapRef.current?.fitToCoordinates([
+                            { latitude: parseFloat(data.trip.pickup_lat), longitude: parseFloat(data.trip.pickup_lng) },
+                            { latitude: parseFloat(data.trip.dest_lat), longitude: parseFloat(data.trip.dest_lng) }
+                        ], {
+                            edgePadding: { top: 100, right: 50, bottom: height / 2, left: 50 },
+                            animated: true
+                        });
+                    }, 1000);
+                }
             } catch {
                 // ignore
             }
@@ -301,10 +315,11 @@ export default function SearchingDriverScreen() {
         <View style={styles.container}>
             {/* Map Background */}
             <MapView
+                ref={mapRef}
                 style={styles.map}
                 initialRegion={{
-                    latitude: trip.pickup_lat || 31.2357,
-                    longitude: trip.pickup_lng || 29.9511,
+                    latitude: parseFloat(trip.pickup_lat) || 31.2357,
+                    longitude: parseFloat(trip.pickup_lng) || 29.9511,
                     latitudeDelta: 0.05,
                     longitudeDelta: 0.05,
                 }}

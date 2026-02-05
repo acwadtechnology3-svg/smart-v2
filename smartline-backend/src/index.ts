@@ -24,6 +24,7 @@ import dashboardAuthRoutes from './routes/dashboardAuthRoutes';
 import popupRoutes from './routes/popupRoutes';
 import surgeRoutes from './routes/surgeRoutes';
 import driverPreferenceRoutes from './routes/driverPreferenceRoutes';
+import chatbotRoutes from './routes/chatbotRoutes';
 import { checkDatabaseConnection } from './config/database';
 import { checkRedisConnection } from './config/redis';
 import { startLocationSync } from './workers/locationSyncWorker';
@@ -84,6 +85,7 @@ app.use('/api/admin/support', supportAdminRoutes);
 app.use('/api/popups', popupRoutes);
 app.use('/api/surge', surgeRoutes);
 app.use('/api/drivers/preferences', driverPreferenceRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // ===== Health Check =====
 app.get('/health', async (req, res) => {

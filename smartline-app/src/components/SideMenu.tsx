@@ -131,9 +131,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
                         {/* Bottom Menu Items */}
                         <View style={styles.menuSection}>
                             <MenuItem icon={<Gift size={22} color="#F97316" />} label={t('inviteFriends')} onPress={() => handleNavigation('InviteFriends')} isRTL={isRTL} />
-                            <MenuItem icon={<CarFront size={22} color="#F97316" />} label={t('driveWithUs')} onPress={() => handleNavigation('RoleSelection')} isRTL={isRTL} />
                             <MenuItem icon={<Tag size={22} color="#14B8A6" />} label={t('discounts')} onPress={() => handleNavigation('Discounts')} isRTL={isRTL} />
-                            <MenuItem icon={<Scan size={22} color="#F97316" />} label={t('scan')} onPress={() => handleNavigation('Scan')} isRTL={isRTL} />
 
                             {/* Sign Out */}
                             <TouchableOpacity style={[styles.menuItem, { marginTop: 12, flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={handleSignOut}>

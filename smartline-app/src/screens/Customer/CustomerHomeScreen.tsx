@@ -317,8 +317,25 @@ const CarMarker = ({ top, left, rotate, delay }: any) => {
         return () => anim.stop();
     }, []);
 
+    // Combine top position with float animation
+    const combinedY = floatAnim.interpolate({
+        inputRange: [-5, 0],
+        outputRange: [top - 5, top]
+    });
+
     return (
-        <Animated.View style={[styles.carMarker, { top, left, transform: [{ rotate }, { translateY: floatAnim }] }]}>
+        <Animated.View
+            style={[
+                styles.carMarker,
+                {
+                    transform: [
+                        { translateX: left },
+                        { translateY: combinedY },
+                        { rotate }
+                    ]
+                }
+            ]}
+        >
             <CarFront size={18} color="#4B5563" fill="#1e1e1e" />
         </Animated.View>
     );

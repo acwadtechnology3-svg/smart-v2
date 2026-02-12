@@ -103,9 +103,11 @@ export default function ChatBotButton({ onPress }: ChatBotButtonProps) {
             style={[
                 styles.container,
                 {
-                    transform: [{ scale: pulse }],
-                    left: position.x,
-                    top: position.y,
+                    transform: [
+                        { translateX: position.x },
+                        { translateY: position.y },
+                        { scale: pulse }
+                    ]
                 },
             ]}
         >

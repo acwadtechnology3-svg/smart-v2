@@ -14,10 +14,11 @@ import {
   ChevronLeft,
   ShieldAlert,
   Shield,
-
   FileText,
   Megaphone,
   Zap,
+  Bell,
+  Image,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,8 @@ const allNavigation: NavItem[] = [
   { name: 'Customers', href: '/customers', icon: Users, page: 'customers' },
   { name: 'Wallet & Payments', href: '/wallet', icon: Wallet, page: 'wallet' },
   { name: 'Promo Codes', href: '/promos', icon: Ticket, page: 'promos' },
-  { name: 'App Popups', href: '/popups', icon: Megaphone, page: 'promos' },
+  { name: 'App Popups', href: '/popups', icon: Bell, page: 'popups' },
+  { name: 'Promo Banners', href: '/promo-banners', icon: Image, page: 'promo_banners' },
   { name: 'Surge Zones', href: '/surge-zones', icon: Zap, page: 'promos' },
   { name: 'Support', href: '/support', icon: HeadphonesIcon, page: 'support' },
   { name: 'Settings', href: '/settings', icon: Settings, page: 'settings' },

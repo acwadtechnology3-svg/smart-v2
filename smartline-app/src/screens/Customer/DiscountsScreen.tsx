@@ -1,116 +1,232 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { Tag } from 'lucide-react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl, Image, Platform, Keyboard, TouchableWithoutFeedback, I18nManager } from 'react-native';
+import { Tag, Ticket, Copy, Check, ArrowRight, ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest } from '../../services/backend';
 import { useLanguage } from '../../context/LanguageContext';
-import AppHeader from '../../components/AppHeader';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
+const CACHE_KEY = 'cached_promos';
 
 export default function DiscountsScreen() {
-    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+    const navigation = useNavigation();
     const { t, isRTL } = useLanguage();
+    const insets = useSafeAreaInsets();
+
+    // RTL Layout Logic
+    const isSimulating = isRTL !== I18nManager.isRTL;
+    const flexDirection = isSimulating ? 'row-reverse' : 'row';
+    const textAlign = isRTL ? 'right' : 'left';
+
     const [promoCode, setPromoCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [promos, setPromos] = useState<any[]>([]);
     const [fetching, setFetching] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchPromos();
+        loadPromos();
     }, []);
 
-    const fetchPromos = async () => {
+    const loadPromos = async () => {
         try {
-            const data = await apiRequest<{ promos: any[] }>('/pricing/available');
-            if (data.promos) {
-                setPromos(data.promos);
+            // 1. Load from cache first
+            const cached = await AsyncStorage.getItem(CACHE_KEY);
+            if (cached) {
+                setPromos(JSON.parse(cached));
+                setFetching(false); // Show cached content immediately
             }
-        } catch (err) {
-            console.log("Error fetching promos", err);
+
+            // 2. Fetch fresh data
+            await fetchPromosContext();
+        } catch (e) {
+            console.error(e);
         } finally {
             setFetching(false);
         }
     };
 
-    const applyPromo = async (code: string, isManual = false) => {
-        if (!code) return;
+    const fetchPromosContext = async () => {
+        try {
+            const data = await apiRequest<{ promos: any[] }>('/pricing/available');
+            if (data.promos) {
+                setPromos(data.promos);
+                // Update cache
+                await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data.promos));
+            }
+        } catch (err) {
+            console.log("Error fetching promos", err);
+        }
+    };
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchPromosContext();
+        setRefreshing(false);
+    }, []);
+
+    const applyPromo = async (code: string) => {
+        if (!code.trim()) {
+            Alert.alert(t('required'), t('enterPromoCode'));
+            return;
+        }
+
+        Keyboard.dismiss();
         setLoading(true);
         try {
-            // Verify first
+            // Verify
             const data = await apiRequest<{ promo: any }>(`/pricing/promo?code=${code}`);
             if (data.promo) {
-                // Store securely as the "Active" promo for next ride
+                // Store securely
                 await AsyncStorage.setItem('selected_promo', JSON.stringify(data.promo));
 
                 Alert.alert(
                     t('success') || "Success",
-                    `${t('promoApplied') || "Promo applied!"} ${t('youWillGet') || "You'll get"} ${data.promo.discount_percent}% ${t('offNextRide') || "off your next ride."}`,
-                    [{ text: t('bookNow') || "Book Now", onPress: () => navigation.navigate('SearchLocation' as any) }]
+                    `${t('promoApplied')} ${data.promo.discount_percent}% ${t('offNextRide')}`,
+                    [
+                        {
+                            text: t('bookNow') || "Book Now",
+                            onPress: () => navigation.navigate('CustomerHome' as never),
+                            style: 'default'
+                        }
+                    ]
                 );
+                setPromoCode('');
             }
         } catch (error: any) {
-            Alert.alert(t('invalidCode') || "Invalid Code", error.message || t('promoInvalid') || "This promo code is not valid.");
+            Alert.alert(t('error'), error.message || t('invalidCode'));
         } finally {
             setLoading(false);
         }
     };
 
-    const renderPromo = ({ item }: { item: any }) => (
-        <View style={[styles.promoCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <View style={[styles.iconCircle, { marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
-                <Tag size={20} color={Colors.primary} />
+    const copyToClipboard = async (code: string, id: string) => {
+        // await Clipboard.setStringAsync(code);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const renderPromo = ({ item, index }: { item: any, index: number }) => (
+        <View style={[styles.card, { flexDirection }]}>
+            {/* Left Decorator */}
+            <View style={styles.cardLeftDecor}>
+                <View style={styles.circleCutoutTop} />
+                <View style={styles.dashedLine} />
+                <View style={styles.circleCutoutBottom} />
             </View>
-            <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                <Text style={styles.promoCode}>{item.code}</Text>
-                <Text style={styles.promoDesc}>
-                    {item.discount_percent > 0 ? `${item.discount_percent}% ${t('off') || 'OFF'}` : ''}
-                    {item.discount_max ? ` (${t('max') || 'Max'} ${item.discount_max} ${t('currency') || 'EGP'})` : ''}
-                </Text>
-                <Text style={styles.validity}>
-                    {item.valid_until ? `${t('validUntil') || 'Valid until'} ${new Date(item.valid_until).toLocaleDateString()}` : t('noExpiry') || 'No Expiry'}
-                </Text>
+
+            {/* Content */}
+            <View style={[styles.cardContent, {
+                flexDirection,
+                paddingLeft: isRTL ? 16 : 24,
+                paddingRight: isRTL ? 24 : 16
+            }]}>
+                <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                    <Text style={styles.cardTitle}>{item.discount_percent}% OFF</Text>
+                    <Text style={styles.cardSubtitle}>
+                        {t('maxDiscount')} {item.discount_max} {t('currency')}
+                    </Text>
+                    <View style={[styles.codeContainer, { flexDirection }]}>
+                        <Text style={styles.codeText}>{item.code}</Text>
+                        <TouchableOpacity onPress={() => copyToClipboard(item.code, item.id)}>
+                            {copiedId === item.id ? (
+                                <Check size={16} color={Colors.success} style={[isRTL ? { marginRight: 8 } : { marginLeft: 8 }]} />
+                            ) : (
+                                <Copy size={16} color="#9CA3AF" style={[isRTL ? { marginRight: 8 } : { marginLeft: 8 }]} />
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.expiryText}>
+                        {t('validUntil')} {new Date(item.valid_until).toLocaleDateString()}
+                    </Text>
+                </View>
+
+                <TouchableOpacity
+                    style={styles.applyBtnSmall}
+                    onPress={() => applyPromo(item.code)}
+                >
+                    <Text style={styles.applyBtnSmallText}>{t('use')}</Text>
+                </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.useButton} onPress={() => applyPromo(item.code)}>
-                <Text style={styles.useText}>{t('use') || 'USE'}</Text>
-            </TouchableOpacity>
         </View>
     );
 
     return (
         <View style={styles.container}>
-            <AppHeader title={t('promoCodes') || 'Promo Codes'} showBack={true} />
+            <StatusBar style="dark" />
 
-            <View style={styles.content}>
-                <View style={[styles.inputContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            {/* Header */}
+            <View style={[styles.header, { paddingTop: insets.top + 10, paddingHorizontal: 20, flexDirection }]}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.backButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <ArrowLeft size={24} color="#1F2937" style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>{t('promoCodes')}</Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            {/* Input Section */}
+            <View style={styles.inputSection}>
+                <View style={[styles.inputWrapper, { flexDirection }]}>
+                    <Ticket size={20} color="#9CA3AF" style={{ marginHorizontal: 12 }} />
                     <TextInput
-                        style={[styles.input, { textAlign: isRTL ? 'right' : 'left', marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}
-                        placeholder={t('enterPromoCode') || "Enter promo code"}
+                        style={[styles.input, { textAlign }]}
+                        placeholder={t('enterPromoCode')}
                         value={promoCode}
                         onChangeText={setPromoCode}
                         autoCapitalize="characters"
+                        placeholderTextColor="#9CA3AF"
                     />
-                    <TouchableOpacity style={styles.applyButton} onPress={() => applyPromo(promoCode, true)} disabled={loading}>
-                        <Text style={styles.applyText}>{loading ? (t('checking') || 'Checking...') : (t('apply') || 'Apply')}</Text>
+                    <TouchableOpacity
+                        style={[styles.applyButton, { opacity: promoCode ? 1 : 0.6 }]}
+                        onPress={() => applyPromo(promoCode)}
+                        disabled={!promoCode || loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            isRTL ? <ArrowLeft size={20} color="#fff" /> : <ArrowRight size={20} color="#fff" />
+                        )}
                     </TouchableOpacity>
                 </View>
+            </View>
 
-                <Text style={[styles.sectionTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('activePromotions') || "Active Promotions"}</Text>
+            <View style={styles.listContainer}>
+                <Text style={[styles.sectionTitle, { textAlign }]}>
+                    {t('activePromotions')}
+                </Text>
 
-                {fetching ? (
-                    <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
+                {fetching && promos.length === 0 ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                    </View>
                 ) : (
                     <FlatList
                         data={promos}
-                        keyExtractor={item => item.id}
+                        keyExtractor={item => item.id || item.code}
                         renderItem={renderPromo}
+                        contentContainerStyle={{ paddingBottom: 40 }}
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
+                        }
                         ListEmptyComponent={
-                            <Text style={{ textAlign: 'center', color: '#9CA3AF', marginTop: 20 }}>
-                                {t('noActivePromos') || "No active promotions at the moment."}
-                            </Text>
+                            <View style={styles.emptyState}>
+                                <Image
+                                    source={{ uri: 'https://cdn-icons-png.flaticon.com/512/612/612803.png' }} // Fallback or local asset
+                                    style={{ width: 80, height: 80, opacity: 0.5, marginBottom: 16 }}
+                                />
+                                <Text style={styles.emptyText}>{t('noActivePromos')}</Text>
+                                <Text style={styles.emptySubtext}>{t('checkBackLater')}</Text>
+                            </View>
                         }
                     />
                 )}
@@ -120,18 +236,121 @@ export default function DiscountsScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.background },
-    content: { flex: 1, padding: 16 },
-    inputContainer: { flexDirection: 'row', marginBottom: 24 },
-    input: { flex: 1, height: 50, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 16, backgroundColor: Colors.surface, marginRight: 12 },
-    applyButton: { backgroundColor: Colors.primary, paddingHorizontal: 24, justifyContent: 'center', borderRadius: 8 },
-    applyText: { color: '#fff', fontWeight: 'bold' },
-    sectionTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.textSecondary, marginBottom: 16 },
-    promoCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: Colors.border },
-    iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-    promoCode: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary },
-    promoDesc: { fontSize: 14, color: Colors.textPrimary, marginVertical: 2 },
-    validity: { fontSize: 12, color: Colors.textSecondary },
-    useButton: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#EFF6FF', borderRadius: 6 },
-    useText: { color: Colors.primary, fontWeight: 'bold', fontSize: 12 },
+    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 20,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6'
+    },
+    backButton: { padding: 4 },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+
+    inputSection: {
+        padding: 20,
+        backgroundColor: '#fff',
+        marginBottom: 10,
+        shadowColor: 'rgba(0,0,0,0.05)',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 1,
+        shadowRadius: 5,
+        elevation: 3
+    },
+    inputWrapper: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        height: 54,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB'
+    },
+    input: {
+        flex: 1,
+        height: '100%',
+        fontSize: 16,
+        color: '#111827',
+        fontWeight: '600'
+    },
+    applyButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 10,
+        backgroundColor: Colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 5,
+        marginLeft: 5
+    },
+
+    listContainer: { flex: 1, padding: 20 },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#374151', marginBottom: 16 },
+
+    // Card Styles
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        marginBottom: 16,
+        height: 140,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#F3F4F6'
+    },
+    cardLeftDecor: {
+        width: 0, // Visual only via decoration
+    },
+    circleCutoutTop: {
+        position: 'absolute', top: -10, left: -10,
+        width: 20, height: 20, borderRadius: 10, backgroundColor: '#F9FAFB', zIndex: 10
+    },
+    circleCutoutBottom: {
+        position: 'absolute', bottom: -10, left: -10,
+        width: 20, height: 20, borderRadius: 10, backgroundColor: '#F9FAFB', zIndex: 10
+    },
+    dashedLine: {
+        position: 'absolute', top: 20, bottom: 20, left: 0,
+        width: 1, borderStyle: 'dashed', borderWidth: 1, borderColor: '#E5E7EB', zIndex: 5
+    },
+    cardContent: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    cardTitle: { fontSize: 24, fontWeight: '800', color: Colors.primary },
+    cardSubtitle: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+    codeContainer: {
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        marginTop: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderStyle: 'dashed'
+    },
+    codeText: { fontSize: 16, fontWeight: '700', color: '#374151', letterSpacing: 1 },
+    expiryText: { fontSize: 11, color: '#9CA3AF', marginTop: 12 },
+
+    applyBtnSmall: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#DBEAFE'
+    },
+    applyBtnSmallText: { fontSize: 13, fontWeight: '700', color: Colors.primary },
+
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 60 },
+    emptyText: { fontSize: 18, fontWeight: '700', color: '#374151', marginBottom: 8 },
+    emptySubtext: { fontSize: 14, color: '#9CA3AF' }
 });

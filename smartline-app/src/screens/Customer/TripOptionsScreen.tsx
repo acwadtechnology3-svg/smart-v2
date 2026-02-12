@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Dimensions, Animated, Modal, TouchableWithoutFeedback, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Dimensions, Animated, Modal, TouchableWithoutFeedback, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, I18nManager } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -40,6 +40,14 @@ export default function TripOptionsScreen() {
     const route = useRoute<TripOptionsScreenRouteProp>();
     const { pickup, destination, destinationCoordinates, autoRequest, pickupCoordinates } = route.params;
     const { t, isRTL } = useLanguage();
+
+    // RTL Layout Logic
+    const isSimulating = isRTL !== I18nManager.isRTL;
+    const flexDirection = isSimulating ? 'row-reverse' : 'row';
+    const textAlign = isRTL ? 'right' : 'left';
+    const alignSelf = isRTL ? 'flex-end' : 'flex-start';
+    const backButtonStyle = isSimulating ? { right: 20 } : { left: 20 };
+    const iconMargin = isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12, marginLeft: 0 };
 
     const [selectedRide, setSelectedRide] = useState('comfort');
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Wallet'>('Cash');
@@ -422,7 +430,7 @@ export default function TripOptionsScreen() {
                 </MapView>
 
                 <TouchableOpacity
-                    style={styles.backButton}
+                    style={[styles.backButton, backButtonStyle]}
                     onPress={() => {
                         if (navigation.canGoBack()) {
                             navigation.goBack();
@@ -434,7 +442,7 @@ export default function TripOptionsScreen() {
                         }
                     }}
                 >
-                    <ArrowLeft size={24} color="#000" strokeWidth={3} />
+                    <ArrowLeft size={24} color="#000" strokeWidth={3} style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
                 </TouchableOpacity>
             </View>
 
@@ -442,18 +450,18 @@ export default function TripOptionsScreen() {
             <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: slideUp }] }]}>
 
                 {/* Route Header */}
-                <View style={[styles.routeInfo, { flexDirection: isRTL ? 'row-reverse' : 'column' }]}>
-                    <View style={[styles.routeNode, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        <View style={[styles.dot, { backgroundColor: '#10B981', marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]} />
-                        <Text style={[styles.addressText, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>{pickup || t('currentLocation')}</Text>
+                {/* Route Header */}
+                <View style={[styles.routeInfo, { flexDirection: 'column' }]}>
+                    <View style={[styles.routeNode, { flexDirection }]}>
+                        <View style={[styles.dot, { backgroundColor: '#10B981' }, iconMargin]} />
+                        <Text style={[styles.addressText, { textAlign }]} numberOfLines={1}>{pickup || t('currentLocation')}</Text>
                     </View>
-                    {/* Vertical Line - Hard to RTL perfectly without flex column/row flip on wrapper. Let's keep it simple for now or hide line in RTL? No, line connects dots. */}
                     <View style={[styles.verticalLineWrapper, { alignItems: isRTL ? 'flex-end' : 'flex-start', paddingRight: isRTL ? 7.5 : 0, paddingLeft: isRTL ? 0 : 4.5 }]}>
                         <View style={styles.verticalLine} />
                     </View>
-                    <View style={[styles.routeNode, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        <View style={[styles.dot, { backgroundColor: '#EF4444', marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]} />
-                        <Text style={[styles.addressText, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>{destination}</Text>
+                    <View style={[styles.routeNode, { flexDirection }]}>
+                        <View style={[styles.dot, { backgroundColor: '#EF4444' }, iconMargin]} />
+                        <Text style={[styles.addressText, { textAlign }]} numberOfLines={1}>{destination}</Text>
                     </View>
                 </View>
 
@@ -465,7 +473,7 @@ export default function TripOptionsScreen() {
 
                 <View style={styles.divider} />
 
-                <Text style={[styles.sectionTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('chooseRide') || 'Choose a ride'}</Text>
+                <Text style={[styles.sectionTitle, { textAlign }]}>{t('chooseRide') || 'Choose a ride'}</Text>
 
                 {/* Ride Options (Vertical List) */}
                 <ScrollView
@@ -479,19 +487,19 @@ export default function TripOptionsScreen() {
                             style={[
                                 styles.rideCard,
                                 selectedRide === ride.id && styles.rideCardSelected,
-                                { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                                { flexDirection }
                             ]}
                             onPress={() => setSelectedRide(ride.id)}
                             activeOpacity={0.9}
                         >
                             {/* Icon Section */}
-                            <View style={[styles.rideIconWrapper, { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>
+                            <View style={[styles.rideIconWrapper, isRTL ? { marginLeft: 8 } : { marginRight: 8 }]}>
                                 <Image source={ride.image} style={styles.rideImage} resizeMode="contain" />
                             </View>
 
                             {/* Info Section */}
                             <View style={[styles.rideInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ flexDirection: flexDirection, alignItems: 'center', gap: 6 }}>
                                     <Text style={styles.rideName}>{ride.name}</Text>
                                     <View style={styles.personRow}>
                                         <Text style={styles.personText}>4</Text>
@@ -508,8 +516,8 @@ export default function TripOptionsScreen() {
 
                             {/* Price Section */}
                             <View style={[styles.priceSection, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}>
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'baseline' }}>
-                                    <Text style={[styles.currency, { marginRight: isRTL ? 0 : 2, marginLeft: isRTL ? 2 : 0 }]}>{t('currency') || 'EGP'}</Text>
+                                <View style={{ flexDirection: flexDirection, alignItems: 'baseline' }}>
+                                    <Text style={[styles.currency, isRTL ? { marginLeft: 2 } : { marginRight: 2 }]}>{t('currency') || 'EGP'}</Text>
                                     <Text style={styles.price}>{ride.price.toFixed(2)}</Text>
                                 </View>
                                 {ride.oldPrice && (
@@ -522,9 +530,9 @@ export default function TripOptionsScreen() {
 
                 {/* Footer Action */}
                 <View style={styles.footer}>
-                    <View style={[styles.paymentRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.paymentRow, { flexDirection }]}>
                         <TouchableOpacity
-                            style={[styles.paymentSelect, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                            style={[styles.paymentSelect, { flexDirection }]}
                             onPress={() => setShowPaymentModal(true)}
                         >
                             {paymentMethod === 'Cash' ? (
@@ -536,7 +544,7 @@ export default function TripOptionsScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.promoSelect, appliedPromo ? { backgroundColor: '#DCFCE7' } : null, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                            style={[styles.promoSelect, appliedPromo ? { backgroundColor: '#DCFCE7' } : null, { flexDirection }]}
                             onPress={() => setShowPromoModal(true)}
                         >
                             <BadgePercent size={18} color={appliedPromo ? '#166534' : "#F97316"} />
@@ -583,27 +591,27 @@ export default function TripOptionsScreen() {
                     <View style={styles.modalOverlay}>
                         <TouchableWithoutFeedback>
                             <View style={styles.modalContent}>
-                                <Text style={[styles.modalTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('selectPaymentMethod') || 'Select Payment Method'}</Text>
+                                <Text style={[styles.modalTitle, { textAlign }]}>{t('selectPaymentMethod') || 'Select Payment Method'}</Text>
 
                                 <TouchableOpacity
-                                    style={[styles.paymentOption, paymentMethod === 'Cash' && styles.paymentOptionSelected, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                                    style={[styles.paymentOption, paymentMethod === 'Cash' && styles.paymentOptionSelected, { flexDirection }]}
                                     onPress={() => { setPaymentMethod('Cash'); setShowPaymentModal(false); }}
                                 >
-                                    <View style={[styles.optionIcon, { marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
+                                    <View style={[styles.optionIcon, iconMargin]}>
                                         <CreditCard size={24} color="#1e1e1e" />
                                     </View>
-                                    <Text style={[styles.optionText, { textAlign: isRTL ? 'right' : 'left' }]}>{t('cash') || 'Cash'}</Text>
+                                    <Text style={[styles.optionText, { textAlign }]}>{t('cash') || 'Cash'}</Text>
                                     {paymentMethod === 'Cash' && <View style={styles.selectedDot} />}
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    style={[styles.paymentOption, paymentMethod === 'Wallet' && styles.paymentOptionSelected, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                                    style={[styles.paymentOption, paymentMethod === 'Wallet' && styles.paymentOptionSelected, { flexDirection }]}
                                     onPress={() => { setPaymentMethod('Wallet'); setShowPaymentModal(false); }}
                                 >
-                                    <View style={[styles.optionIcon, { marginRight: isRTL ? 0 : 16, marginLeft: isRTL ? 16 : 0 }]}>
+                                    <View style={[styles.optionIcon, iconMargin]}>
                                         <Wallet size={24} color="#1e1e1e" />
                                     </View>
-                                    <Text style={[styles.optionText, { textAlign: isRTL ? 'right' : 'left' }]}>{t('wallet') || 'Wallet'}</Text>
+                                    <Text style={[styles.optionText, { textAlign }]}>{t('wallet') || 'Wallet'}</Text>
                                     {paymentMethod === 'Wallet' && <View style={styles.selectedDot} />}
                                 </TouchableOpacity>
                             </View>
@@ -624,11 +632,11 @@ export default function TripOptionsScreen() {
                         <View style={styles.modalOverlay}>
                             <TouchableWithoutFeedback>
                                 <View style={[styles.modalContent, { maxHeight: '80%' }]}>
-                                    <Text style={[styles.modalTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('enterPromoCode') || "Enter Promo Code"}</Text>
-                                    <Text style={[styles.modalSubtitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('promoSubtitle') || "Have a discount code? Enter it below."}</Text>
+                                    <Text style={[styles.modalTitle, { textAlign }]}>{t('enterPromoCode') || "Enter Promo Code"}</Text>
+                                    <Text style={[styles.modalSubtitle, { textAlign }]}>{t('promoSubtitle') || "Have a discount code? Enter it below."}</Text>
 
                                     <TextInput
-                                        style={[styles.promoInput, { textAlign: isRTL ? 'right' : 'left' }]}
+                                        style={[styles.promoInput, { textAlign }]}
                                         placeholder={t('promoPlaceholder') || "e.g. SMART50"}
                                         placeholderTextColor="#9CA3AF"
                                         value={promoInput}
@@ -715,7 +723,8 @@ const styles = StyleSheet.create({
     mapLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: height * 0.5, backgroundColor: '#EFF6FF' },
     mapBackground: { flex: 1, backgroundColor: '#EEF2FF' },
     street: { position: 'absolute', backgroundColor: '#fff', opacity: 0.5 },
-    backButton: { position: 'absolute', top: 60, left: 20, backgroundColor: '#fff', padding: 10, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.1, elevation: 5 }, // 👽 02-02-2026: Increased top to 60 for better status bar clearance
+    street: { position: 'absolute', backgroundColor: '#fff', opacity: 0.5 },
+    backButton: { position: 'absolute', top: 60, backgroundColor: '#fff', padding: 10, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.1, elevation: 5 }, // Left/Right handled dynamically
 
     // Fake Route Line
     routeLineContainer: { position: 'absolute', top: '30%', left: '20%', width: '60%', height: 100 },

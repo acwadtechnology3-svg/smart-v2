@@ -5,7 +5,9 @@ import {
     StyleSheet,
     Text,
     View,
-    Dimensions
+    Dimensions,
+    StyleProp,
+    ViewStyle
 } from 'react-native';
 import { MessageCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,13 +15,15 @@ import { Colors } from '../../constants/Colors';
 
 interface ChatBotButtonProps {
     onPress: () => void;
+    disableDrag?: boolean;
+    style?: StyleProp<ViewStyle>;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BUTTON_SIZE = 70;
 const EDGE_PADDING = 16;
 
-export default function ChatBotButton({ onPress }: ChatBotButtonProps) {
+export default function ChatBotButton({ onPress, disableDrag = false, style }: ChatBotButtonProps) {
     const initialPosition = {
         x: SCREEN_WIDTH - BUTTON_SIZE - EDGE_PADDING,
         y: SCREEN_HEIGHT - BUTTON_SIZE - 180,
@@ -97,43 +101,75 @@ export default function ChatBotButton({ onPress }: ChatBotButtonProps) {
         })
     ).current;
 
+    const animatedStyle = {
+        transform: [
+            ...(disableDrag ? [] : [{ translateX: position.x }, { translateY: position.y }]),
+            { scale: pulse }
+        ]
+    };
+
     return (
         <Animated.View
-            {...panResponder.panHandlers}
+            {...(disableDrag ? {} : panResponder.panHandlers)}
             style={[
                 styles.container,
-                {
-                    transform: [
-                        { translateX: position.x },
-                        { translateY: position.y },
-                        { scale: pulse }
-                    ]
-                },
+                style,
+                animatedStyle
             ]}
         >
-            <LinearGradient
-                colors={['#2563EB', Colors.primary]}
-                style={styles.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-            >
-                <View style={styles.wave}>
-                    <Animated.View
-                        style={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: 30,
-                            borderWidth: 1,
-                            borderColor: 'rgba(255,255,255,0.2)',
-                        }}
-                    />
+            {disableDrag && (
+                <View style={{ flex: 1 }} onTouchEnd={onPress}>
+                    <LinearGradient
+                        colors={['#2563EB', Colors.primary]}
+                        style={styles.gradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <View style={styles.wave}>
+                            <Animated.View
+                                style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 30,
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255,255,255,0.2)',
+                                }}
+                            />
+                        </View>
+                        <MessageCircle size={26} color="#FFFFFF" fill="#FFFFFF" />
+                        <Text style={styles.label}>Help</Text>
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>AI</Text>
+                        </View>
+                    </LinearGradient>
                 </View>
-                <MessageCircle size={26} color="#FFFFFF" fill="#FFFFFF" />
-                <Text style={styles.label}>Help</Text>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>AI</Text>
-                </View>
-            </LinearGradient>
+            )}
+
+            {!disableDrag && (
+                <LinearGradient
+                    colors={['#2563EB', Colors.primary]}
+                    style={styles.gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
+                    <View style={styles.wave}>
+                        <Animated.View
+                            style={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 30,
+                                borderWidth: 1,
+                                borderColor: 'rgba(255,255,255,0.2)',
+                            }}
+                        />
+                    </View>
+                    <MessageCircle size={26} color="#FFFFFF" fill="#FFFFFF" />
+                    <Text style={styles.label}>Help</Text>
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>AI</Text>
+                    </View>
+                </LinearGradient>
+            )}
         </Animated.View>
     );
 }

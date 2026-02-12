@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput, Keyboard } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput, Keyboard, I18nManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,6 +8,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import { searchPlaces } from '../../services/mapService';
 import * as Location from 'expo-location';
+import { useLanguage } from '../../context/LanguageContext';
 
 type SearchLocationScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SearchLocation'>;
 type SearchLocationScreenRouteProp = RouteProp<RootStackParamList, 'SearchLocation'>;
@@ -23,6 +24,14 @@ const MOCK_PLACES = [
 export default function SearchLocationScreen() {
     const navigation = useNavigation<SearchLocationScreenNavigationProp>();
     const route = useRoute<SearchLocationScreenRouteProp>();
+    const { t, isRTL } = useLanguage();
+
+    // RTL Logic
+    const isSimulating = isRTL !== I18nManager.isRTL;
+    const flexDirection = isSimulating ? 'row-reverse' : 'row';
+    const textAlign = isRTL ? 'right' : 'left';
+    const lineStyle = isSimulating ? { right: 11 } : { left: 11 };
+    const iconMargin = isRTL ? { marginLeft: 16, marginRight: 0 } : { marginRight: 16, marginLeft: 0 };
 
     const [pickup, setPickup] = useState('Current Location'); // Default to "Current Location" text
     const [destination, setDestination] = useState('');
@@ -191,23 +200,23 @@ export default function SearchLocationScreen() {
         <SafeAreaView style={styles.container}>
             <View style={styles.contentContainer}>
                 {/* Header & Inputs Block */}
-                <View style={styles.topSection}>
+                <View style={[styles.topSection, { flexDirection }]}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <ArrowLeft size={24} color="#1e1e1e" />
+                        <ArrowLeft size={24} color="#1e1e1e" style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
                     </TouchableOpacity>
 
                     <View style={styles.inputCluster}>
                         {/* Connecting Line */}
-                        {!route.params?.returnScreen && <View style={styles.connectingLine} />}
+                        {!route.params?.returnScreen && <View style={[styles.connectingLine, lineStyle]} />}
 
                         {/* Pickup Input */}
                         {(!route.params?.returnScreen || activeField === 'pickup') && (
-                            <View style={styles.inputRow}>
-                                <View style={[styles.dot, styles.dotPickup]} />
-                                <View style={styles.inputContainer} pointerEvents="box-none">
+                            <View style={[styles.inputRow, { flexDirection }]}>
+                                <View style={[styles.dot, styles.dotPickup, isRTL ? { marginLeft: 12, marginRight: 6 } : {}]} />
+                                <View style={[styles.inputContainer, { flexDirection }]} pointerEvents="box-none">
                                     <TextInput
                                         ref={pickupRef}
-                                        style={styles.textInput}
+                                        style={[styles.textInput, { textAlign }]}
                                         value={pickup}
                                         onChangeText={(text) => {
                                             setPickup(text);
@@ -238,12 +247,12 @@ export default function SearchLocationScreen() {
 
                         {/* Destination Input */}
                         {(!route.params?.returnScreen || activeField === 'destination') && (
-                            <View style={styles.inputRow}>
-                                <View style={[styles.dot, styles.dotDest]} />
-                                <View style={styles.inputContainer} pointerEvents="box-none">
+                            <View style={[styles.inputRow, { flexDirection }]}>
+                                <View style={[styles.dot, styles.dotDest, isRTL ? { marginLeft: 12, marginRight: 6 } : {}]} />
+                                <View style={[styles.inputContainer, { flexDirection }]} pointerEvents="box-none">
                                     <TextInput
                                         ref={destinationRef}
-                                        style={styles.textInput}
+                                        style={[styles.textInput, { textAlign }]}
                                         value={destination}
                                         onChangeText={(text) => {
                                             setDestination(text);
@@ -320,15 +329,15 @@ export default function SearchLocationScreen() {
                     contentContainerStyle={styles.listContent}
                     renderItem={({ item }) => (
                         <TouchableOpacity
-                            style={styles.resultItem}
+                            style={[styles.resultItem, { flexDirection }]}
                             onPress={() => handleSelectPlace(item)}
                         >
-                            <View style={styles.iconContainer}>
+                            <View style={[styles.iconContainer, iconMargin]}>
                                 <MapPin size={20} color="#1e1e1e" />
                             </View>
                             <View style={styles.textContainer}>
-                                <Text style={styles.placeName}>{item.text || item.name}</Text>
-                                <Text style={styles.placeAddress} numberOfLines={2}>
+                                <Text style={[styles.placeName, { textAlign }]}>{item.text || item.name}</Text>
+                                <Text style={[styles.placeAddress, { textAlign }]} numberOfLines={2}>
                                     {item.place_name || item.address}
                                 </Text>
                             </View>
@@ -345,7 +354,7 @@ const styles = StyleSheet.create({
     contentContainer: { flex: 1 },
 
     topSection: {
-        flexDirection: 'row',
+        // flexDirection handled dynamically
         alignItems: 'flex-start',
         paddingHorizontal: 16,
         paddingTop: 50, // 👽 02-02-2026: Increased top padding (was 16)
@@ -370,7 +379,7 @@ const styles = StyleSheet.create({
         zIndex: -1,
     },
     inputRow: {
-        flexDirection: 'row',
+        // flexDirection handled dynamically
         alignItems: 'center',
         // zIndex removed to prevent stacking issues
     },

@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, Image } from 'react-native';
-import { ArrowLeft, User, Mail, Phone, Camera, Smartphone } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, Image, I18nManager } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ArrowLeft, User, Mail, Smartphone, Camera, Lock } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiRequest } from '../../services/backend';
 import { Colors } from '../../constants/Colors';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
-// @ts-ignore
-import { readAsStringAsync } from 'expo-file-system/legacy';
+import { StatusBar } from 'expo-status-bar';
+import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function PersonalInformationScreen() {
     const navigation = useNavigation();
+    const { t, isRTL } = useLanguage();
+
+    // RTL Layout Logic
+    const isSimulating = isRTL !== I18nManager.isRTL;
+    const flexDirection = isSimulating ? 'row-reverse' : 'row';
+    const textAlign = isRTL ? 'right' : 'left';
+    const iconMargin = isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12, marginLeft: 0 };
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -109,7 +119,7 @@ export default function PersonalInformationScreen() {
             if (!userId) throw new Error('User ID not found');
 
             // Read file as Base64
-            const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
+            const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
             const arrayBuffer = decode(base64);
 
             // Use 'avatars' bucket, usually public
@@ -207,17 +217,18 @@ export default function PersonalInformationScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <ArrowLeft size={24} color="#1e1e1e" />
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <StatusBar style="dark" />
+            <View style={[styles.header, { flexDirection }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <ArrowLeft size={24} color="#1e1e1e" style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Personal Information</Text>
+                <Text style={styles.headerTitle}>{t('personalInfo') || 'Personal Information'}</Text>
                 <TouchableOpacity onPress={handleSave} disabled={saving}>
                     {saving ? (
                         <ActivityIndicator size="small" color={Colors.primary} />
                     ) : (
-                        <Text style={[styles.saveText, { color: hasUnsavedChanges(fullName, email, photo, initialData) ? Colors.primary : '#9CA3AF' }]}>Save</Text>
+                        <Text style={[styles.saveText, { color: hasUnsavedChanges(fullName, email, photo, initialData) ? Colors.primary : '#9CA3AF' }]}>{t('save') || 'Save'}</Text>
                     )}
                 </TouchableOpacity>
             </View>
@@ -227,20 +238,20 @@ export default function PersonalInformationScreen() {
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
                 >
-                    <ScrollView contentContainerStyle={styles.content}>
+                    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
                         {/* Profile Photo - Now Touchable */}
                         <View style={styles.photoContainer}>
-                            <TouchableOpacity onPress={pickImage} activeOpacity={0.7}>
-                                <View style={styles.photoPlaceholder}>
-                                    {photo ? (
-                                        <Image source={{ uri: photo }} style={styles.avatar} />
-                                    ) : (
+                            <TouchableOpacity onPress={pickImage} activeOpacity={0.7} style={styles.avatarWrapper}>
+                                {photo ? (
+                                    <Image source={{ uri: photo }} style={styles.avatar} />
+                                ) : (
+                                    <View style={styles.avatarPlaceholder}>
                                         <User size={40} color="#9CA3AF" />
-                                    )}
-                                    <View style={styles.editBadge}>
-                                        <Camera size={14} color="#fff" />
                                     </View>
+                                )}
+                                <View style={styles.editBadge}>
+                                    <Camera size={14} color="#fff" />
                                 </View>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={pickImage}>
@@ -250,28 +261,28 @@ export default function PersonalInformationScreen() {
 
                         {/* Form Fields */}
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Full Name</Text>
-                            <View style={styles.inputContainer}>
-                                <User size={20} color="#9CA3AF" style={styles.inputIcon} />
+                            <Text style={[styles.label, { textAlign }]}>{t('fullName') || 'Full Name'}</Text>
+                            <View style={[styles.inputContainer, { flexDirection }]}>
+                                <User size={20} color="#9CA3AF" style={iconMargin} />
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { textAlign }]}
                                     value={fullName}
                                     onChangeText={setFullName}
-                                    placeholder="Enter your full name"
+                                    placeholder={t('enterFullName') || "Enter your full name"}
                                     placeholderTextColor="#9CA3AF"
                                 />
                             </View>
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Email Address</Text>
-                            <View style={styles.inputContainer}>
-                                <Mail size={20} color="#9CA3AF" style={styles.inputIcon} />
+                            <Text style={[styles.label, { textAlign }]}>{t('emailAddress') || 'Email Address'}</Text>
+                            <View style={[styles.inputContainer, { flexDirection }]}>
+                                <Mail size={20} color="#9CA3AF" style={iconMargin} />
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { textAlign }]}
                                     value={email}
                                     onChangeText={setEmail}
-                                    placeholder="Enter your email"
+                                    placeholder={t('enterEmail') || "Enter your email"}
                                     placeholderTextColor="#9CA3AF"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
@@ -280,18 +291,18 @@ export default function PersonalInformationScreen() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Phone Number</Text>
-                            <View style={[styles.inputContainer, styles.disabledInput]}>
-                                <Smartphone size={20} color="#9CA3AF" style={styles.inputIcon} />
+                            <Text style={[styles.label, { textAlign }]}>{t('phoneNumber') || 'Phone Number'}</Text>
+                            <View style={[styles.inputContainer, styles.disabledInput, { flexDirection }]}>
+                                <Smartphone size={20} color="#9CA3AF" style={iconMargin} />
                                 <TextInput
-                                    style={[styles.input, { color: '#6B7280' }]}
+                                    style={[styles.input, { color: '#6B7280', textAlign }]}
                                     value={phone}
                                     editable={false}
-                                    placeholder="Phone number"
+                                    placeholder={t('phoneNumber') || "Phone number"}
                                 />
                                 <LockIcon />
                             </View>
-                            <Text style={styles.helperText}>Contact support to change phone number</Text>
+                            <Text style={[styles.helperText, { textAlign }]}>{t('contactSupport') || 'Contact support to change phone number'}</Text>
                         </View>
 
                     </ScrollView>
@@ -314,48 +325,59 @@ const LockIcon = () => (
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        // flexDirection handled dynamically
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingBottom: 20,
-        paddingTop: Platform.OS === 'android' ? 50 : 20,
+        paddingTop: 20, // SafeAreaView handles the top inset now
         backgroundColor: '#fff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
-        zIndex: 10
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
     },
     backBtn: { padding: 4 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
     saveText: { fontSize: 16, fontWeight: '600' },
 
-    content: { padding: 24 },
+    content: { padding: 24, paddingBottom: 50 },
 
     photoContainer: { alignItems: 'center', marginBottom: 32 },
-    photoPlaceholder: {
-        width: 100, height: 100, borderRadius: 50,
-        backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 12, position: 'relative', overflow: 'hidden'
+    avatarWrapper: {
+        width: 110, height: 110,
+        marginBottom: 12, position: 'relative',
+        shadowColor: 'rgba(0,0,0,0.1)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 10,
+        elevation: 4
     },
-    avatar: { width: '100%', height: '100%' },
+    avatar: { width: '100%', height: '100%', borderRadius: 55, borderWidth: 3, borderColor: '#fff' },
+    avatarPlaceholder: {
+        width: '100%', height: '100%', borderRadius: 55,
+        backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
+        borderWidth: 3, borderColor: '#fff'
+    },
     editBadge: {
         position: 'absolute', bottom: 4, right: 4,
-        backgroundColor: Colors.primary, width: 28, height: 28, borderRadius: 14,
+        backgroundColor: Colors.primary, width: 32, height: 32, borderRadius: 16,
         alignItems: 'center', justifyContent: 'center',
-        borderWidth: 2, borderColor: '#fff'
+        borderWidth: 2, borderColor: '#fff',
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2, shadowRadius: 3, elevation: 3
     },
-    changePhotoText: { color: Colors.primary, fontSize: 14, fontWeight: '500' },
+    changePhotoText: { color: Colors.primary, fontSize: 15, fontWeight: '600' },
 
     inputGroup: { marginBottom: 20 },
-    label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 8 },
+    label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
     inputContainer: {
-        flexDirection: 'row', alignItems: 'center',
+        // flexDirection handled dynamically
+        alignItems: 'center',
         backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12,
-        paddingHorizontal: 12, height: 50
+        paddingHorizontal: 16, height: 54,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 2, elevation: 1
     },
     inputIcon: { marginRight: 12 },
     input: { flex: 1, fontSize: 16, color: '#111827' },
-    disabledInput: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
+    disabledInput: { backgroundColor: '#F9FAFB', borderColor: '#F3F4F6', shadowOpacity: 0 },
     helperText: { fontSize: 12, color: '#9CA3AF', marginTop: 6, marginLeft: 4 }
 });

@@ -1,17 +1,18 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Animated, Modal, TouchableWithoutFeedback, I18nManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Modal, TouchableWithoutFeedback, I18nManager, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
     BookOpen, CreditCard, Headphones, MessageSquare, ShieldCheck, Settings,
-    Gift, CarFront, Tag, Scan, ChevronRight, User, LogOut
+    Gift, Tag, ChevronRight, User, LogOut, ArrowRight, ArrowLeft
 } from 'lucide-react-native';
 import { RootStackParamList } from '../types/navigation';
 import { Colors } from '../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '../context/LanguageContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
 
 interface SideMenuProps {
@@ -25,10 +26,33 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
     const [modalVisible, setModalVisible] = React.useState(false);
     const { t, isRTL } = useLanguage();
 
-    // Define hidden values based on direction
-    const hiddenValue = isRTL ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH;
+    // Calculate correct hidden offset
+    // XOR Logic: If isRTL matches I18nManager.isRTL, we use standard directions. 
+    // If mismatch, we flip.
+    // 
+    // Goal:
+    // Arabic (isRTL=true): Want sidebar on visual Right.
+    // English (isRTL=false): Want sidebar on visual Left.
+    //
+    // Offsets:
+    // Native LTR: Right is +W, Left is -W.
+    // Native RTL: Right is -W, Left is +W.
 
-    // Use hiddenValue as initial value to avoid jump on reload/lang change
+    const getHiddenOffset = () => {
+        const wantsRight = isRTL;
+        const nativeRTL = I18nManager.isRTL;
+
+        if (nativeRTL) {
+            // Native RTL: 0 is Right, +X is Left, -X is Right(offscreen)
+            return wantsRight ? -SIDEBAR_WIDTH : SIDEBAR_WIDTH;
+        } else {
+            // Native LTR: 0 is Left, +X is Right, -X is Left(offscreen)
+            return wantsRight ? SIDEBAR_WIDTH : -SIDEBAR_WIDTH;
+        }
+    };
+
+    const hiddenValue = getHiddenOffset();
+
     const slideAnim = useRef(new Animated.Value(hiddenValue)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -36,9 +60,10 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
 
     useEffect(() => {
         if (visible) {
-            // Reset position before showing (in case language changed while closed)
-            slideAnim.setValue(hiddenValue);
             setModalVisible(true);
+            // Instant reset to hidden position before animating in
+            slideAnim.setValue(hiddenValue);
+
             Animated.parallel([
                 Animated.timing(slideAnim, {
                     toValue: 0,
@@ -67,13 +92,12 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
                 setModalVisible(false);
             });
         }
-    }, [visible, hiddenValue]); // Include hiddenValue dependency
+    }, [visible, isRTL]); // Re-run if RTL changes
 
     if (!modalVisible) return null;
 
     const handleNavigation = (screen: any) => {
         onClose();
-        // Small delay to allow closing animation to start
         setTimeout(() => {
             navigation.navigate(screen);
         }, 300);
@@ -84,154 +108,222 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
         await AsyncStorage.multiRemove(['userSession', 'token']);
         navigation.reset({
             index: 0,
-            routes: [{ name: 'SplashScreen' }],
+            routes: [{ name: 'Auth' as never }],
         });
     };
 
+    // Layout Direction Helper
+    // If isRTL matches native, use Row. If mismatch (simulating), use Row-Reverse.
+    const flexDirection = (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse';
+    const textAlign = isRTL ? 'right' : 'left';
+    const iconMargin = isRTL ? { marginLeft: 16 } : { marginRight: 16 };
+
+    // For specific inner items that need strict row-reverse regardless of container
+    const itemDirection = isRTL ? 'row-reverse' : 'row';
+
     return (
         <Modal transparent visible={modalVisible} onRequestClose={onClose} animationType="none">
-            <View style={[styles.overlay, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]}>
-                {/* Backdrop / Click outside to close */}
+            {/* The Overlay Container determines which side the Sidebar sits on */}
+            <View style={[styles.overlay, { flexDirection }]}>
+
+                {/* Backdrop */}
                 <TouchableWithoutFeedback onPress={onClose}>
                     <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} />
                 </TouchableWithoutFeedback>
 
-                {/* Sidebar Content */}
-                <Animated.View style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}>
-                    <View style={styles.safeArea}>
+                {/* Sidebar */}
+                <Animated.View style={[
+                    styles.sidebar,
+                    { transform: [{ translateX: slideAnim }] }
+                ]}>
+                    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+
                         {/* Header */}
-                        <View style={[styles.header, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]}>
-                            <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                                <Text style={styles.userName}>Salah Ezzat</Text>
-                                <TouchableOpacity style={[styles.editProfileRow, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={() => { /* Navigate to Profile Edit */ }}>
-                                    <Text style={[styles.editProfileText, { marginRight: isRTL ? 0 : 2, marginLeft: isRTL ? 2 : 0 }]}>{t('editPersonalInfo')}</Text>
-                                    <View style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }}>
-                                        <ChevronRight size={14} color="#6B7280" />
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={[styles.avatarContainer, { marginLeft: isRTL ? 0 : 0, marginRight: isRTL ? 0 : 0 }]}>
-                                {/* Using icon as placeholder if no image, user can replace later */}
+                        <TouchableOpacity
+                            style={[styles.header, { flexDirection }]}
+                            onPress={() => handleNavigation('PersonalInformation')}
+                        >
+                            <View style={styles.avatarContainer}>
                                 <User size={30} color="#fff" />
                             </View>
-                        </View>
-
-                        {/* Top Menu Items */}
-                        <View style={styles.menuSection}>
-                            <MenuItem icon={<BookOpen size={22} color="#F97316" />} label={t('myTrips')} onPress={() => handleNavigation('MyTrips')} isRTL={isRTL} />
-                            <MenuItem icon={<CreditCard size={22} color="#10B981" />} label={t('wallet')} onPress={() => handleNavigation('Wallet')} isRTL={isRTL} />
-                            <MenuItem icon={<Headphones size={22} color="#3B82F6" />} label={t('support')} onPress={() => handleNavigation('Help')} isRTL={isRTL} />
-                            <MenuItem icon={<MessageSquare size={22} color="#14B8A6" />} label={t('messages')} onPress={() => handleNavigation('Messages')} isRTL={isRTL} />
-                            <MenuItem icon={<ShieldCheck size={22} color="#3B82F6" />} label={t('safetyCenter')} onPress={() => handleNavigation('Safety')} isRTL={isRTL} />
-                            <MenuItem icon={<Settings size={22} color="#3B82F6" />} label={t('settings')} onPress={() => handleNavigation('Settings')} isRTL={isRTL} />
-                        </View>
+                            <View style={{ flex: 1, marginHorizontal: 12, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                                <Text style={styles.userName}>Salah Ezzat</Text>
+                                <Text style={styles.editProfileText}>{t('viewProfile')}</Text>
+                            </View>
+                            {isRTL ? <ArrowLeft size={16} color="#9CA3AF" /> : <ArrowRight size={16} color="#9CA3AF" />}
+                        </TouchableOpacity>
 
                         <View style={styles.divider} />
 
-                        {/* Bottom Menu Items */}
-                        <View style={styles.menuSection}>
-                            <MenuItem icon={<Gift size={22} color="#F97316" />} label={t('inviteFriends')} onPress={() => handleNavigation('InviteFriends')} isRTL={isRTL} />
-                            <MenuItem icon={<Tag size={22} color="#14B8A6" />} label={t('discounts')} onPress={() => handleNavigation('Discounts')} isRTL={isRTL} />
+                        {/* Menu Items */}
+                        <View style={styles.menuContainer}>
+                            <MenuItem
+                                icon={<BookOpen size={22} color="#F97316" />}
+                                label={t('tripHistory')}
+                                onPress={() => handleNavigation('History')}
+                                isRTL={isRTL}
+                            />
+                            <MenuItem
+                                icon={<CreditCard size={22} color="#10B981" />}
+                                label={t('wallet')}
+                                onPress={() => handleNavigation('Wallet')}
+                                isRTL={isRTL}
+                            />
+                            <MenuItem
+                                icon={<Tag size={22} color="#14B8A6" />}
+                                label={t('discounts')}
+                                onPress={() => handleNavigation('Discounts')}
+                                isRTL={isRTL}
+                            />
+                            <MenuItem
+                                icon={<Headphones size={22} color="#3B82F6" />}
+                                label={t('support')}
+                                onPress={() => handleNavigation('Help')}
+                                isRTL={isRTL}
+                            />
+                            <MenuItem
+                                icon={<MessageSquare size={22} color="#8B5CF6" />}
+                                label={t('messages')}
+                                onPress={() => handleNavigation('Messages')}
+                                isRTL={isRTL}
+                            />
+                            <MenuItem
+                                icon={<ShieldCheck size={22} color="#EF4444" />}
+                                label={t('safetyCenter')}
+                                onPress={() => handleNavigation('Safety')}
+                                isRTL={isRTL}
+                            />
+                            <MenuItem
+                                icon={<Settings size={22} color="#6B7280" />}
+                                label={t('settings')}
+                                onPress={() => handleNavigation('Settings')}
+                                isRTL={isRTL}
+                            />
+                            <MenuItem
+                                icon={<Gift size={22} color="#EC4899" />}
+                                label={t('inviteFriends')}
+                                onPress={() => handleNavigation('InviteFriends')}
+                                isRTL={isRTL}
+                            />
+                        </View>
 
-                            {/* Sign Out */}
-                            <TouchableOpacity style={[styles.menuItem, { marginTop: 12, flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={handleSignOut}>
+                        {/* Footer */}
+                        <View style={styles.footer}>
+                            <TouchableOpacity style={[styles.menuItem, { flexDirection }]} onPress={handleSignOut}>
                                 <View style={styles.iconBox}>
                                     <LogOut size={22} color={Colors.danger} />
                                 </View>
-                                <Text style={[styles.menuLabel, { color: Colors.danger, textAlign: isRTL ? 'right' : 'left' }]}>{t('signOut')}</Text>
+                                <Text style={[styles.menuLabel, { color: Colors.danger }]}>{t('signOut')}</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
+
+                    </SafeAreaView>
                 </Animated.View>
             </View>
         </Modal>
     );
 }
 
-const MenuItem = ({ icon, label, onPress, isRTL }: { icon: React.ReactNode, label: string, onPress: () => void, isRTL: boolean }) => (
-    <TouchableOpacity style={[styles.menuItem, { flexDirection: (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse' }]} onPress={onPress}>
-        <View style={styles.iconBox}>
-            {icon}
-        </View>
-        <Text style={[styles.menuLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
-    </TouchableOpacity>
-);
+const MenuItem = ({ icon, label, onPress, isRTL }: { icon: React.ReactNode, label: string, onPress: () => void, isRTL: boolean }) => {
+    // If simulating RTL (Ar but Native LTR), we need row-reverse.
+    // If simulating LTR (En but Native RTL), we need row-reverse.
+    // Basically if isRTL != NativeRTL, use row-reverse.
+    // Wait, simpler:
+    // If isRTL: we want [Label ... Icon] ? No, sidebar usually [Icon Label]
+    // Standard Sidebar: [Icon] [Label]
+    // Arabic Sidebar: [Label] [Icon]? No, usually [Icon] [Label] right aligned.
+    // Actually, standard material design RTL: [Icon] [Label] but aligned start (Right).
+
+    // So we just want 'row' direction always (Start -> End), but the 'Start' changes.
+    // If Native LTR + Ar: Start is Left. We want Right. So 'row-reverse'.
+    // If Native RTL + Ar: Start is Right. We want Right. So 'row'.
+
+    const flexDirection = (isRTL === I18nManager.isRTL) ? 'row' : 'row-reverse';
+
+    return (
+        <TouchableOpacity style={[styles.menuItem, { flexDirection }]} onPress={onPress}>
+            <View style={styles.iconBox}>
+                {icon}
+            </View>
+            <Text style={[styles.menuLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+        </TouchableOpacity>
+    );
+};
 
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        // flexDirection set dynamically
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.4)',
-        width: width, // Ensure covers full screen
     },
     sidebar: {
         width: SIDEBAR_WIDTH,
         height: '100%',
         backgroundColor: '#fff',
         shadowColor: '#000',
-        shadowOffset: { width: 4, height: 0 },
-        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
         shadowRadius: 10,
         elevation: 10,
     },
     safeArea: {
         flex: 1,
-        paddingTop: 60, // Adjust for status bar
-        paddingHorizontal: 24,
+        paddingTop: 20,
+        paddingHorizontal: 20,
     },
     header: {
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 40,
-        // flexDirection set dynamically
+        paddingVertical: 20,
     },
     userName: {
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: 'bold',
         color: '#111827',
-        marginBottom: 4,
-    },
-    editProfileRow: {
-        alignItems: 'center',
-        // flexDirection set dynamically
     },
     editProfileText: {
         fontSize: 14,
-        color: '#6B7280',
-        // margin set dynamically
+        color: Colors.primary,
+        marginTop: 2,
     },
     avatarContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#3B82F6', // Using blue bg placeholder like image
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#3B82F6',
         alignItems: 'center',
         justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    menuSection: {
-        gap: 24,
-    },
-    menuItem: {
-        alignItems: 'center',
-        gap: 16,
-        // flexDirection set dynamically
-    },
-    iconBox: {
-        width: 24,
-        alignItems: 'center',
-    },
-    menuLabel: {
-        fontSize: 16,
-        color: '#111827',
-        fontWeight: '500',
     },
     divider: {
         height: 1,
         backgroundColor: '#F3F4F6',
-        marginVertical: 24,
+        marginVertical: 10,
     },
+    menuContainer: {
+        flex: 1,
+        paddingTop: 10,
+    },
+    menuItem: {
+        alignItems: 'center',
+        paddingVertical: 12,
+        marginBottom: 8,
+    },
+    iconBox: {
+        width: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    menuLabel: {
+        fontSize: 16,
+        color: '#374151',
+        fontWeight: '500',
+        flex: 1,
+        marginHorizontal: 12,
+    },
+    footer: {
+        paddingVertical: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+    }
 });

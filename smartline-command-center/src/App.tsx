@@ -17,11 +17,12 @@ import Trips from "./pages/Trips";
 import Customers from "./pages/Customers";
 import Wallet from "./pages/Wallet";
 import Promos from "./pages/Promos";
+import PromoBanners from '@/pages/PromoBanners';
 import Support from "./pages/Support";
 import Safety from "./pages/Safety";
 import Settings from "./pages/Settings";
 import Members from "./pages/Members";
-import AppPopups from "./pages/AppPopups";
+import AppPopups from '@/pages/AppPopups';
 import SurgeZones from "./pages/SurgeZones";
 import NotFound from "./pages/NotFound";
 
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/withdrawal-requests" element={<ProtectedPage page="withdrawal_requests"><WithdrawalRequests /></ProtectedPage>} />
             <Route path="/promos" element={<ProtectedPage page="promos"><Promos /></ProtectedPage>} />
             <Route path="/popups" element={<ProtectedPage page="popups" requiredRoles={['super_admin', 'admin']}><AppPopups /></ProtectedPage>} />
+            <Route path="/promo-banners" element={<ProtectedPage page="promo_banners" requiredRoles={['super_admin', 'admin']}><PromoBanners /></ProtectedPage>} />
             <Route path="/surge-zones" element={<ProtectedPage page="surge_zones" requiredRoles={['super_admin', 'admin']}><SurgeZones /></ProtectedPage>} />
             <Route path="/support" element={<ProtectedPage page="support"><Support /></ProtectedPage>} />
             <Route path="/safety" element={<ProtectedPage page="safety"><Safety /></ProtectedPage>} />

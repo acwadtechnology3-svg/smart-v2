@@ -32,6 +32,7 @@ export type RootStackParamList = {
     MyTrips: undefined;
     Discounts: undefined;
     Help: undefined;
+    CustomerSupportChat: { ticketId?: string; subject?: string };
     Messages: undefined;
     Chat: { driverName: string; tripId?: string; role?: 'customer' | 'driver' };
     Safety: { tripId?: string };

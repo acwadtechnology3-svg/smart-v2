@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Linking, RefreshControl, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, ScrollView, ActivityIndicator, Linking, RefreshControl, Platform, I18nManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronRight, CreditCard, Banknote, PlusCircle, Wallet as WalletIcon, Check, X, ArrowDownLeft, Wallet } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { Colors } from '../../constants/Colors';
 import { apiRequest } from '../../services/backend';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { useLanguage } from '../../context/LanguageContext';
 
 type PaymentMethod = 'balance' | 'cash' | 'card';
 
@@ -25,6 +26,16 @@ interface Transaction {
 
 export default function WalletScreen() {
     const navigation = useNavigation();
+    const { t, isRTL } = useLanguage();
+
+    // RTL Layout Logic
+    const isSimulating = isRTL !== I18nManager.isRTL;
+    const flexDirection = isSimulating ? 'row-reverse' : 'row';
+    const textAlign = isRTL ? 'right' : 'left';
+    const iconMargin = isRTL ? { marginLeft: 16, marginRight: 0 } : { marginRight: 16, marginLeft: 0 };
+    const iconMarginSmall = isRTL ? { marginLeft: 12, marginRight: 0 } : { marginRight: 12, marginLeft: 0 };
+
+
     const [balance, setBalance] = useState<number | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
@@ -131,9 +142,9 @@ export default function WalletScreen() {
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { flexDirection }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={Colors.textPrimary} />
+                    <ArrowLeft size={24} color={Colors.textPrimary} style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>SmartLine Pay</Text>
                 <View style={{ width: 24 }} />
@@ -152,10 +163,10 @@ export default function WalletScreen() {
 
                 {/* Balance Section - Click to Top Up */}
                 <View style={styles.balanceSection}>
-                    <Text style={styles.balanceLabel}>Total Balance</Text>
-                    <TouchableOpacity style={styles.balanceRow} onPress={() => setShowTopUp(true)}>
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                            <Text style={styles.currency}>EGP</Text>
+                    <Text style={[styles.balanceLabel, { textAlign }]}>{t('totalBalance') || 'Total Balance'}</Text>
+                    <TouchableOpacity style={[styles.balanceRow, { flexDirection }]} onPress={() => setShowTopUp(true)}>
+                        <View style={{ flexDirection: flexDirection, alignItems: 'baseline', gap: 6 }}>
+                            <Text style={styles.currency}>{t('currency') || 'EGP'}</Text>
                             {loading ? (
                                 <ActivityIndicator color={Colors.textPrimary} />
                             ) : (
@@ -164,7 +175,7 @@ export default function WalletScreen() {
                         </View>
                         <View style={styles.topUpBadge}>
                             <PlusCircle size={14} color="#fff" />
-                            <Text style={styles.topUpText}>Top Up</Text>
+                            <Text style={styles.topUpText}>{t('topUp') || 'Top Up'}</Text>
                         </View>
                     </TouchableOpacity>
                 </View>
@@ -172,19 +183,19 @@ export default function WalletScreen() {
                 {/* Divider Line */}
                 <View style={styles.divider} />
 
-                <Text style={styles.sectionHeader}>Payment Methods</Text>
+                <Text style={[styles.sectionHeader, { textAlign }]}>{t('paymentMethods') || 'Payment Methods'}</Text>
 
                 {/* Payment Methods List */}
                 <View style={styles.listContainer}>
                     {/* SmartLine Balance Item */}
                     <TouchableOpacity
-                        style={[styles.itemRow, selectedMethod === 'balance' && styles.selectedItemRow]}
+                        style={[styles.itemRow, selectedMethod === 'balance' && styles.selectedItemRow, { flexDirection }]}
                         onPress={() => setSelectedMethod('balance')}
                     >
-                        <View style={[styles.iconBox, { backgroundColor: '#EFF6FF' }]}>
+                        <View style={[styles.iconBox, { backgroundColor: '#EFF6FF' }, iconMargin]}>
                             <WalletIcon size={20} color={Colors.primary} fill={selectedMethod === 'balance' ? Colors.primary : "none"} />
                         </View>
-                        <Text style={[styles.itemTitle, selectedMethod === 'balance' && styles.selectedItemTitle]}>SmartLine Balance</Text>
+                        <Text style={[styles.itemTitle, selectedMethod === 'balance' && styles.selectedItemTitle]}>{t('smartLineBalance') || 'SmartLine Balance'}</Text>
                         <View style={{ flex: 1 }} />
                         {selectedMethod === 'balance' && <Check size={20} color={Colors.primary} />}
                     </TouchableOpacity>
@@ -193,13 +204,13 @@ export default function WalletScreen() {
 
                     {/* Cash Item */}
                     <TouchableOpacity
-                        style={[styles.itemRow, selectedMethod === 'cash' && styles.selectedItemRow]}
+                        style={[styles.itemRow, selectedMethod === 'cash' && styles.selectedItemRow, { flexDirection }]}
                         onPress={() => setSelectedMethod('cash')}
                     >
-                        <View style={[styles.iconBox, { backgroundColor: '#F3F4F6' }]}>
+                        <View style={[styles.iconBox, { backgroundColor: '#F3F4F6' }, iconMargin]}>
                             <Banknote size={20} color={Colors.textSecondary} />
                         </View>
-                        <Text style={[styles.itemTitle, selectedMethod === 'cash' && styles.selectedItemTitle]}>Cash</Text>
+                        <Text style={[styles.itemTitle, selectedMethod === 'cash' && styles.selectedItemTitle]}>{t('cash') || 'Cash'}</Text>
                         <View style={{ flex: 1 }} />
                         {selectedMethod === 'cash' && <Check size={20} color={Colors.primary} />}
                     </TouchableOpacity>
@@ -207,42 +218,42 @@ export default function WalletScreen() {
                     <View style={styles.listDivider} />
 
                     {/* Add Card Item */}
-                    <TouchableOpacity style={styles.itemRow} onPress={() => setShowAddCard(true)}>
-                        <View style={[styles.iconBox, { backgroundColor: '#F0FDF4' }]}>
+                    <TouchableOpacity style={[styles.itemRow, { flexDirection }]} onPress={() => setShowAddCard(true)}>
+                        <View style={[styles.iconBox, { backgroundColor: '#F0FDF4' }, iconMargin]}>
                             <PlusCircle size={20} color={Colors.success} />
                         </View>
                         <View>
-                            <Text style={styles.itemTitle}>Credit / Debit Card</Text>
-                            <Text style={styles.itemSubtitle}>Visa • Mastercard • Meeza</Text>
+                            <Text style={[styles.itemTitle, { textAlign }]}>{t('creditDebitCard') || 'Credit / Debit Card'}</Text>
+                            <Text style={[styles.itemSubtitle, { textAlign }]}>Visa • Mastercard • Meeza</Text>
                         </View>
                         <View style={{ flex: 1 }} />
-                        <ChevronRight size={20} color={Colors.border} />
+                        <ChevronRight size={20} color={Colors.border} style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Transaction History */}
-                <Text style={styles.sectionHeader}>Recent Transactions</Text>
+                <Text style={[styles.sectionHeader, { textAlign }]}>{t('recentTransactions') || 'Recent Transactions'}</Text>
                 {transactions.length === 0 ? (
-                    <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>No transactions yet</Text>
+                    <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>{t('noTransactions') || 'No transactions yet'}</Text>
                 ) : (
                     transactions.slice(0, 10).map((tx) => (
-                        <View key={tx.id} style={styles.txCard}>
-                            <View style={styles.txIcon}>
+                        <View key={tx.id} style={[styles.txCard, { flexDirection }]}>
+                            <View style={[styles.txIcon, iconMarginSmall]}>
                                 {tx.type === 'deposit' ? (
                                     <ArrowDownLeft size={20} color="#10B981" />
                                 ) : (
                                     <Wallet size={20} color={Colors.primary} />
                                 )}
                             </View>
-                            <View style={styles.txInfo}>
+                            <View style={[styles.txInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
                                 <Text style={styles.txTitle}>
-                                    {tx.type === 'deposit' ? 'Deposit' : tx.type === 'payment' ? 'Payment' : 'Transaction'}
+                                    {tx.type === 'deposit' ? (t('deposit') || 'Deposit') : tx.type === 'payment' ? (t('payment') || 'Payment') : (t('transaction') || 'Transaction')}
                                 </Text>
                                 <Text style={styles.txDate}>{new Date(tx.created_at).toLocaleString()}</Text>
                             </View>
-                            <View style={{ alignItems: 'flex-end' }}>
+                            <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
                                 <Text style={[styles.txAmount, { color: tx.amount > 0 ? '#10B981' : '#111827' }]}>
-                                    {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)} EGP
+                                    {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)} {t('currency') || 'EGP'}
                                 </Text>
                                 <View style={[styles.statusBadge, { backgroundColor: (tx.status === 'completed' ? '#10B981' : tx.status === 'pending' ? '#F59E0B' : '#EF4444') + '20' }]}>
                                     <Text style={[styles.statusText, { color: tx.status === 'completed' ? '#10B981' : tx.status === 'pending' ? '#F59E0B' : '#EF4444' }]}>
@@ -259,15 +270,15 @@ export default function WalletScreen() {
             <Modal visible={showTopUp} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Top Up Balance</Text>
+                        <View style={[styles.modalHeader, { flexDirection }]}>
+                            <Text style={styles.modalTitle}>{t('topUpBalance') || 'Top Up Balance'}</Text>
                             <TouchableOpacity onPress={() => setShowTopUp(false)}>
                                 <X size={24} color={Colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.inputLabel}>Enter Amount (EGP)</Text>
+                        <Text style={[styles.inputLabel, { textAlign }]}>{t('enterAmount') || 'Enter Amount'} ({t('currency') || 'EGP'})</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { textAlign }]}
                             placeholder="0.00"
                             keyboardType="numeric"
                             value={topUpAmount}
@@ -282,7 +293,7 @@ export default function WalletScreen() {
                             {toppingUp ? (
                                 <ActivityIndicator color="#fff" />
                             ) : (
-                                <Text style={styles.modalButtonText}>Confirm Top Up</Text>
+                                <Text style={styles.modalButtonText}>{t('confirmTopUp') || 'Confirm Top Up'}</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -293,17 +304,17 @@ export default function WalletScreen() {
             <Modal visible={showAddCard} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Add New Card</Text>
+                        <View style={[styles.modalHeader, { flexDirection }]}>
+                            <Text style={styles.modalTitle}>{t('addNewCard') || 'Add New Card'}</Text>
                             <TouchableOpacity onPress={() => setShowAddCard(false)}>
                                 <X size={24} color={Colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Card Number</Text>
+                            <Text style={[styles.inputLabel, { textAlign }]}>{t('cardNumber') || 'Card Number'}</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { textAlign }]}
                                 placeholder="0000 0000 0000 0000"
                                 keyboardType="number-pad"
                                 value={cardNumber}
@@ -312,11 +323,11 @@ export default function WalletScreen() {
                             />
                         </View>
 
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <View style={{ flexDirection: flexDirection, gap: 12 }}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.inputLabel}>Expiry</Text>
+                                <Text style={[styles.inputLabel, { textAlign }]}>{t('expiry') || 'Expiry'}</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { textAlign }]}
                                     placeholder="MM/YY"
                                     keyboardType="numeric"
                                     value={cardExpiry}
@@ -325,9 +336,9 @@ export default function WalletScreen() {
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.inputLabel}>CVC</Text>
+                                <Text style={[styles.inputLabel, { textAlign }]}>{t('cvc') || 'CVC'}</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { textAlign }]}
                                     placeholder="123"
                                     keyboardType="numeric"
                                     value={cardCVC}
@@ -338,7 +349,7 @@ export default function WalletScreen() {
                         </View>
 
                         <TouchableOpacity style={styles.modalButton} onPress={handleAddCard}>
-                            <Text style={styles.modalButtonText}>Verify & Add Card</Text>
+                            <Text style={styles.modalButtonText}>{t('verifyAndAdd') || 'Verify & Add Card'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -350,7 +361,6 @@ export default function WalletScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
     header: {
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
@@ -371,7 +381,7 @@ const styles = StyleSheet.create({
 
     balanceSection: { marginBottom: 24, marginTop: 8 },
     balanceLabel: { fontSize: 15, fontWeight: '600', color: Colors.textSecondary, marginBottom: 8 },
-    balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    balanceRow: { alignItems: 'center', justifyContent: 'space-between' },
     currency: { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary },
     amount: { fontSize: 48, fontWeight: 'bold', color: Colors.textPrimary, lineHeight: 56 },
     topUpBadge: {
@@ -386,9 +396,9 @@ const styles = StyleSheet.create({
     sectionHeader: { fontSize: 14, fontWeight: 'bold', color: Colors.textSecondary, marginBottom: 12, textTransform: 'uppercase' },
 
     listContainer: { marginTop: 8 },
-    itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderRadius: 12, paddingHorizontal: 8 },
+    itemRow: { alignItems: 'center', paddingVertical: 18, borderRadius: 12, paddingHorizontal: 8 },
     selectedItemRow: { backgroundColor: '#F0F9FF' }, // Light blue highlights
-    iconBox: { width: 44, height: 32, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+    iconBox: { width: 44, height: 32, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }, // Margins handled by style prop
     itemTitle: { fontSize: 16, fontWeight: '600', color: Colors.textPrimary },
     selectedItemTitle: { color: Colors.primary },
     itemSubtitle: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
@@ -396,12 +406,12 @@ const styles = StyleSheet.create({
 
     // Transaction Styles
     txCard: {
-        flexDirection: 'row', alignItems: 'center',
+        alignItems: 'center',
         backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 8
     },
     txIcon: {
         width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6',
-        alignItems: 'center', justifyContent: 'center', marginRight: 12
+        alignItems: 'center', justifyContent: 'center'
     },
     txInfo: { flex: 1 },
     txTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
@@ -413,7 +423,7 @@ const styles = StyleSheet.create({
     // Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContent: { backgroundColor: '#fff', padding: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    modalHeader: { justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary },
     inputGroup: { marginBottom: 16 },
     inputLabel: { fontSize: 14, fontWeight: 'bold', color: Colors.textSecondary, marginBottom: 8 },

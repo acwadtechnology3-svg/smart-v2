@@ -26,6 +26,7 @@ import surgeRoutes from './routes/surgeRoutes';
 import driverPreferenceRoutes from './routes/driverPreferenceRoutes';
 import chatbotRoutes from './routes/chatbotRoutes';
 import intercityRoutes from './routes/intercityRoutes';
+import bannerRoutes from './routes/bannerRoutes';
 import { checkDatabaseConnection } from './config/database';
 import { checkRedisConnection } from './config/redis';
 import { startLocationSync } from './workers/locationSyncWorker';
@@ -93,6 +94,7 @@ app.use('/api/surge', surgeRoutes);
 app.use('/api/drivers/preferences', driverPreferenceRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/intercity', intercityRoutes);
+app.use('/api/banners', bannerRoutes);
 
 // ===== Health Check =====
 app.get('/health', async (req, res) => {

@@ -28,6 +28,7 @@ import WalletScreen from '../screens/Customer/WalletScreen';
 import MyTripsScreen from '../screens/Customer/MyTripsScreen';
 import DiscountsScreen from '../screens/Customer/DiscountsScreen';
 import ChatScreen from '../screens/Customer/ChatScreen';
+import CustomerSupportChatScreen from '../screens/Customer/SupportChatScreen';
 import DriverHomeScreen from '../screens/Driver/DriverHomeScreen';
 
 import HelpScreen from '../screens/Menu/HelpScreen';
@@ -106,6 +107,7 @@ export default function AppNavigator() {
 
                 {/* Menu Screens */}
                 <Stack.Screen name="Help" component={HelpScreen} />
+                <Stack.Screen name="CustomerSupportChat" component={CustomerSupportChatScreen} />
                 <Stack.Screen name="Messages" component={MessagesScreen} />
                 <Stack.Screen name="Safety" component={SafetyScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator, Platform, I18nManager } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, User, Bell, Globe, ChevronRight, Trash2 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiRequest } from '../../services/backend';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '../../context/LanguageContext';
+import { StatusBar } from 'expo-status-bar';
 
 export default function SettingsScreen() {
     const navigation = useNavigation();
@@ -116,13 +118,22 @@ export default function SettingsScreen() {
         );
     }
 
-    const rowStyle = { flexDirection: isRTL ? 'row-reverse' : 'row' } as any;
-    const textAlign = { textAlign: isRTL ? 'right' : 'left' } as any;
+    // Determine effective layout direction
+    // If we are Simulating (isRTL != NativeRTL), we flip.
+    // If not simulating (Native Matches Context), we use 'row'.
+    const isSimulating = isRTL !== I18nManager.isRTL;
+    const flexDirection = isSimulating ? 'row-reverse' : 'row';
+    const textAlign = isRTL ? 'right' : 'left';
+
+    const rowStyle = { flexDirection } as any;
+    const paddingStyle = isRTL ? { marginRight: 0, marginLeft: 12 } : { marginRight: 12, marginLeft: 0 };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }}>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <StatusBar style="dark" />
+
+            <View style={[styles.header, { flexDirection }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <ArrowLeft size={24} color="#1e1e1e" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('settings')}</Text>
@@ -131,21 +142,22 @@ export default function SettingsScreen() {
 
             <ScrollView contentContainerStyle={styles.content}>
 
-                <Text style={[styles.sectionHeader, textAlign]}>{t('account')}</Text>
+                <Text style={[styles.sectionHeader, { textAlign }]}>{t('account')}</Text>
                 <View style={styles.groupContainer}>
                     <SettingItem
                         icon={<User size={20} color="#3B82F6" />}
                         label={t('personalInfo')}
                         onPress={() => navigation.navigate('PersonalInformation' as never)}
                         isRTL={isRTL}
+                        flexDirection={flexDirection}
                     />
                 </View>
 
-                <Text style={[styles.sectionHeader, textAlign]}>{t('preferences')}</Text>
+                <Text style={[styles.sectionHeader, { textAlign }]}>{t('preferences')}</Text>
                 <View style={[styles.groupContainer, { paddingBottom: 16 }]}>
                     <View style={[styles.row, rowStyle]}>
                         <View style={[styles.rowLeft, rowStyle]}>
-                            <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
+                            <View style={[styles.iconBox, paddingStyle]}>
                                 <Bell size={20} color="#10B981" />
                             </View>
                             <Text style={styles.label}>{t('notifications')}</Text>
@@ -163,7 +175,7 @@ export default function SettingsScreen() {
                     {/* Improved Language Selection UI */}
                     <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
                         <View style={[rowStyle, { alignItems: 'center', marginBottom: 12 }]}>
-                            <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
+                            <View style={[styles.iconBox, paddingStyle]}>
                                 <Globe size={20} color="#F59E0B" />
                             </View>
                             <Text style={styles.label}>{t('language')}</Text>
@@ -189,7 +201,7 @@ export default function SettingsScreen() {
                 <View style={styles.dangerZone}>
                     <TouchableOpacity style={[
                         styles.deleteBtn,
-                        { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                        { flexDirection }
                     ]} onPress={handleDeleteAccount}>
                         <Trash2 size={20} color="#DC2626" />
                         <Text style={styles.deleteText}>{t('deleteAccount')}</Text>
@@ -202,16 +214,16 @@ export default function SettingsScreen() {
     );
 }
 
-const SettingItem = ({ icon, label, value, onPress, isRTL }: { icon: any, label: string, value?: string, onPress?: () => void, isRTL: boolean }) => (
-    <TouchableOpacity style={[styles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={onPress}>
-        <View style={[styles.rowLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
+const SettingItem = ({ icon, label, value, onPress, isRTL, flexDirection }: { icon: any, label: string, value?: string, onPress?: () => void, isRTL: boolean, flexDirection: any }) => (
+    <TouchableOpacity style={[styles.row, { flexDirection }]} onPress={onPress}>
+        <View style={[styles.rowLeft, { flexDirection }]}>
+            <View style={[styles.iconBox, isRTL ? { marginLeft: 12 } : { marginRight: 12 }]}>
                 {icon}
             </View>
             <Text style={styles.label}>{label}</Text>
         </View>
-        <View style={[styles.rowRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            {value && <Text style={[styles.value, { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>{value}</Text>}
+        <View style={[styles.rowRight, { flexDirection }]}>
+            {value && <Text style={[styles.value, isRTL ? { marginLeft: 8 } : { marginRight: 8 }]}>{value}</Text>}
             <View style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }}>
                 <ChevronRight size={20} color="#9CA3AF" />
             </View>
@@ -226,7 +238,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingBottom: 20,
-        paddingTop: Platform.OS === 'android' ? 50 : 20,
+        paddingTop: 20, // SafeAreaView handles the top inset
         backgroundColor: '#fff',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },

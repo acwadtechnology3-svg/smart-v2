@@ -376,8 +376,22 @@ export default function DriverWalletScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
-    header: { alignItems: 'center', justifyContent: 'space-between', padding: 20 },
-    headerTitle: { fontSize: 20, fontWeight: 'bold' },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: Platform.OS === 'android' ? 50 : 20,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
+        zIndex: 10
+    },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
 
     content: { flex: 1, paddingHorizontal: 20 },
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
-import { ArrowLeft, User, Bell, Lock, Globe, Moon, ChevronRight, LogOut, Trash2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Switch, Alert, ActivityIndicator, Platform } from 'react-native';
+import { ArrowLeft, User, Bell, Globe, ChevronRight, Trash2 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { apiRequest } from '../../services/backend';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,27 +10,47 @@ export default function SettingsScreen() {
     const navigation = useNavigation();
     const { t, language, setLanguage, isRTL } = useLanguage();
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [darkMode, setDarkMode] = useState(false);
 
     useEffect(() => {
-        loadSettings();
+        loadSettings(true);
     }, []);
 
-    const loadSettings = async () => {
+    const loadSettings = async (withLoading = false) => {
         try {
-            setLoading(true);
-            const data = await apiRequest<{ user: any }>('/users/me');
-            setUser(data.user);
+            // 1. Try to load from cache first for instant UI
+            const session = await AsyncStorage.getItem('userSession');
+            if (session) {
+                const { user: cachedUser } = JSON.parse(session);
+                if (cachedUser) {
+                    setUser(cachedUser);
+                    if (cachedUser.preferences) {
+                        setNotificationsEnabled(cachedUser.preferences.notifications ?? true);
+                    }
+                }
+            }
 
-            if (data.user?.preferences) {
-                setNotificationsEnabled(data.user.preferences.notifications ?? true);
-                setDarkMode(data.user.preferences.darkMode ?? false);
+            if (withLoading && !user) setLoading(true);
+
+            // 2. Fetch latest data from server
+            const data = await apiRequest<{ user: any }>('/users/me');
+            if (data?.user) {
+                setUser(data.user);
+                // Background update cache
+                if (session) {
+                    const parsed = JSON.parse(session);
+                    await AsyncStorage.setItem('userSession', JSON.stringify({ ...parsed, user: data.user }));
+                }
+
+                if (data.user.preferences) {
+                    setNotificationsEnabled(data.user.preferences.notifications ?? true);
+                }
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
+            // If fetch failed, we already have cached data in 'user' state if available
         } finally {
             setLoading(false);
         }
@@ -39,11 +59,9 @@ export default function SettingsScreen() {
     const updatePreference = async (key: string, value: boolean) => {
         try {
             if (key === 'notifications') setNotificationsEnabled(value);
-            if (key === 'darkMode') setDarkMode(value);
 
             const updatedPreferences = {
                 notifications: key === 'notifications' ? value : notificationsEnabled,
-                darkMode: key === 'darkMode' ? value : darkMode,
             };
 
             await apiRequest('/users/profile', {
@@ -55,42 +73,9 @@ export default function SettingsScreen() {
         } catch (error: any) {
             Alert.alert(t('error'), t('updateFailed'));
             if (key === 'notifications') setNotificationsEnabled(!value);
-            if (key === 'darkMode') setDarkMode(!value);
         }
     };
 
-    const handleLanguageChange = () => {
-        Alert.alert(
-            t('selectLanguage'),
-            "",
-            [
-                { text: t('english'), onPress: () => setLanguage('en') },
-                { text: t('arabic'), onPress: () => setLanguage('ar') },
-                { text: t('cancel'), style: 'cancel' }
-            ]
-        );
-    };
-
-    const handleLogout = async () => {
-        Alert.alert(
-            t('signOut'),
-            t('confirmLogout'),
-            [
-                { text: t('cancel'), style: "cancel" },
-                {
-                    text: t('signOut'),
-                    style: "destructive",
-                    onPress: async () => {
-                        await AsyncStorage.multiRemove(['userSession', 'token']);
-                        navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'Auth' as never }],
-                        });
-                    }
-                }
-            ]
-        );
-    };
 
     const handleDeleteAccount = async () => {
         Alert.alert(
@@ -147,74 +132,69 @@ export default function SettingsScreen() {
             <ScrollView contentContainerStyle={styles.content}>
 
                 <Text style={[styles.sectionHeader, textAlign]}>{t('account')}</Text>
-
-                {/* Note: In a real implementation we would translate 'Personal Information' etc too */}
-                <SettingItem
-                    icon={<User size={20} color="#4B5563" />}
-                    label={t('personalInfo')}
-                    onPress={() => navigation.navigate('PersonalInformation' as never)}
-                    isRTL={isRTL}
-                />
-                <SettingItem
-                    icon={<Lock size={20} color="#4B5563" />}
-                    label={t('securityLogin')}
-                    onPress={() => navigation.navigate('ChangePassword' as never)}
-                    isRTL={isRTL}
-                />
+                <View style={styles.groupContainer}>
+                    <SettingItem
+                        icon={<User size={20} color="#3B82F6" />}
+                        label={t('personalInfo')}
+                        onPress={() => navigation.navigate('PersonalInformation' as never)}
+                        isRTL={isRTL}
+                    />
+                </View>
 
                 <Text style={[styles.sectionHeader, textAlign]}>{t('preferences')}</Text>
-
-                <View style={[styles.row, rowStyle]}>
-                    <View style={[styles.rowLeft, rowStyle]}>
-                        <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
-                            <Bell size={20} color="#4B5563" />
+                <View style={[styles.groupContainer, { paddingBottom: 16 }]}>
+                    <View style={[styles.row, rowStyle]}>
+                        <View style={[styles.rowLeft, rowStyle]}>
+                            <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
+                                <Bell size={20} color="#10B981" />
+                            </View>
+                            <Text style={styles.label}>{t('notifications')}</Text>
                         </View>
-                        <Text style={styles.label}>{t('notifications')}</Text>
+                        <Switch
+                            value={notificationsEnabled}
+                            onValueChange={(val) => updatePreference('notifications', val)}
+                            trackColor={{ false: '#E5E7EB', true: '#10B981' }}
+                            thumbColor={Platform.OS === 'ios' ? undefined : (notificationsEnabled ? '#fff' : '#f4f3f4')}
+                        />
                     </View>
-                    <Switch
-                        value={notificationsEnabled}
-                        onValueChange={(val) => updatePreference('notifications', val)}
-                        trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
-                    />
+
+                    <View style={styles.divider} />
+
+                    {/* Improved Language Selection UI */}
+                    <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+                        <View style={[rowStyle, { alignItems: 'center', marginBottom: 12 }]}>
+                            <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
+                                <Globe size={20} color="#F59E0B" />
+                            </View>
+                            <Text style={styles.label}>{t('language')}</Text>
+                        </View>
+
+                        <View style={[styles.langSelector, rowStyle]}>
+                            <TouchableOpacity
+                                style={[styles.langOption, language === 'en' && styles.langOptionActive]}
+                                onPress={() => setLanguage('en')}
+                            >
+                                <Text style={[styles.langText, language === 'en' && styles.langTextActive]}>English</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.langOption, language === 'ar' && styles.langOptionActive]}
+                                onPress={() => setLanguage('ar')}
+                            >
+                                <Text style={[styles.langText, language === 'ar' && styles.langTextActive, { fontFamily: 'Outfit' }]}>العربية</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
 
-                <SettingItem
-                    icon={<Globe size={20} color="#4B5563" />}
-                    label={t('language')}
-                    value={language === 'ar' ? t('arabic') : t('english')}
-                    onPress={handleLanguageChange}
-                    isRTL={isRTL}
-                />
-
-                <View style={[styles.row, rowStyle]}>
-                    <View style={[styles.rowLeft, rowStyle]}>
-                        <View style={[styles.iconBox, { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }]}>
-                            <Moon size={20} color="#4B5563" />
-                        </View>
-                        <Text style={styles.label}>{t('darkMode')}</Text>
-                    </View>
-                    <Switch
-                        value={darkMode}
-                        onValueChange={(val) => updatePreference('darkMode', val)}
-                        trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
-                    />
+                <View style={styles.dangerZone}>
+                    <TouchableOpacity style={[
+                        styles.deleteBtn,
+                        { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                    ]} onPress={handleDeleteAccount}>
+                        <Trash2 size={20} color="#DC2626" />
+                        <Text style={styles.deleteText}>{t('deleteAccount')}</Text>
+                    </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity style={[
-                    styles.logoutBtn,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' }
-                ]} onPress={handleLogout}>
-                    <LogOut size={20} color="#EF4444" />
-                    <Text style={styles.logoutText}>{t('signOut')}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[
-                    styles.deleteBtn,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' }
-                ]} onPress={handleDeleteAccount}>
-                    <Trash2 size={20} color="#DC2626" />
-                    <Text style={styles.deleteText}>{t('deleteAccount')}</Text>
-                </TouchableOpacity>
 
                 <Text style={styles.versionText}>{t('version')} 1.0.0</Text>
             </ScrollView>
@@ -241,29 +221,85 @@ const SettingItem = ({ icon, label, value, onPress, isRTL }: { icon: any, label:
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
-    header: { alignItems: 'center', justifyContent: 'space-between', padding: 20, backgroundColor: '#fff' },
+    header: {
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: Platform.OS === 'android' ? 50 : 20,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
+        zIndex: 10
+    },
     headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
-    content: { padding: 20 },
-    sectionHeader: { fontSize: 13, fontWeight: 'bold', color: '#9CA3AF', marginBottom: 8, marginTop: 16, textTransform: 'uppercase' },
+    content: { paddingHorizontal: 16, paddingTop: 10 },
+    sectionHeader: { fontSize: 13, fontWeight: '700', color: '#9CA3AF', marginBottom: 10, marginTop: 20, textTransform: 'uppercase', paddingHorizontal: 10 },
+    groupContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
     row: {
-        alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 8,
-        shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 2, elevation: 1
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
     },
-    rowLeft: { alignItems: 'center' },
-    iconBox: {},
-    label: { fontSize: 16, color: '#1F2937', fontWeight: '500', marginTop: 4 },
-    rowRight: { alignItems: 'center', marginTop: 4 },
-    value: { color: '#6B7280' },
-    logoutBtn: {
-        alignItems: 'center', justifyContent: 'center',
-        backgroundColor: '#FEE2E2', padding: 16, borderRadius: 12, marginTop: 32, gap: 8
+    rowLeft: { flexDirection: 'row', alignItems: 'center' },
+    iconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#F3F4F6',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    logoutText: { color: '#EF4444', fontWeight: 'bold', fontSize: 16 },
+    label: { fontSize: 16, color: '#374151', fontWeight: '600' },
+    rowRight: { flexDirection: 'row', alignItems: 'center' },
+    value: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+    divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 64 },
+    dangerZone: { marginTop: 10 },
     deleteBtn: {
         alignItems: 'center', justifyContent: 'center',
-        backgroundColor: '#FECACA', padding: 16, borderRadius: 12, marginTop: 12, gap: 8
+        backgroundColor: '#fff', padding: 16, borderRadius: 16, marginTop: 12, gap: 8,
+        borderWidth: 1, borderColor: '#FECACA',
     },
     deleteText: { color: '#DC2626', fontWeight: 'bold', fontSize: 16 },
-    versionText: { textAlign: 'center', color: '#9CA3AF', marginTop: 24, fontSize: 12 },
+    versionText: { textAlign: 'center', color: '#9CA3AF', marginTop: 30, marginBottom: 40, fontSize: 12 },
+
+    // Language Selector Styles
+    langSelector: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        padding: 4,
+        gap: 4
+    },
+    langOption: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 10,
+    },
+    langOptionActive: {
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2
+    },
+    langText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280'
+    },
+    langTextActive: {
+        color: '#111827'
+    }
 });

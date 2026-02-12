@@ -7,6 +7,7 @@ import { ArrowLeft, Clock, MapPin, Plus, Flame, Home, Briefcase, Star } from 'lu
 import { RootStackParamList } from '../../types/navigation';
 import { Colors } from '../../constants/Colors';
 import { searchPlaces } from '../../services/mapService';
+import * as Location from 'expo-location';
 
 type SearchLocationScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SearchLocation'>;
 type SearchLocationScreenRouteProp = RouteProp<RootStackParamList, 'SearchLocation'>;
@@ -27,6 +28,8 @@ export default function SearchLocationScreen() {
     const [destination, setDestination] = useState('');
     const [activeField, setActiveField] = useState<'pickup' | 'destination'>('destination');
     const [results, setResults] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [searchCache, setSearchCache] = useState<Record<string, any[]>>({});
 
     const pickupRef = useRef<TextInput | null>(null);
     const destinationRef = useRef<TextInput | null>(null);
@@ -78,6 +81,20 @@ export default function SearchLocationScreen() {
     // Yes, if we use navigate 'SearchLocation'. If we use goBack() we need context or route.params injection.
     // My LocationPicker uses navigation.navigate('SearchLocation', params). This updates route params.
 
+    const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+
+    // Get proximity location on mount
+    useEffect(() => {
+        (async () => {
+            try {
+                const loc = await Location.getCurrentPositionAsync({});
+                setUserLocation([loc.coords.longitude, loc.coords.latitude]);
+            } catch (e) {
+                console.log("Error getting location for search proximity", e);
+            }
+        })();
+    }, []);
+
     // Debounce search
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -89,32 +106,47 @@ export default function SearchLocationScreen() {
             return;
         }
 
+        if (searchCache[text]) {
+            setResults(searchCache[text]);
+            return;
+        }
+
+        setIsLoading(true);
         timeoutRef.current = setTimeout(async () => {
-            const places = await searchPlaces(text);
-            setResults(places);
-        }, 500);
+            try {
+                // Priority search for Egypt with proximity
+                // If we are in "TravelRequest" mode, prioritize "place" (cities) over addresses
+                const isIntercity = route.params?.returnScreen === 'TravelRequest';
+                const searchTypes = isIntercity ? 'place,locality' : undefined;
+
+                const places = await searchPlaces(text, userLocation || undefined, searchTypes);
+
+                // Save to cache
+                setSearchCache(prev => ({ ...prev, [text]: places }));
+                setResults(places);
+            } finally {
+                setIsLoading(false);
+            }
+        }, 700); // Increased debounce to 700ms to reduce API tokens/costs
     };
 
     useEffect(() => {
         if (route.params?.field) {
             setActiveField(route.params.field);
             if (route.params.field === 'pickup') {
-                // If opening for pickup, likely want to clear "Current Location" to type, or keep it? 
-                // Usually user wants to search.
                 if (pickup === 'Current Location') setPickup('');
                 setTimeout(() => pickupRef.current?.focus(), 100);
             } else {
                 setTimeout(() => destinationRef.current?.focus(), 100);
             }
         } else {
-            // Default behavior
             const id = setTimeout(() => {
                 destinationRef.current?.focus();
                 setActiveField('destination');
             }, 100);
             return () => clearTimeout(id);
         }
-    }, []); // Run once on mount
+    }, [route.params?.field]);
 
     const handleSelectPlace = (place: any) => {
         Keyboard.dismiss();
@@ -225,13 +257,21 @@ export default function SearchLocationScreen() {
                                     />
                                     {destination.length > 0 && (
                                         <TouchableOpacity
-                                            onPress={() => setDestination('')}
+                                            onPress={() => {
+                                                setDestination('');
+                                                setResults([]);
+                                            }}
                                             style={styles.clearButton}
                                         >
                                             <Text style={styles.clearButtonText}>✕</Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
+                            </View>
+                        )}
+                        {isLoading && (
+                            <View style={styles.loadingIndicator}>
+                                <Text style={styles.loadingText}>Searching in Egypt...</Text>
                             </View>
                         )}
                     </View>
@@ -419,4 +459,13 @@ const styles = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center', marginRight: 16
     },
     mapPinText: { fontSize: 16, color: '#1e1e1e', fontWeight: '500' },
+    loadingIndicator: {
+        paddingTop: 8,
+        paddingLeft: 28,
+    },
+    loadingText: {
+        fontSize: 12,
+        color: '#4F46E5',
+        fontStyle: 'italic',
+    }
 });

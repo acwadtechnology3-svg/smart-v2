@@ -44,7 +44,6 @@ import DriverActiveTripScreen from '../screens/Driver/DriverActiveTripScreen';
 import DriverWalletScreen from '../screens/Driver/DriverWalletScreen';
 import DriverChangeVehicleScreen from '../screens/Driver/DriverChangeVehicleScreen';
 import SupportChatScreen from '../screens/Driver/SupportChatScreen';
-import DriverDestinationsScreen from '../screens/Driver/DriverDestinationsScreen';
 import PersonalInformationScreen from '../screens/Menu/PersonalInformationScreen';
 import { tripStatusService } from '../services/tripStatusService';
 
@@ -90,7 +89,6 @@ export default function AppNavigator() {
                 <Stack.Screen name="DriverWallet" component={DriverWalletScreen} />
                 <Stack.Screen name="DriverChangeVehicle" component={DriverChangeVehicleScreen} />
                 <Stack.Screen name="SupportChat" component={SupportChatScreen} />
-                <Stack.Screen name="DriverDestinations" component={DriverDestinationsScreen} />
 
 
                 <Stack.Screen name="CustomerHome" component={CustomerHomeScreen} />

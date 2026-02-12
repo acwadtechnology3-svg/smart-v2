@@ -160,6 +160,18 @@ export default function DriverFoundScreen() {
                     const status = payload?.new?.status;
                     console.log("[DriverFound] Realtime Status Update:", status);
 
+                    if (isTravelRequest) {
+                        // For travel requests, we don't want to force navigation away if the user is elsewhere
+                        // However, if they ARE on this screen, they might still want to see the status update (like Arrived)
+                        if (status === 'arrived' && !arrivedRef.current) {
+                            arrivedRef.current = true;
+                            setIsArrived(true);
+                            Alert.alert(t('driverArrived'), t('captainReached'), [{ text: "OK" }]);
+                        }
+                        console.log("[DriverFound] Travel request status update, skipping navigation:", status);
+                        return;
+                    }
+
                     if (status === 'arrived' && !arrivedRef.current) {
                         arrivedRef.current = true;
                         setIsArrived(true);

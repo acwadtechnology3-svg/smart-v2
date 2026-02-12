@@ -279,6 +279,16 @@ export default function DriverActiveTripScreen() {
 
     return (
         <View style={styles.container}>
+            {/* Home Button for Travel Requests */}
+            {trip?.is_travel_request && (
+                <TouchableOpacity
+                    style={styles.homeButton}
+                    onPress={() => navigation.navigate('DriverHome')}
+                >
+                    <Navigation size={24} color="#1F2937" />
+                </TouchableOpacity>
+            )}
+
             <View style={styles.navigationButtonContainer}>
                 <TouchableOpacity style={styles.navigationButton} onPress={openNavigationApp}>
                     <Navigation size={28} color="#fff" fill="#fff" />
@@ -435,5 +445,21 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 5,
         elevation: 10,
+    },
+    homeButton: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+        width: 44,
+        height: 44,
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 10,
+        zIndex: 60
     },
 });

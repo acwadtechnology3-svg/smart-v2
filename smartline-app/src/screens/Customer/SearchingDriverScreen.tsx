@@ -174,6 +174,13 @@ export default function SearchingDriverScreen() {
                     console.log('[SearchingDriver] Trip status updated:', payload.new?.status, 'driver_id:', payload.new?.driver_id);
 
                     if (payload.new?.status === 'accepted' && payload.new?.driver_id) {
+                        // If it is a travel request, do NOT auto-navigate. 
+                        // The user can navigate via the home screen card or the accept button.
+                        if (trip?.is_travel_request) {
+                            console.log('[SearchingDriver] Trip is travel request, skipping auto-navigation to DriverFound');
+                            return;
+                        }
+
                         console.log('[SearchingDriver] Trip accepted! Fetching driver details for driver:', payload.new.driver_id);
                         try {
                             const response = await apiRequest<{ driver: any }>(`/drivers/public/${payload.new.driver_id}?tripId=${tripId}`);
@@ -229,7 +236,13 @@ export default function SearchingDriverScreen() {
             });
 
             console.log('[SearchingDriver] Offer accepted successfully');
-            // Navigation will happen automatically via the status listener
+
+            // For travel requests, we disabled auto-navigation in the status listener, 
+            // so we navigate manually here after the user explicitly accepts an offer.
+            if (trip?.is_travel_request) {
+                navigation.replace('DriverFound', { tripId });
+            }
+            // Navigation for normal trips will happen automatically via the status listener
         } catch (err: any) {
             console.error('[SearchingDriver] Error:', err);
             // Check if trip was already accepted by another driver
@@ -321,47 +334,51 @@ export default function SearchingDriverScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Map Background */}
-            <MapView
-                ref={mapRef}
-                style={styles.map}
-                initialRegion={{
-                    latitude: parseFloat(trip.pickup_lat) || 31.2357,
-                    longitude: parseFloat(trip.pickup_lng) || 29.9511,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                }}
-            >
-                <UrlTile
-                    urlTemplate={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_ACCESS_TOKEN}`}
-                    maximumZ={19}
-                    flipY={false}
-                    tileSize={256}
-                />
-                <Marker
-                    coordinate={{
-                        latitude: trip.pickup_lat,
-                        longitude: trip.pickup_lng,
+            {/* Map View */}
+            <View style={styles.mapContainer}>
+                <MapView
+                    ref={mapRef}
+                    style={styles.map}
+                    initialRegion={{
+                        latitude: 31.2357,
+                        longitude: 29.9511,
+                        latitudeDelta: 0.05,
+                        longitudeDelta: 0.05,
                     }}
-                    title="Pickup"
                 >
-                    <View style={styles.pickupMarker}>
-                        <MapPin size={24} color="#fff" fill="#fff" />
-                    </View>
-                </Marker>
-                <Marker
-                    coordinate={{
-                        latitude: trip.dest_lat,
-                        longitude: trip.dest_lng,
-                    }}
-                    title="Destination"
-                >
-                    <View style={styles.destMarker}>
-                        <NavigationIcon size={20} color="#fff" fill="#fff" />
-                    </View>
-                </Marker>
-            </MapView>
+                    <UrlTile
+                        urlTemplate={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_ACCESS_TOKEN}`}
+                        maximumZ={19}
+                        flipY={false}
+                        tileSize={256}
+                    />
 
+                    {trip && (
+                        <>
+                            <Marker coordinate={{ latitude: parseFloat(trip.pickup_lat), longitude: parseFloat(trip.pickup_lng) }}>
+                                <View style={styles.pickupMarker}>
+                                    <MapPin size={20} color="#fff" />
+                                </View>
+                            </Marker>
+                            <Marker coordinate={{ latitude: parseFloat(trip.dest_lat), longitude: parseFloat(trip.dest_lng) }}>
+                                <View style={styles.destMarker}>
+                                    <MapPin size={20} color="#fff" />
+                                </View>
+                            </Marker>
+                        </>
+                    )}
+                </MapView>
+            </View>
+
+            {/* Home Button for Travel Requests */}
+            {trip?.is_travel_request && (
+                <TouchableOpacity
+                    style={styles.homeButton}
+                    onPress={() => navigation.navigate('CustomerHome')}
+                >
+                    <NavigationIcon size={24} color="#1F2937" />
+                </TouchableOpacity>
+            )}
             {/* Close Button */}
             <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
                 <X size={24} color="#1F2937" />
@@ -866,4 +883,24 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: 'bold',
     },
+    homeButton: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+        width: 44,
+        height: 44,
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 10,
+        zIndex: 60
+    },
+    mapContainer: {
+        flex: 1,
+        width: '100%',
+    }
 });

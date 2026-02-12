@@ -81,35 +81,52 @@ class TripStatusService {
 
         console.log(`[TripService] 🎯 Handling status: ${status}`);
 
-        switch (status) {
-            case 'accepted':
-                console.log('[TripService] ✅ Trip ACCEPTED - navigating to DriverFound');
-                this.navigationRef.navigate('DriverFound', { tripId: this.activeTripId });
-                break;
+        (async () => {
+            try {
+                const data = await apiRequest<{ trip: any }>(`/trips/${this.activeTripId}`);
+                const isTravel = data.trip?.is_travel_request;
 
-            case 'arrived':
-                console.log('[TripService] 📍 Driver ARRIVED');
-                // Will show alert in DriverFoundScreen
-                break;
+                if (isTravel) {
+                    // For travel requests, we don't want to force navigation away from Home
+                    console.log('[TripService] ✈️ Trip is a Travel Request, skipping auto-navigation');
+                    return;
+                }
 
-            case 'started':
-                console.log('[TripService] 🚗 Trip STARTED');
-                this.navigationRef.navigate('OnTrip', { tripId: this.activeTripId });
-                break;
+                if (!this.navigationRef || !this.activeTripId) return;
 
-            case 'completed':
-                console.log('[TripService] 🏁 Trip COMPLETED');
-                this.navigationRef.navigate('TripComplete', { tripId: this.activeTripId });
-                this.stopMonitoring(); // Stop monitoring after completion
-                break;
+                switch (status) {
+                    case 'accepted':
+                        console.log('[TripService] ✅ Trip ACCEPTED - navigating to DriverFound');
+                        this.navigationRef.navigate('DriverFound', { tripId: this.activeTripId });
+                        break;
 
-            case 'cancelled':
-                console.log('[TripService] ❌ Trip CANCELLED');
-                Alert.alert('Trip Cancelled', 'The trip has been cancelled.');
-                this.navigationRef.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
-                this.stopMonitoring();
-                break;
-        }
+                    case 'arrived':
+                        console.log('[TripService] 📍 Driver ARRIVED');
+                        // Will show alert in DriverFoundScreen
+                        break;
+
+                    case 'started':
+                        console.log('[TripService] 🚗 Trip STARTED');
+                        this.navigationRef.navigate('OnTrip', { tripId: this.activeTripId });
+                        break;
+
+                    case 'completed':
+                        console.log('[TripService] 🏁 Trip COMPLETED');
+                        this.navigationRef.navigate('TripComplete', { tripId: this.activeTripId });
+                        this.stopMonitoring(); // Stop monitoring after completion
+                        break;
+
+                    case 'cancelled':
+                        console.log('[TripService] ❌ Trip CANCELLED');
+                        Alert.alert('Trip Cancelled', 'The trip has been cancelled.');
+                        this.navigationRef.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
+                        this.stopMonitoring();
+                        break;
+                }
+            } catch (err) {
+                console.error('[TripService] Error checking trip type:', err);
+            }
+        })();
     }
 
     stopMonitoring() {

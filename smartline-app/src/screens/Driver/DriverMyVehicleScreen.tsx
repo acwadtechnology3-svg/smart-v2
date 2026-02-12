@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, ScrollView, Alert, Platform } from 'react-native';
 import { Colors } from '../../constants/Colors';
 import { ArrowLeft, Car, PenTool, AlertCircle } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -167,12 +167,22 @@ const DocumentRow = ({ label, status, expires, isWarning, isRTL }: any) => (
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     header: {
-        alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff',
-        borderBottomWidth: 1, borderBottomColor: '#E5E7EB'
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: Platform.OS === 'android' ? 50 : 20,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
+        zIndex: 10
     },
     backButton: { padding: 4 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1e1e' },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
 
     content: { padding: 20 },
 

@@ -28,19 +28,33 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = data?.error || 'Request failed';
-    const errorMsgString = typeof message === 'object' ? JSON.stringify(message) : String(message);
-    const error: any = new Error(errorMsgString);
-    error.status = response.status;
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data?.error || 'Request failed';
+      const errorMsgString = typeof message === 'object' ? JSON.stringify(message) : String(message);
+      const error: any = new Error(errorMsgString);
+      error.status = response.status;
+      throw error;
+    }
+
+    return data as T;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
     throw error;
   }
-
-  return data as T;
 }

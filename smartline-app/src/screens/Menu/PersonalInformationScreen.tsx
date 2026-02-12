@@ -27,12 +27,32 @@ export default function PersonalInformationScreen() {
     const [initialData, setInitialData] = useState({ fullName: '', email: '', photo: '' });
 
     useEffect(() => {
-        loadUserProfile();
+        loadUserProfile(true);
     }, []);
 
-    const loadUserProfile = async () => {
+    const loadUserProfile = async (withLoading = false) => {
         try {
-            setLoading(true);
+            // 1. Load from cache first
+            const session = await AsyncStorage.getItem('userSession');
+            if (session) {
+                const { user: cachedUser } = JSON.parse(session);
+                if (cachedUser) {
+                    setUserId(cachedUser.id);
+                    setFullName(cachedUser.full_name || '');
+                    setEmail(cachedUser.email || '');
+                    setPhone(cachedUser.phone || '');
+                    setPhoto(cachedUser.profile_photo_url || null);
+                    setInitialData({
+                        fullName: cachedUser.full_name || '',
+                        email: cachedUser.email || '',
+                        photo: cachedUser.profile_photo_url || ''
+                    });
+                }
+            }
+
+            if (withLoading && !userId) setLoading(true);
+
+            // 2. Fetch latest from server
             const data = await apiRequest<{ user: any }>('/users/me');
             if (data.user) {
                 setUserId(data.user.id);
@@ -46,10 +66,16 @@ export default function PersonalInformationScreen() {
                     email: data.user.email || '',
                     photo: data.user.profile_photo_url || ''
                 });
+
+                // Update cache
+                if (session) {
+                    const parsed = JSON.parse(session);
+                    await AsyncStorage.setItem('userSession', JSON.stringify({ ...parsed, user: data.user }));
+                }
             }
         } catch (error) {
             console.error('Failed to load user profile:', error);
-            Alert.alert("Error", "Could not load profile details");
+            // Don't alert if we already have cached data, but maybe toast if it's a persistent failure
         } finally {
             setLoading(false);
         }
@@ -289,8 +315,16 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        padding: 20, backgroundColor: '#fff',
-        borderBottomWidth: 1, borderBottomColor: '#F3F4F6'
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: Platform.OS === 'android' ? 50 : 20,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
+        zIndex: 10
     },
     backBtn: { padding: 4 },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },

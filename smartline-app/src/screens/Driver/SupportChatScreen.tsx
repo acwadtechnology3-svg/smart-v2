@@ -149,8 +149,16 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff',
-        borderBottomWidth: 1, borderBottomColor: '#E5E7EB'
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        paddingTop: Platform.OS === 'android' ? 50 : 16,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
+        zIndex: 10
     },
     backButton: { padding: 4 },
     headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },

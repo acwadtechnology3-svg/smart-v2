@@ -50,9 +50,12 @@ export default function CustomerHomeScreen() {
                         const activeTrip = response.trip;
                         console.log("Restoring passenger trip:", activeTrip.id, activeTrip.status, activeTrip.is_travel_request);
 
-                        if (activeTrip.is_travel_request && (activeTrip.status === 'requested' || activeTrip.status === 'scheduled')) {
+                        if (activeTrip.is_travel_request) {
+                            // If it's a travel request (Intercity/Scheduled), we stay on Home.
+                            // We only navigate if the user explicitly taps the green card.
                             setActiveTravelRequestId(activeTrip.id);
                         } else {
+                            // Normal trip flow - auto-navigate to the correct screen
                             setActiveTravelRequestId(null);
                             if (activeTrip.status === 'requested') {
                                 navigation.navigate('SearchingDriver', { tripId: activeTrip.id });
@@ -263,13 +266,13 @@ export default function CustomerHomeScreen() {
                                 {/* Affordable Box - Updated for Travel Request Indicator */}
                                 <TouchableOpacity
                                     style={[styles.featureCard, activeTravelRequestId ? { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' } : {}]}
-                                    onPress={() => activeTravelRequestId ? navigation.navigate('SearchingDriver', { tripId: activeTravelRequestId }) : navigation.navigate('TravelRequest')}
+                                    onPress={() => activeTravelRequestId ? (navigation.navigate as any)('SearchingDriver', { tripId: activeTravelRequestId }) : (navigation.navigate as any)('TravelRequest', {})}
                                 >
                                     <View style={{ flex: 1 }}>
                                         {activeTravelRequestId ? (
                                             <>
-                                                <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left', color: '#15803D' }]} adjustsFontSizeToFit numberOfLines={1}>Request Active</Text>
-                                                <Text style={[styles.featureSubHighlight, { textAlign: isRTL ? 'right' : 'left', color: '#166534' }]} adjustsFontSizeToFit numberOfLines={2}>View Details/Offers</Text>
+                                                <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left', color: '#15803D' }]} adjustsFontSizeToFit numberOfLines={1}>{t('travelRequestActive') || 'Travel Active'}</Text>
+                                                <Text style={[styles.featureSubHighlight, { textAlign: isRTL ? 'right' : 'left', color: '#166534' }]} adjustsFontSizeToFit numberOfLines={2}>{t('tapToView') || 'Tap to view'}</Text>
                                             </>
                                         ) : (
                                             <>

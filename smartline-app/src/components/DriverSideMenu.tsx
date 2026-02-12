@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
     Wallet, History, CircleDollarSign, Car, Settings, Headphones,
-    LogOut, User, ChevronRight, RefreshCw, MapPin
+    LogOut, User, ChevronRight, RefreshCw, MapPin, Navigation
 } from 'lucide-react-native';
 import { RootStackParamList } from '../types/navigation';
 import { Colors } from '../constants/Colors';
@@ -38,6 +38,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
     // User Data State
     const [driverName, setDriverName] = useState('Driver');
     const [profileUrl, setProfileUrl] = useState<string | null>(null);
+    const [activeTravelTripId, setActiveTravelTripId] = useState<string | null>(null);
 
     useEffect(() => {
         if (initialProfile) {
@@ -57,9 +58,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
 
     useEffect(() => {
         if (visible) {
-            if (!initialProfile || (!initialProfile.users?.full_name && !initialProfile.profile_photo_url)) {
-                fetchDriverData();
-            }
+            checkAndFetchData();
 
             setModalVisible(true);
             Animated.parallel([
@@ -104,6 +103,29 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
         } catch (e) {
             console.error("fetchDriverData exception:", e);
         }
+    };
+
+    const fetchActiveTravelTrip = async () => {
+        try {
+            const history = await apiRequest<{ trips: any[] }>('/trips/driver/history');
+            const activeTravel = history.trips?.find((t: any) =>
+                t.is_travel_request && ['accepted', 'arrived', 'started'].includes(t.status)
+            );
+            if (activeTravel) {
+                setActiveTravelTripId(activeTravel.id);
+            } else {
+                setActiveTravelTripId(null);
+            }
+        } catch (e) {
+            console.error("fetchActiveTravelTrip error:", e);
+        }
+    };
+
+    const checkAndFetchData = async () => {
+        if (!initialProfile || (!initialProfile.users?.full_name && !initialProfile.profile_photo_url)) {
+            fetchDriverData();
+        }
+        fetchActiveTravelTrip();
     };
 
     if (!modalVisible) return null;
@@ -176,7 +198,14 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
                             <MenuItem icon={<History size={22} color="#F97316" />} label={t('tripHistory')} onPress={() => handleNavigation('DriverHistory')} isRTL={isRTL} />
                             <MenuItem icon={<CircleDollarSign size={22} color="#10B981" />} label={t('earnings')} onPress={() => handleNavigation('DriverEarnings')} isRTL={isRTL} />
                             <MenuItem icon={<Car size={22} color="#3B82F6" />} label={t('myVehicle')} onPress={() => handleNavigation('DriverMyVehicle')} isRTL={isRTL} />
-                            <MenuItem icon={<MapPin size={22} color="#8B5CF6" />} label={t('preferredDestinations')} onPress={() => handleNavigation('DriverDestinations')} isRTL={isRTL} />
+                            {activeTravelTripId && (
+                                <MenuItem
+                                    icon={<Navigation size={22} color={Colors.primary} />}
+                                    label={t('activeTravel') || 'Active Travel'}
+                                    onPress={() => handleNavigation({ name: 'DriverActiveTrip', params: { tripId: activeTravelTripId } } as any)}
+                                    isRTL={isRTL}
+                                />
+                            )}
                         </View>
 
                         <View style={styles.divider} />

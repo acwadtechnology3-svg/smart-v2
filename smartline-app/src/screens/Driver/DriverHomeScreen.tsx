@@ -80,10 +80,16 @@ export default function DriverHomeScreen() {
             );
 
             if (activeTrip) {
-                console.log("Restoring active trip:", activeTrip.id);
-                navigation.navigate('DriverActiveTrip', { tripId: activeTrip.id });
-                // Also ensure we are online if we have an active trip
-                setIsOnline(true);
+                // If it is a travel request (scheduled/intercity), do NOT auto-navigate.
+                // The driver can view it in history or the new sidebar item.
+                if (activeTrip.is_travel_request) {
+                    console.log("Active Travel Request found, staying on Home:", activeTrip.id);
+                } else {
+                    console.log("Restoring active trip:", activeTrip.id);
+                    navigation.navigate('DriverActiveTrip', { tripId: activeTrip.id });
+                    // Also ensure we are online if we have an active trip
+                    setIsOnline(true);
+                }
             }
         } catch (e) {
             console.log("Error checking active trip", e);

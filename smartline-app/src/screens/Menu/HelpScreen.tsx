@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { ArrowLeft, MessageCircle, Phone, FileText, ChevronRight } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../../constants/Colors';
@@ -65,7 +65,20 @@ export default function HelpScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: '#fff' },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: Platform.OS === 'android' ? 50 : 20,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
+        zIndex: 10
+    },
     backBtn: { marginRight: 16 },
     headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
     content: { padding: 20 },

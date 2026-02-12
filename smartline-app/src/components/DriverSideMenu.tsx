@@ -142,7 +142,7 @@ export default function DriverSideMenu({ visible, onClose, initialProfile }: Sid
         await AsyncStorage.removeItem('userSession');
         navigation.reset({
             index: 0,
-            routes: [{ name: 'SplashScreen' }],
+            routes: [{ name: 'RoleSelection' }],
         });
     };
 

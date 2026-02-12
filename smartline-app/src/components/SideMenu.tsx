@@ -108,7 +108,7 @@ export default function SideMenu({ visible, onClose }: SideMenuProps) {
         await AsyncStorage.multiRemove(['userSession', 'token']);
         navigation.reset({
             index: 0,
-            routes: [{ name: 'Auth' as never }],
+            routes: [{ name: 'RoleSelection' as never }],
         });
     };
 

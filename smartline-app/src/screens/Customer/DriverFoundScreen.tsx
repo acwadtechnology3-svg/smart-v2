@@ -12,7 +12,7 @@ import { tripStatusService } from '../../services/tripStatusService';
 import { useLanguage } from '../../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
-const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
+const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
 type DriverFoundScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'DriverFound'>;
 type DriverFoundScreenRouteProp = RouteProp<RootStackParamList, 'DriverFound'>;

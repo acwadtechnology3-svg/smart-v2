@@ -13,7 +13,7 @@ type LocationPickerNavigationProp = NativeStackNavigationProp<RootStackParamList
 type LocationPickerRouteProp = RouteProp<RootStackParamList, 'LocationPicker'>;
 
 const { width, height } = Dimensions.get('window');
-const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2FsYWhlenphdDEyMCIsImEiOiJjbWwyem4xMHIwaGFjM2NzYmhtNDNobmZvIn0.Q5Tm9dtAgsgsI84y4KWTUg';
+const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
 // 👽 02-02-2026: Extracted UrlTile to a component or memoize it to prevent re-creation on every render
 const MapTiles = React.memo(() => (

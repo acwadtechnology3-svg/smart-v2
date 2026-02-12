@@ -39,6 +39,8 @@ export type RootStackParamList = {
     Settings: undefined;
     PersonalInformation: undefined;
     InviteFriends: undefined;
+    Support: undefined;
+    Profile: undefined;
     Scan: undefined;
 
     // Driver Routes

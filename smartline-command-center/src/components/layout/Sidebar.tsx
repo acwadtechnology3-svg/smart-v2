@@ -46,7 +46,7 @@ const allNavigation: NavItem[] = [
   { name: 'Promo Codes', href: '/promos', icon: Ticket, page: 'promos' },
   { name: 'App Popups', href: '/popups', icon: Bell, page: 'popups' },
   { name: 'Promo Banners', href: '/promo-banners', icon: Image, page: 'promo_banners' },
-  { name: 'Surge Zones', href: '/surge-zones', icon: Zap, page: 'promos' },
+  { name: 'Surge Zones', href: '/surge-zones', icon: Zap, page: 'surge_zones' },
   { name: 'Support', href: '/support', icon: HeadphonesIcon, page: 'support' },
   { name: 'Settings', href: '/settings', icon: Settings, page: 'settings' },
 ];

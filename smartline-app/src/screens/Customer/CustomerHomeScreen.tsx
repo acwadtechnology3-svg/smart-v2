@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, I18nManager, PanResponder, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, I18nManager, PanResponder, ScrollView, Platform, Image, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Menu, Scan, ShieldCheck, Search, MapPin, Gift, CarFront, Navigation, ChevronRight } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import { apiRequest } from '../../services/backend';
 import { useLanguage } from '../../context/LanguageContext';
 import ChatBotButton from '../../components/ChatBot/ChatBotButton';
 import ChatBotModal from '../../components/ChatBot/ChatBotModal';
+import { getActiveBanners, PromoBanner } from '../../services/bannerService';
 
 type CustomerHomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CustomerHome'>;
 
@@ -49,6 +50,8 @@ export default function CustomerHomeScreen() {
     const [currentAddress, setCurrentAddress] = useState<{ title: string, subtitle: string } | null>(null);
     const [isChatBotVisible, setChatBotVisible] = useState(false);
     const [activeTravelRequestId, setActiveTravelRequestId] = useState<string | null>(null);
+    const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
+    const [bannersLoading, setBannersLoading] = useState(true);
 
     // Draggable Sheet Logic
     const pan = useRef(new Animated.Value(SNAP_DEFAULT)).current;
@@ -169,6 +172,21 @@ export default function CustomerHomeScreen() {
         })();
     }, []);
 
+    useEffect(() => {
+        const fetchBanners = async () => {
+            try {
+                setBannersLoading(true);
+                const { banners } = await getActiveBanners('customer');
+                setPromoBanners(banners);
+            } catch (error) {
+                console.log('Error fetching banners:', error);
+            } finally {
+                setBannersLoading(false);
+            }
+        };
+        fetchBanners();
+    }, []);
+
     const isSimulating = isRTL !== I18nManager.isRTL;
     const flexDirection = isSimulating ? 'row-reverse' : 'row';
     const textAlign = isRTL ? 'right' : 'left';
@@ -177,6 +195,45 @@ export default function CustomerHomeScreen() {
 
     const handleWhereToPress = () => {
         navigation.navigate('SearchLocation');
+    };
+
+    const handleBannerPress = async (banner: PromoBanner) => {
+        try {
+            switch (banner.action_type) {
+                case 'link':
+                    if (banner.action_value) {
+                        const supported = await Linking.canOpenURL(banner.action_value);
+                        if (supported) {
+                            await Linking.openURL(banner.action_value);
+                        } else {
+                            Alert.alert('Error', 'Cannot open this link');
+                        }
+                    }
+                    break;
+                case 'screen':
+                    if (banner.action_value) {
+                        const screenName = banner.action_value;
+                        if (screenName === 'InviteFriends') {
+                            navigation.navigate('InviteFriends');
+                        } else if (screenName === 'Wallet') {
+                            navigation.navigate('Wallet');
+                        } else if (screenName === 'Support') {
+                            navigation.navigate('Support');
+                        } else if (screenName === 'Profile') {
+                            navigation.navigate('Profile');
+                        } else {
+                            console.log('Unknown screen:', screenName);
+                        }
+                    }
+                    break;
+                case 'refer':
+                    navigation.navigate('InviteFriends');
+                    break;
+            }
+        } catch (error) {
+            console.log('Error handling banner press:', error);
+            Alert.alert('Error', 'Failed to perform action');
+        }
     };
 
     return (
@@ -253,24 +310,49 @@ export default function CustomerHomeScreen() {
 
                     {/* NEW: Banners Section (Moved under Search as requested) */}
                     <View style={[styles.bannerContainer, { marginTop: 0, marginBottom: 16 }]}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bannerScroll}>
-                            {PROMO_BANNERS.map((banner) => (
-                                <TouchableOpacity key={banner.id} style={styles.bannerItem}>
-                                    <LinearGradient
-                                        colors={banner.colors as any}
-                                        style={styles.bannerGradient}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
+                        {bannersLoading ? (
+                            <View style={styles.bannerLoading}>
+                                <Text style={styles.bannerLoadingText}>Loading...</Text>
+                            </View>
+                        ) : promoBanners.length > 0 ? (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bannerScroll}>
+                                {promoBanners.map((banner) => (
+                                    <TouchableOpacity
+                                        key={banner.id}
+                                        style={styles.bannerItem}
+                                        onPress={() => handleBannerPress(banner)}
                                     >
-                                        <View style={{ flex: 1, padding: 16, justifyContent: 'center' }}>
-                                            <Text style={[styles.bannerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{banner.title}</Text>
-                                            <Text style={[styles.bannerSub, { textAlign: isRTL ? 'right' : 'left' }]}>{banner.sub}</Text>
-                                        </View>
-                                        <ChevronRight color="#fff" size={20} style={{ margin: 16, transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
+                                        {banner.image_url ? (
+                                            <View style={styles.bannerImageContainer}>
+                                                <Image source={{ uri: banner.image_url }} style={styles.bannerImage} />
+                                                <View style={styles.bannerOverlay}>
+                                                    <Text style={[styles.bannerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{banner.title}</Text>
+                                                    {banner.subtitle && (
+                                                        <Text style={[styles.bannerSub, { textAlign: isRTL ? 'right' : 'left' }]}>{banner.subtitle}</Text>
+                                                    )}
+                                                </View>
+                                                <ChevronRight color="#fff" size={20} style={{ margin: 16, transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
+                                            </View>
+                                        ) : (
+                                            <LinearGradient
+                                                colors={['#4F46E5', '#818CF8']}
+                                                style={styles.bannerGradient}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                            >
+                                                <View style={{ flex: 1, padding: 16, justifyContent: 'center' }}>
+                                                    <Text style={[styles.bannerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{banner.title}</Text>
+                                                    {banner.subtitle && (
+                                                        <Text style={[styles.bannerSub, { textAlign: isRTL ? 'right' : 'left' }]}>{banner.subtitle}</Text>
+                                                    )}
+                                                </View>
+                                                <ChevronRight color="#fff" size={20} style={{ margin: 16, transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }} />
+                                            </LinearGradient>
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        ) : null}
                     </View>
 
                     <View style={[styles.gridContainer, { flexDirection }]}>
@@ -449,4 +531,11 @@ const styles = StyleSheet.create({
     bannerGradient: { flex: 1, flexDirection: 'row', alignItems: 'center' },
     bannerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
     bannerSub: { color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 4 },
+    
+    // Dynamic banner styles
+    bannerLoading: { width: 280, height: 120, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 16 },
+    bannerLoadingText: { color: '#6B7280', fontSize: 14 },
+    bannerImageContainer: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    bannerImage: { flex: 1, height: 120, resizeMode: 'cover' },
+    bannerOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, padding: 16, justifyContent: 'center' },
 });

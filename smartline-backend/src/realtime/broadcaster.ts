@@ -70,9 +70,20 @@ export function notifyDriver(driverId: string, event: string, payload: any) {
     }
     return true;
   } else {
-    console.log(`[Broadcaster] Driver ${driverId} not connected or not found.`);
+    // console.log(`[Broadcaster] Driver ${driverId} not connected or not found.`); // Reduce noise
     return false;
   }
+}
+
+export function notifyDrivers(driverIds: string[], event: string, payload: any) {
+  let sentCount = 0;
+  for (const driverId of driverIds) {
+    if (notifyDriver(driverId, event, payload)) {
+      sentCount++;
+    }
+  }
+  console.log(`[Broadcaster] Targeted notification sent to ${sentCount}/${driverIds.length} drivers`);
+  return sentCount;
 }
 
 export function getConnectedDriversCount() {

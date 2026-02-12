@@ -283,12 +283,20 @@ export default function SearchingDriverScreen() {
                             const data = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
 
                             if (data.trip) {
-                                // Navigate back to options with pre-filled addresses
-                                navigation.replace('TripOptions', {
-                                    pickup: data.trip.pickup_address,
-                                    destination: data.trip.dest_address,
-                                    destinationCoordinates: [data.trip.dest_lng, data.trip.dest_lat]
-                                });
+                                if (data.trip.is_travel_request) {
+                                    // Go back to Intercity Screen
+                                    navigation.replace('TravelRequest', {
+                                        pickup: { address: data.trip.pickup_address, lat: data.trip.pickup_lat, lng: data.trip.pickup_lng },
+                                        destination: { address: data.trip.dest_address, lat: data.trip.dest_lat, lng: data.trip.dest_lng }
+                                    });
+                                } else {
+                                    // Navigate back to options with pre-filled addresses
+                                    navigation.replace('TripOptions', {
+                                        pickup: data.trip.pickup_address,
+                                        destination: data.trip.dest_address,
+                                        destinationCoordinates: [data.trip.dest_lng, data.trip.dest_lat]
+                                    });
+                                }
                             } else {
                                 navigation.goBack();
                             }

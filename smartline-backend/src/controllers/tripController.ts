@@ -1,7 +1,20 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
-import { broadcastToDrivers, notifyDriver } from '../realtime/broadcaster';
+import { broadcastToDrivers, notifyDrivers, notifyDriver } from '../realtime/broadcaster';
+import { locationCache } from '../services/locationCache';
 
+// Helper: Calculate Haversine Distance (in km)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Radius of Earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return parseFloat((R * c).toFixed(2));
+}
 async function getTripById(tripId: string) {
     const { data, error } = await supabase
         .from('trips')
@@ -12,17 +25,54 @@ async function getTripById(tripId: string) {
     return data;
 }
 
-async function assertTripParticipant(tripId: string, userId: string) {
-    const { data, error } = await supabase
+async function fetchAnyTrip(tripId: string) {
+    // 1. Try standard trips
+    const { data: trip, error } = await supabase
         .from('trips')
-        .select('customer_id, driver_id')
+        .select('*')
         .eq('id', tripId)
         .single();
-    if (error || !data) throw new Error('Trip not found');
-    if (data.customer_id !== userId && data.driver_id !== userId) {
+
+    if (trip) return { ...trip, table: 'trips' };
+
+    // 2. Try intercity requests
+    const { data: intercity, error: intercityError } = await supabase
+        .from('intercity_requests')
+        .select('*')
+        .eq('id', tripId)
+        .single();
+
+    if (intercity) {
+        // Map to trip structure
+        return {
+            id: intercity.id,
+            customer_id: intercity.user_id,
+            driver_id: null, // Intercity logic might differ for assignment
+            pickup_lat: intercity.pickup_lat,
+            pickup_lng: intercity.pickup_lng,
+            dest_lat: intercity.destination_lat,
+            dest_lng: intercity.destination_lng,
+            pickup_address: intercity.pickup_location,
+            dest_address: intercity.destination_location,
+            status: intercity.status, // pending, accepted, etc.
+            price: intercity.offer_price,
+            created_at: intercity.created_at,
+            is_travel_request: true,
+            table: 'intercity_requests'
+        };
+    }
+
+    throw new Error('Trip not found');
+}
+
+async function assertTripParticipant(tripId: string, userId: string) {
+    const trip = await fetchAnyTrip(tripId);
+    if (!trip) throw new Error('Trip not found');
+
+    if (trip.customer_id !== userId && trip.driver_id !== userId) {
         throw new Error('Not authorized');
     }
-    return data;
+    return trip;
 }
 
 // ... imports
@@ -31,20 +81,25 @@ export const createTrip = async (req: Request, res: Response) => {
     try {
         const {
             customer_id,
-            pickup_lat, pickup_lng,
+            pickup_lat, pickup_lng, // Original fields
             dest_lat, dest_lng,
             pickup_address, dest_address,
-            price,
+            price, // Proposed price or estimate
             distance,
             duration,
             car_type,
             payment_method,
-            promo_code // New field
+            promo_code,
+            // New Travel Request Fields
+            is_travel_request,
+            scheduled_at,
+            seats_required,
+            is_entire_car
         } = req.body;
 
         // Validation
         const customerId = req.user?.id || customer_id;
-        if (!customerId || !pickup_lat || !dest_lat || !price) {
+        if (!customerId || !pickup_lat || !dest_lat || price === undefined) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
@@ -83,6 +138,20 @@ export const createTrip = async (req: Request, res: Response) => {
             }
         }
 
+        // Calculate Distance & Duration if missing
+        let finalDistance = distance ? parseFloat(distance) : 0;
+        let finalDuration = duration ? parseFloat(duration) : 0;
+
+        if (finalDistance === 0 && pickup_lat && dest_lat) {
+            finalDistance = calculateDistance(
+                parseFloat(pickup_lat), parseFloat(pickup_lng),
+                parseFloat(dest_lat), parseFloat(dest_lng)
+            );
+            // Estimate duration (assume 60km/h avg speed => 1km = 1 min)
+            finalDuration = Math.ceil(finalDistance * 1.2); // +20% buffer
+        }
+
+        // Insert Trip
         const { data, error } = await supabase
             .from('trips')
             .insert({
@@ -93,14 +162,19 @@ export const createTrip = async (req: Request, res: Response) => {
                 dest_lng,
                 pickup_address,
                 dest_address,
-                price, // This is the discounted price passed from frontend
-                distance,
-                duration,
+                price,
+                distance: finalDistance,
+                duration: finalDuration,
                 car_type,
                 payment_method,
-                status: 'requested',
-                promo_code: promoId ? promo_code : null, // Store if valid
-                promo_id: promoId
+                status: is_travel_request ? 'requested' : 'requested', // Both start as requested
+                promo_code: promoId ? promo_code : null,
+                promo_id: promoId,
+                // Travel Request Fields
+                is_travel_request: is_travel_request || false,
+                scheduled_at: is_travel_request ? scheduled_at : null,
+                seats_required: is_travel_request ? (seats_required || 4) : null,
+                is_entire_car: is_travel_request ? (is_entire_car || false) : null
             })
             .select()
             .single();
@@ -110,11 +184,52 @@ export const createTrip = async (req: Request, res: Response) => {
             return res.status(500).json({ error: error.message });
         }
 
-        console.log(`[Trip Created] Trip ${data.id} created with status: ${data.status}`);
-        console.log(`[Trip Created] Price: ${price} (Promo: ${promo_code || 'None'})`);
+        console.log(`[Trip Created] Trip ${data.id} created. Is Travel Request: ${is_travel_request}`);
 
-        // Broadcast to all connected drivers
-        broadcastToDrivers('INSERT', data);
+        // Broadcast Logic
+        if (is_travel_request) {
+            // Specialized Broadcasting for Travel Requests
+            // 1. Find drivers within 50km radius
+            try {
+                const nearby = await locationCache.getNearbyDrivers(pickup_lat, pickup_lng, 50, 100);
+                const nearIds = nearby.map(d => d.driverId);
+
+                if (nearIds.length > 0) {
+                    // 2. Filter for verified Travel Captains
+                    const { data: captains } = await supabase
+                        .from('drivers')
+                        .select('id')
+                        .in('id', nearIds)
+                        .eq('is_travel_captain', true)
+                        .eq('travel_captain_status', 'approved'); // Only approved
+
+                    if (captains && captains.length > 0) {
+                        const targetIds = captains.map(c => c.id);
+                        notifyDrivers(targetIds, 'INSERT', data);
+                        console.log(`[Travel Broadcast] Sent request to ${targetIds.length} Travel Captains.`);
+                    } else {
+                        console.log(`[Travel Broadcast] No nearby approved Travel Captains found.`);
+                    }
+                } else {
+                    console.log(`[Travel Broadcast] No drivers found within 50km.`);
+                }
+            } catch (err) {
+                console.error("Error broadcasting Travel Request:", err);
+            }
+        } else {
+            // Standard Broadcast
+            // Augment payload with aliases for Driver App compatibility
+            const broadcastPayload = {
+                ...data,
+                // Aliases
+                pickup_location: data.pickup_address,
+                destination_location: data.dest_address,
+                // Ensure number types
+                distance: finalDistance,
+                duration: finalDuration
+            };
+            broadcastToDrivers('INSERT', broadcastPayload);
+        }
 
         res.status(201).json({ trip: data });
 
@@ -127,19 +242,13 @@ export const createTrip = async (req: Request, res: Response) => {
 export const getTripStatus = async (req: Request, res: Response) => {
     try {
         const tripId = req.params.tripId as string;
-        await assertTripParticipant(tripId, req.user!.id);
-
-        const { data, error } = await supabase
-            .from('trips')
-            .select('*')
-            .eq('id', tripId)
-            .single();
-
-        if (error) {
-            return res.status(404).json({ error: 'Trip not found' });
+        const trip = await fetchAnyTrip(tripId);
+        // Authorization check
+        if (trip.customer_id !== req.user!.id && trip.driver_id !== req.user!.id) {
+            return res.status(403).json({ error: 'Not authorized' });
         }
 
-        res.json({ trip: data });
+        res.json({ trip });
     } catch (err) {
         res.status(500).json({ error: 'Internal Server Error' });
     }

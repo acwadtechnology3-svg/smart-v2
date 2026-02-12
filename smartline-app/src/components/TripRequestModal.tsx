@@ -37,19 +37,24 @@ export default function TripRequestModal({ visible, trip, onAccept, onDecline, o
     const rowStyle = { flexDirection: isRTL ? 'row-reverse' : 'row' } as any;
     const textAlign = { textAlign: isRTL ? 'right' : 'left' } as any;
 
+    const isTravelRequest = trip?.is_travel_request;
+    const themeColor = isTravelRequest ? '#7C3AED' : Colors.primary; // Purple for Travel, Primary for City
+
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={onDecline}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.overlay}
             >
-                <View style={styles.card}>
+                <View style={[styles.card, isTravelRequest && { borderTopWidth: 4, borderColor: themeColor }]}>
                     {/* Header */}
                     <View style={[styles.header, rowStyle]}>
-                        <Text style={styles.title}>{t('newRequest')}</Text>
-                        <View style={styles.timerBadge}>
+                        <Text style={[styles.title, isTravelRequest && { color: themeColor, fontWeight: '900' }]}>
+                            {isTravelRequest ? t('intercityTravel') || 'INTERCITY TRAVEL' : t('newRequest')}
+                        </Text>
+                        <View style={[styles.timerBadge, isTravelRequest && { backgroundColor: themeColor }]}>
                             <Clock size={14} color="#fff" />
-                            <Text style={styles.timerText}>30s</Text>
+                            <Text style={styles.timerText}>{isTravelRequest ? 'Expires in 60s' : '30s'}</Text>
                         </View>
                     </View>
 
@@ -57,7 +62,7 @@ export default function TripRequestModal({ visible, trip, onAccept, onDecline, o
                         {/* Route Info */}
                         <View style={styles.routeContainer}>
                             <View style={[styles.routeRow, rowStyle]}>
-                                <View style={[styles.dot, { backgroundColor: Colors.primary, marginLeft: isRTL ? 12 : 0, marginRight: isRTL ? 0 : 12 }]} />
+                                <View style={[styles.dot, { backgroundColor: themeColor, marginLeft: isRTL ? 12 : 0, marginRight: isRTL ? 0 : 12 }]} />
                                 <Text style={[styles.address, textAlign]} numberOfLines={2}>{trip.pickup_address || t('pickup')}</Text>
                             </View>
                             <View style={[styles.connector, { marginLeft: isRTL ? 0 : 5, marginRight: isRTL ? 5 : 0 }]} />
@@ -95,7 +100,10 @@ export default function TripRequestModal({ visible, trip, onAccept, onDecline, o
                                     <Text style={styles.bidText}>{t('bid')}</Text>
                                 </TouchableOpacity>
 
-                                <TouchableOpacity style={styles.acceptBtn} onPress={() => onAccept(trip.id)}>
+                                <TouchableOpacity
+                                    style={[styles.acceptBtn, isTravelRequest && { backgroundColor: themeColor }]}
+                                    onPress={() => onAccept(trip.id)}
+                                >
                                     <Text style={styles.acceptText}>{t('accept')} {trip.price}</Text>
                                 </TouchableOpacity>
                             </View>

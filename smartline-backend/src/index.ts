@@ -25,6 +25,7 @@ import popupRoutes from './routes/popupRoutes';
 import surgeRoutes from './routes/surgeRoutes';
 import driverPreferenceRoutes from './routes/driverPreferenceRoutes';
 import chatbotRoutes from './routes/chatbotRoutes';
+import intercityRoutes from './routes/intercityRoutes';
 import { checkDatabaseConnection } from './config/database';
 import { checkRedisConnection } from './config/redis';
 import { startLocationSync } from './workers/locationSyncWorker';
@@ -68,6 +69,11 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.disable('x-powered-by');
 
 // ===== Routes =====
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard/auth', dashboardAuthRoutes);
 app.use('/api/trips', tripRoutes);
@@ -86,6 +92,7 @@ app.use('/api/popups', popupRoutes);
 app.use('/api/surge', surgeRoutes);
 app.use('/api/drivers/preferences', driverPreferenceRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/intercity', intercityRoutes);
 
 // ===== Health Check =====
 app.get('/health', async (req, res) => {

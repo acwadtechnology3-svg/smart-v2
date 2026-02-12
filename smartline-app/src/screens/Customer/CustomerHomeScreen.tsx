@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, I18nManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Menu, Scan, ShieldCheck, Search, MapPin, Gift, CarFront, Navigation } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { UrlTile } from 'react-native-maps';
@@ -38,6 +38,43 @@ export default function CustomerHomeScreen() {
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
     const [currentAddress, setCurrentAddress] = useState<{ title: string, subtitle: string } | null>(null);
     const [isChatBotVisible, setChatBotVisible] = useState(false);
+    const [activeTravelRequestId, setActiveTravelRequestId] = useState<string | null>(null);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            const checkActiveTrip = async () => {
+                try {
+                    const response = await apiRequest<{ trip: any }>('/trips/active');
+
+                    if (response.trip) {
+                        const activeTrip = response.trip;
+                        console.log("Restoring passenger trip:", activeTrip.id, activeTrip.status, activeTrip.is_travel_request);
+
+                        if (activeTrip.is_travel_request && (activeTrip.status === 'requested' || activeTrip.status === 'scheduled')) {
+                            setActiveTravelRequestId(activeTrip.id);
+                        } else {
+                            setActiveTravelRequestId(null);
+                            if (activeTrip.status === 'requested') {
+                                navigation.navigate('SearchingDriver', { tripId: activeTrip.id });
+                            } else if (activeTrip.status === 'accepted' || activeTrip.status === 'arrived') {
+                                navigation.navigate('DriverFound', { tripId: activeTrip.id, driver: null });
+                            } else if (activeTrip.status === 'started') {
+                                navigation.navigate('OnTrip', { tripId: activeTrip.id });
+                            }
+                        }
+                    } else {
+                        setActiveTravelRequestId(null);
+                    }
+                } catch (e: any) {
+                    if (e.status !== 404) {
+                        console.log("Error checking passenger active trip", e);
+                    }
+                    setActiveTravelRequestId(null);
+                }
+            };
+            checkActiveTrip();
+        }, [navigation])
+    );
 
     useEffect(() => {
         (async () => {
@@ -48,34 +85,6 @@ export default function CustomerHomeScreen() {
 
             let location = await Location.getCurrentPositionAsync({});
             setLocation(location);
-
-            // Check for active trip
-            // Check for active trip
-            try {
-                // Use the dedicated endpoint for active trips
-                const response = await apiRequest<{ trip: any }>('/trips/active');
-
-                if (response.trip) {
-                    const activeTrip = response.trip;
-                    console.log("Restoring passenger trip:", activeTrip.id, activeTrip.status);
-
-                    if (activeTrip.status === 'requested') {
-                        navigation.navigate('SearchingDriver', { tripId: activeTrip.id });
-                    } else if (activeTrip.status === 'accepted' || activeTrip.status === 'arrived') {
-                        // DriverFound handles both accepted and arrived states
-                        // If accepted, we might generally have driver info in the trip object, 
-                        // but DriverFound fetches it again.
-                        navigation.navigate('DriverFound', { tripId: activeTrip.id, driver: null });
-                    } else if (activeTrip.status === 'started') {
-                        navigation.navigate('OnTrip', { tripId: activeTrip.id });
-                    }
-                }
-            } catch (e: any) {
-                // Ignore 404 (no active trip)
-                if (e.status !== 404) {
-                    console.log("Error checking passenger active trip", e);
-                }
-            }
 
             // 👽 02-02-2026: Added Reverse Geocoding to get real address
             try {
@@ -251,14 +260,26 @@ export default function CustomerHomeScreen() {
                                     <ShieldCheck size={24} color="#4F46E5" fill="#fff" style={styles.featureIcon} />
                                 </TouchableOpacity>
 
-                                {/* Affordable Box */}
-                                <TouchableOpacity style={styles.featureCard} onPress={() => navigation.navigate('SearchLocation')}>
+                                {/* Affordable Box - Updated for Travel Request Indicator */}
+                                <TouchableOpacity
+                                    style={[styles.featureCard, activeTravelRequestId ? { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' } : {}]}
+                                    onPress={() => activeTravelRequestId ? navigation.navigate('SearchingDriver', { tripId: activeTravelRequestId }) : navigation.navigate('TravelRequest')}
+                                >
                                     <View style={{ flex: 1 }}>
-                                        <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('enjoy')}</Text>
-                                        <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('affordable')}</Text>
-                                        <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('tripsWithUs')}</Text>
+                                        {activeTravelRequestId ? (
+                                            <>
+                                                <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left', color: '#15803D' }]} adjustsFontSizeToFit numberOfLines={1}>Request Active</Text>
+                                                <Text style={[styles.featureSubHighlight, { textAlign: isRTL ? 'right' : 'left', color: '#166534' }]} adjustsFontSizeToFit numberOfLines={2}>View Details/Offers</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('enjoy')}</Text>
+                                                <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('affordable')}</Text>
+                                                <Text style={[styles.featureTitle, { textAlign: isRTL ? 'right' : 'left' }]} adjustsFontSizeToFit numberOfLines={1}>{t('tripsWithUs')}</Text>
+                                            </>
+                                        )}
                                     </View>
-                                    <CarFront size={24} color="#4F46E5" fill="#E0E7FF" style={styles.featureIcon} />
+                                    <CarFront size={24} color={activeTravelRequestId ? '#15803D' : "#4F46E5"} fill={activeTravelRequestId ? '#DCFCE7' : "#E0E7FF"} style={styles.featureIcon} />
                                 </TouchableOpacity>
                             </View>
                         </View>

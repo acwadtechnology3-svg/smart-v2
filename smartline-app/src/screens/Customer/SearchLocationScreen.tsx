@@ -36,24 +36,40 @@ export default function SearchLocationScreen() {
         if (route.params?.selectedAddress) {
             const { selectedAddress, selectedCoordinates, field } = route.params;
 
+            // Prepare coordinate data
+            const coords = selectedCoordinates
+                ? { lat: selectedCoordinates.latitude, lng: selectedCoordinates.longitude }
+                : undefined;
+            const placeData = { address: selectedAddress, ...coords };
+
+            // If we have a return screen, return immediately with the data
+            if (route.params.returnScreen) {
+                const targetField = field || 'destination';
+                navigation.navigate(route.params.returnScreen as any, {
+                    // Start with existing values to prevent overwriting
+                    pickup: route.params.currentPickup,
+                    destination: route.params.currentDest,
+                    // Apply new selection
+                    [targetField]: placeData
+                });
+                return;
+            }
+
             if (field === 'pickup') {
                 setPickup(selectedAddress);
                 setActiveField('destination');
                 setTimeout(() => destinationRef.current?.focus(), 500);
             } else {
                 setDestination(selectedAddress);
-                // navigate immediately? Or let user confirm? 
-                // Let's navigate to TripOptions to make it smooth.
-                // We need to pass coordinates if available.
-                // Coordinates from LocationPicker are object {latitude, longitude}, TripOptions expects [lng, lat]
-                const coords: [number, number] | undefined = selectedCoordinates
+
+                const destCoords: [number, number] | undefined = selectedCoordinates
                     ? [selectedCoordinates.longitude, selectedCoordinates.latitude]
                     : undefined;
 
                 navigation.navigate('TripOptions', {
                     pickup: pickup,
                     destination: selectedAddress,
-                    destinationCoordinates: coords
+                    destinationCoordinates: destCoords
                 });
             }
         }
@@ -80,24 +96,48 @@ export default function SearchLocationScreen() {
     };
 
     useEffect(() => {
-        const id = setTimeout(() => {
-            destinationRef.current?.focus();
-            setActiveField('destination');
-        }, 100);
-        return () => clearTimeout(id);
-    }, []);
+        if (route.params?.field) {
+            setActiveField(route.params.field);
+            if (route.params.field === 'pickup') {
+                // If opening for pickup, likely want to clear "Current Location" to type, or keep it? 
+                // Usually user wants to search.
+                if (pickup === 'Current Location') setPickup('');
+                setTimeout(() => pickupRef.current?.focus(), 100);
+            } else {
+                setTimeout(() => destinationRef.current?.focus(), 100);
+            }
+        } else {
+            // Default behavior
+            const id = setTimeout(() => {
+                destinationRef.current?.focus();
+                setActiveField('destination');
+            }, 100);
+            return () => clearTimeout(id);
+        }
+    }, []); // Run once on mount
 
     const handleSelectPlace = (place: any) => {
         Keyboard.dismiss();
 
         // If clicking a result
         const selectedAddress = place.place_name || place.address || place.name;
+        const coords = place.center ? { lat: place.center[1], lng: place.center[0] } : undefined;
+        const placeData = { address: selectedAddress, ...coords };
+
+        // If explicitly requested to return to a screen
+        if (route.params?.returnScreen && activeField) {
+            navigation.navigate(route.params.returnScreen as any, {
+                [activeField]: placeData
+            });
+            return;
+        }
 
         if (activeField === 'pickup') {
             setPickup(selectedAddress);
             // After picking pickup, jump to destination
             setActiveField('destination');
-            destinationRef.current?.focus();
+            // destinationRef.current?.focus(); // Focus managed by useEffect or logic
+            setTimeout(() => destinationRef.current?.focus(), 100);
         } else {
             setDestination(selectedAddress);
             // Ready to Go!
@@ -126,70 +166,74 @@ export default function SearchLocationScreen() {
 
                     <View style={styles.inputCluster}>
                         {/* Connecting Line */}
-                        <View style={styles.connectingLine} />
+                        {!route.params?.returnScreen && <View style={styles.connectingLine} />}
 
                         {/* Pickup Input */}
-                        <View style={styles.inputRow}>
-                            <View style={[styles.dot, styles.dotPickup]} />
-                            <View style={styles.inputContainer} pointerEvents="box-none">
-                                <TextInput
-                                    ref={pickupRef}
-                                    style={styles.textInput}
-                                    value={pickup}
-                                    onChangeText={(text) => {
-                                        setPickup(text);
-                                        setActiveField('pickup');
-                                        handleSearch(text);
-                                    }}
-                                    placeholder="Current Location"
-                                    placeholderTextColor="#9CA3AF"
-                                    onFocus={() => {
-                                        setActiveField('pickup');
-                                        if (pickup === 'Current Location') setPickup('');
-                                    }}
-                                    autoCorrect={false}
-                                />
-                                {pickup.length > 0 && (
-                                    <TouchableOpacity
-                                        onPress={() => setPickup('')}
-                                        style={styles.clearButton}
-                                    >
-                                        <Text style={styles.clearButtonText}>✕</Text>
-                                    </TouchableOpacity>
-                                )}
+                        {(!route.params?.returnScreen || activeField === 'pickup') && (
+                            <View style={styles.inputRow}>
+                                <View style={[styles.dot, styles.dotPickup]} />
+                                <View style={styles.inputContainer} pointerEvents="box-none">
+                                    <TextInput
+                                        ref={pickupRef}
+                                        style={styles.textInput}
+                                        value={pickup}
+                                        onChangeText={(text) => {
+                                            setPickup(text);
+                                            setActiveField('pickup');
+                                            handleSearch(text);
+                                        }}
+                                        placeholder={activeField === 'pickup' ? "Enter Pickup Location" : "Current Location"}
+                                        placeholderTextColor="#9CA3AF"
+                                        onFocus={() => {
+                                            setActiveField('pickup');
+                                            if (pickup === 'Current Location') setPickup('');
+                                        }}
+                                        autoCorrect={false}
+                                    />
+                                    {pickup.length > 0 && (
+                                        <TouchableOpacity
+                                            onPress={() => setPickup('')}
+                                            style={styles.clearButton}
+                                        >
+                                            <Text style={styles.clearButtonText}>✕</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
-                        </View>
+                        )}
 
-                        <View style={{ height: 12 }} />
+                        {!route.params?.returnScreen && <View style={{ height: 12 }} />}
 
                         {/* Destination Input */}
-                        <View style={styles.inputRow}>
-                            <View style={[styles.dot, styles.dotDest]} />
-                            <View style={styles.inputContainer} pointerEvents="box-none">
-                                <TextInput
-                                    ref={destinationRef}
-                                    style={styles.textInput}
-                                    value={destination}
-                                    onChangeText={(text) => {
-                                        setDestination(text);
-                                        setActiveField('destination');
-                                        handleSearch(text);
-                                    }}
-                                    placeholder="Where to?"
-                                    placeholderTextColor="#9CA3AF"
-                                    onFocus={() => setActiveField('destination')}
-                                    autoCorrect={false}
-                                />
-                                {destination.length > 0 && (
-                                    <TouchableOpacity
-                                        onPress={() => setDestination('')}
-                                        style={styles.clearButton}
-                                    >
-                                        <Text style={styles.clearButtonText}>✕</Text>
-                                    </TouchableOpacity>
-                                )}
+                        {(!route.params?.returnScreen || activeField === 'destination') && (
+                            <View style={styles.inputRow}>
+                                <View style={[styles.dot, styles.dotDest]} />
+                                <View style={styles.inputContainer} pointerEvents="box-none">
+                                    <TextInput
+                                        ref={destinationRef}
+                                        style={styles.textInput}
+                                        value={destination}
+                                        onChangeText={(text) => {
+                                            setDestination(text);
+                                            setActiveField('destination');
+                                            handleSearch(text);
+                                        }}
+                                        placeholder="Where to?"
+                                        placeholderTextColor="#9CA3AF"
+                                        onFocus={() => setActiveField('destination')}
+                                        autoCorrect={false}
+                                    />
+                                    {destination.length > 0 && (
+                                        <TouchableOpacity
+                                            onPress={() => setDestination('')}
+                                            style={styles.clearButton}
+                                        >
+                                            <Text style={styles.clearButtonText}>✕</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
-                        </View>
+                        )}
                     </View>
                 </View>
 
@@ -197,7 +241,12 @@ export default function SearchLocationScreen() {
                 <View style={styles.actionRow}>
                     <TouchableOpacity
                         style={styles.mapButton}
-                        onPress={() => navigation.navigate('LocationPicker', { field: activeField })}
+                        onPress={() => navigation.navigate('LocationPicker', {
+                            field: activeField,
+                            returnScreen: route.params?.returnScreen,
+                            currentPickup: route.params?.currentPickup,
+                            currentDest: route.params?.currentDest
+                        })}
                     >
                         <View style={styles.mapIconCircle}>
                             <MapPin size={16} color="#4F46E5" />

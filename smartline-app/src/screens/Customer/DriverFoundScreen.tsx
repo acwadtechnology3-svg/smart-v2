@@ -36,6 +36,7 @@ export default function DriverFoundScreen() {
         longitude: driver?.lng || 29.9511
     });
     const [isArrived, setIsArrived] = useState(false);
+    const [isTravelRequest, setIsTravelRequest] = useState(false);
     const arrivedRef = useRef(false);
     const mapRef = useRef<MapView>(null);
 
@@ -49,6 +50,9 @@ export default function DriverFoundScreen() {
             (async () => {
                 try {
                     const tripData = await apiRequest<{ trip: any }>(`/trips/${tripId}`);
+                    if (tripData.trip) {
+                        setIsTravelRequest(tripData.trip.is_travel_request || false);
+                    }
                     if (tripData.trip?.driver_id) {
                         const response = await apiRequest<{ driver: any }>(`/drivers/public/${tripData.trip.driver_id}?tripId=${tripId}`);
                         if (response.driver) {
@@ -211,6 +215,16 @@ export default function DriverFoundScreen() {
                 </Marker>
             </MapView>
 
+            {/* Home Button for Scheduled Trips */}
+            {isTravelRequest && (
+                <TouchableOpacity
+                    style={styles.homeButton}
+                    onPress={() => navigation.navigate('CustomerHome')}
+                >
+                    <Navigation size={24} color="#1F2937" />
+                </TouchableOpacity>
+            )}
+
             <View style={styles.bottomSheet}>
                 <View style={styles.statusHeader}>
                     <Text style={[styles.etaText, isArrived && { color: Colors.success }]}>
@@ -323,6 +337,11 @@ const styles = StyleSheet.create({
         width: 40, height: 40, backgroundColor: Colors.primary, borderRadius: 20,
         alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff',
         shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, elevation: 5
+    },
+    homeButton: {
+        position: 'absolute', top: 50, left: 20, width: 44, height: 44,
+        backgroundColor: '#fff', borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+        shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3, zIndex: 50
     },
     bottomSheet: {
         position: 'absolute', bottom: 0, width: width, backgroundColor: '#fff',

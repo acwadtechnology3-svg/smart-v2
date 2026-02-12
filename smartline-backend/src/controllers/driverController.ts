@@ -115,6 +115,7 @@ export const registerDriver = async (req: Request, res: Response) => {
       vehicle_back_url,
       vehicle_right_url,
       vehicle_left_url,
+      is_travel_captain_request,
     } = req.body;
 
     const { error } = await supabase
@@ -139,6 +140,8 @@ export const registerDriver = async (req: Request, res: Response) => {
           vehicle_back_url,
           vehicle_right_url,
           vehicle_left_url,
+          is_travel_captain: is_travel_captain_request || false,
+          travel_captain_status: is_travel_captain_request ? 'pending' : 'none',
         },
         { onConflict: 'id' }
       );

@@ -35,7 +35,7 @@ export default function DriverSignupScreen() {
         }
         navigation.navigate('DriverVehicle', {
             phone,
-            name: '', // Name is already set in User profile, not needed here
+            name: '',
             nationalId,
             city
         });
@@ -43,6 +43,7 @@ export default function DriverSignupScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Header ... */}
             <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
                     <ArrowLeft size={28} color={Colors.textPrimary} style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />

@@ -34,7 +34,8 @@ export default function DriverHomeScreen() {
     const [dailyEarnings, setDailyEarnings] = useState(0);
     const [walletBalance, setWalletBalance] = useState(0);
     const [incomingTrip, setIncomingTrip] = useState<any>(null);
-    const [ignoredTripIds, setIgnoredTripIds] = useState<Set<string>>(new Set());
+    // Track ignored IDs AND their price. If price changes, show again.
+    const [ignoredTrips, setIgnoredTrips] = useState<Map<string, number>>(new Map());
     const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
     const [safetyModalVisible, setSafetyModalVisible] = useState(false);
 
@@ -179,7 +180,14 @@ export default function DriverHomeScreen() {
 
                     if (trips && trips.length > 0) {
                         const validTrips = trips.filter(trip => {
-                            if (ignoredTripIds.has(trip.id)) return false;
+                            // Check if ignored
+                            if (ignoredTrips.has(trip.id)) {
+                                const ignoredPrice = ignoredTrips.get(trip.id);
+                                // If price changed (increased), show it again!
+                                if (trip.price === ignoredPrice) {
+                                    return false;
+                                }
+                            }
                             if (!trip.pickup_lat) return false;
 
                             const dist = getDistanceFromLatLonInKm(
@@ -208,11 +216,15 @@ export default function DriverHomeScreen() {
         }
 
         return () => clearInterval(pollInterval);
-    }, [isOnline, location, incomingTrip, ignoredTripIds, driverProfile]);
+    }, [isOnline, location, incomingTrip, ignoredTrips, driverProfile]);
 
     const handleDeclineTrip = () => {
         if (incomingTrip) {
-            setIgnoredTripIds(prev => new Set(prev).add(incomingTrip.id));
+            setIgnoredTrips(prev => {
+                const newMap = new Map(prev);
+                newMap.set(incomingTrip.id, incomingTrip.price);
+                return newMap;
+            });
         }
         setIncomingTrip(null);
     };
@@ -399,8 +411,18 @@ export default function DriverHomeScreen() {
                     }
                     processedAcceptedTrips.current.add(tripId);
 
-                    console.log(`[DriverHome] Offer accepted for ${tripId}. Navigating...`);
-                    navigation.navigate('DriverActiveTrip', { tripId });
+                    if (payload.new.is_travel_request) {
+                        console.log(`[DriverHome] Travel Request Accepted. Staying on Home.`);
+                        Alert.alert(
+                            "🎉 Offer Accepted!",
+                            "You can find this trip in your 'Scheduled Trips' or 'History'.",
+                            [{ text: "OK" }]
+                        );
+                        // Refresh data or whatever
+                    } else {
+                        console.log(`[DriverHome] Offer accepted for ${tripId}. Navigating...`);
+                        navigation.navigate('DriverActiveTrip', { tripId });
+                    }
                 }
             }
         );
@@ -430,7 +452,11 @@ export default function DriverHomeScreen() {
             console.log("Offer Inserted Successfully:", tripId, amount);
 
             // Ignore this trip so it doesn't reappear in polling
-            setIgnoredTripIds(prev => new Set(prev).add(tripId));
+            setIgnoredTrips(prev => {
+                const newMap = new Map(prev);
+                newMap.set(tripId, amount); // Store our bid as the 'seen' price
+                return newMap;
+            });
 
             Alert.alert("Offer Sent", "Waiting for customer to accept...");
             setIncomingTrip(null);
@@ -655,7 +681,7 @@ export default function DriverHomeScreen() {
                 visible={!!incomingTrip}
                 trip={incomingTrip}
                 onAccept={handleAcceptTrip}
-                onDecline={() => setIncomingTrip(null)}
+                onDecline={handleDeclineTrip}
                 // @ts-ignore
                 onBid={handleBidTrip}
             />

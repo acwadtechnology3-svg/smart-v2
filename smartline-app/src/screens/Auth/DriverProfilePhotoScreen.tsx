@@ -20,7 +20,7 @@ import { useLanguage } from '../../context/LanguageContext';
 export default function DriverProfilePhotoScreen() {
     const navigation = useNavigation<DriverProfilePhotoScreenNavigationProp>();
     const route = useRoute<DriverProfilePhotoScreenRouteProp>();
-    const { phone, name, nationalId, city, vehicleType, vehicleModel, vehiclePlate } = route.params;
+    const { phone, name, nationalId, city, vehicleType, vehicleModel, vehiclePlate, isTravelCaptain } = route.params;
     const { t, isRTL } = useLanguage();
 
     const [photo, setPhoto] = useState<string | null>(null);
@@ -55,7 +55,8 @@ export default function DriverProfilePhotoScreen() {
             vehicleType,
             vehicleModel,
             vehiclePlate,
-            profilePhoto: photo
+            profilePhoto: photo,
+            isTravelCaptain
         });
     };
 

@@ -24,7 +24,7 @@ export default function DriverDocumentsScreen() {
 
     // We expect profilePhoto to be passed from the previous screen (DriverProfilePhoto)
     // @ts-ignore 
-    const { phone, name, nationalId, city, vehicleType, vehicleModel, vehiclePlate, profilePhoto } = route.params;
+    const { phone, name, nationalId, city, vehicleType, vehicleModel, vehiclePlate, profilePhoto, isTravelCaptain } = route.params;
 
     const [documents, setDocuments] = useState<{ [key: string]: string | null }>({
         idFront: null,
@@ -166,6 +166,7 @@ export default function DriverDocumentsScreen() {
                     vehicle_back_url: uploadedUrls.vehicle_back_url,
                     vehicle_left_url: uploadedUrls.vehicle_left_url,
                     vehicle_right_url: uploadedUrls.vehicle_right_url,
+                    is_travel_captain_request: isTravelCaptain || false
                 })
             });
 

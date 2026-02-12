@@ -98,7 +98,10 @@ export default function LocationPickerScreen() {
         navigation.navigate('SearchLocation', {
             selectedAddress: address,
             selectedCoordinates: { latitude: currentRegion.latitude, longitude: currentRegion.longitude },
-            field: field
+            field: field,
+            returnScreen: route.params.returnScreen,
+            currentPickup: route.params.currentPickup,
+            currentDest: route.params.currentDest
         });
     };
 

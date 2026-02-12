@@ -23,6 +23,7 @@ import SearchingDriverScreen from '../screens/Customer/SearchingDriverScreen';
 import DriverFoundScreen from '../screens/Customer/DriverFoundScreen';
 import OnTripScreen from '../screens/Customer/OnTripScreen';
 import TripCompleteScreen from '../screens/Customer/TripCompleteScreen';
+import TravelRequestScreen from '../screens/Customer/TravelRequestScreen';
 import WalletScreen from '../screens/Customer/WalletScreen';
 import MyTripsScreen from '../screens/Customer/MyTripsScreen';
 import DiscountsScreen from '../screens/Customer/DiscountsScreen';
@@ -100,6 +101,7 @@ export default function AppNavigator() {
                 <Stack.Screen name="DriverFound" component={DriverFoundScreen} />
                 <Stack.Screen name="OnTrip" component={OnTripScreen} />
                 <Stack.Screen name="TripComplete" component={TripCompleteScreen} />
+                <Stack.Screen name="TravelRequest" component={TravelRequestScreen} />
                 <Stack.Screen name="Wallet" component={WalletScreen} />
                 <Stack.Screen name="MyTrips" component={MyTripsScreen} />
                 <Stack.Screen name="Discounts" component={DiscountsScreen} />

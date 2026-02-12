@@ -8,8 +8,8 @@ export type RootStackParamList = {
     DriverHome: undefined;
     DriverSignup: { phone: string };
     DriverVehicle: { phone: string; name: string; nationalId: string; city: string };
-    DriverProfilePhoto: { phone: string; name: string; nationalId: string; city: string; vehicleType: string; vehicleModel: string; vehiclePlate: string };
-    DriverDocuments: { phone: string; name: string; nationalId: string; city: string; vehicleType: string; vehicleModel: string; vehiclePlate: string; profilePhoto: string };
+    DriverProfilePhoto: { phone: string; name: string; nationalId: string; city: string; vehicleType: string; vehicleModel: string; vehicleYear?: string; vehiclePlate: string; vehicleColor?: string; isTravelCaptain?: boolean };
+    DriverDocuments: { phone: string; name: string; nationalId: string; city: string; vehicleType: string; vehicleModel: string; vehiclePlate: string; profilePhoto: string; isTravelCaptain?: boolean };
     DriverWaiting: undefined;
     OTPVerification: { phone: string; role: 'customer' | 'driver'; purpose?: 'signup' | 'reset-password' };
     ResetPassword: { phone: string };
@@ -17,13 +17,17 @@ export type RootStackParamList = {
         selectedAddress?: string;
         selectedCoordinates?: { latitude: number; longitude: number };
         field?: 'pickup' | 'destination';
+        returnScreen?: keyof RootStackParamList; // Allows returning to any screen by name
+        currentPickup?: any;
+        currentDest?: any;
     } | undefined;
-    LocationPicker: { field: 'pickup' | 'destination' };
+    LocationPicker: { field: 'pickup' | 'destination'; returnScreen?: keyof RootStackParamList; currentPickup?: any; currentDest?: any };
     TripOptions: { pickup: string; destination: string; destinationCoordinates?: [number, number]; preselectedRide?: string; pickupCoordinates?: [number, number]; autoRequest?: boolean };
     SearchingDriver: { tripId: string };
     DriverFound: { tripId: string; driver?: any };
     OnTrip: { tripId: string };
     TripComplete: { tripId: string };
+    TravelRequest: { pickup?: any; destination?: any };
     Wallet: undefined;
     MyTrips: undefined;
     Discounts: undefined;

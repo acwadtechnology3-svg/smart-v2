@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, Image, ImageSourcePropType } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, Image, ImageSourcePropType, Switch } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
@@ -20,6 +20,14 @@ export default function DriverVehicleScreen() {
     const [vehicleType, setVehicleType] = useState<'car' | 'motorcycle' | 'taxi' | null>(null);
     const [vehicleModel, setVehicleModel] = useState('');
     const [vehiclePlate, setVehiclePlate] = useState('');
+    const [isTravelCaptain, setIsTravelCaptain] = useState(false);
+
+    // Reset Travel Captain if changing away from car
+    React.useEffect(() => {
+        if (vehicleType !== 'car') {
+            setIsTravelCaptain(false);
+        }
+    }, [vehicleType]);
 
     const handleNext = () => {
         if (!vehicleType || !vehicleModel || !vehiclePlate) {
@@ -35,6 +43,7 @@ export default function DriverVehicleScreen() {
             vehicleType,
             vehicleModel,
             vehiclePlate,
+            isTravelCaptain,
         });
     };
 
@@ -98,6 +107,32 @@ export default function DriverVehicleScreen() {
                         onChangeText={setVehiclePlate}
                     />
                 </View>
+
+                {vehicleType === 'car' && (
+                    <View style={[styles.inputContainer, { marginBottom: 32 }]}>
+                        <View style={{
+                            flexDirection: isRTL ? 'row-reverse' : 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 12,
+                            borderWidth: 1,
+                            borderColor: isTravelCaptain ? Colors.primary : Colors.border,
+                            borderRadius: 8,
+                            backgroundColor: isTravelCaptain ? '#F0F9FF' : '#fff'
+                        }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>Apply as Travel Captain</Text>
+                                <Text style={{ fontSize: 12, color: Colors.textSecondary, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>Receive long-distance intercity requests (50km range)</Text>
+                            </View>
+                            <Switch
+                                value={isTravelCaptain}
+                                onValueChange={setIsTravelCaptain}
+                                trackColor={{ false: '#ccc', true: Colors.primary }}
+                                thumbColor={'#fff'}
+                            />
+                        </View>
+                    </View>
+                )}
 
                 <TouchableOpacity style={styles.button} onPress={handleNext}>
                     <Text style={styles.buttonText}>{t('nextProfilePhoto')}</Text>

@@ -16,7 +16,8 @@ async function runMigration() {
         await client.connect();
         console.log('Connected.');
 
-        const sqlPath = path.resolve(__dirname, '../../../../ADD_WAITING_TIME_LOGIC.sql');
+        // Use absolute path for safety
+        const sqlPath = 'c:\\Users\\Ezzat\\Desktop\\smartline\\ADD_INTERCITY_COLUMNS_TO_TRIPS.sql';
         console.log('Reading migration file:', sqlPath);
 
         if (!fs.existsSync(sqlPath)) {

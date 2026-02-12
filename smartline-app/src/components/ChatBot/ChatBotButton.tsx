@@ -1,60 +1,180 @@
-import React from 'react';
-import { TouchableOpacity, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+    Animated,
+    PanResponder,
+    StyleSheet,
+    Text,
+    View,
+    Dimensions
+} from 'react-native';
 import { MessageCircle } from 'lucide-react-native';
-import { Colors } from '../../constants/Colors';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Colors } from '../../constants/Colors';
 
 interface ChatBotButtonProps {
     onPress: () => void;
 }
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const BUTTON_SIZE = 70;
+const EDGE_PADDING = 16;
+
 export default function ChatBotButton({ onPress }: ChatBotButtonProps) {
+    const initialPosition = {
+        x: SCREEN_WIDTH - BUTTON_SIZE - EDGE_PADDING,
+        y: SCREEN_HEIGHT - BUTTON_SIZE - 180,
+    };
+
+    const position = useRef(new Animated.ValueXY(initialPosition)).current;
+    const pulse = useRef(new Animated.Value(1)).current;
+    const lastPosition = useRef(initialPosition);
+    const gestureStart = useRef(initialPosition);
+    const hasMoved = useRef(false);
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulse, {
+                    toValue: 1.08,
+                    duration: 1200,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulse, {
+                    toValue: 1,
+                    duration: 1200,
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    }, []);
+
+    const clamp = (value: number, min: number, max: number) => {
+        'worklet';
+        return Math.min(Math.max(value, min), max);
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onPanResponderGrant: () => {
+                hasMoved.current = false;
+                gestureStart.current = { ...lastPosition.current };
+            },
+            onPanResponderMove: (_, gesture) => {
+                hasMoved.current = true;
+                const nextX = clamp(
+                    gestureStart.current.x + gesture.dx,
+                    EDGE_PADDING,
+                    SCREEN_WIDTH - BUTTON_SIZE - EDGE_PADDING
+                );
+                const nextY = clamp(
+                    gestureStart.current.y + gesture.dy,
+                    EDGE_PADDING,
+                    SCREEN_HEIGHT - BUTTON_SIZE - EDGE_PADDING
+                );
+                position.setValue({ x: nextX, y: nextY });
+                lastPosition.current = { x: nextX, y: nextY };
+            },
+            onPanResponderRelease: (_, gesture) => {
+                const distance = Math.abs(gesture.dx) + Math.abs(gesture.dy);
+                const releaseX = clamp(
+                    gestureStart.current.x + gesture.dx,
+                    EDGE_PADDING,
+                    SCREEN_WIDTH - BUTTON_SIZE - EDGE_PADDING
+                );
+                const releaseY = clamp(
+                    gestureStart.current.y + gesture.dy,
+                    EDGE_PADDING,
+                    SCREEN_HEIGHT - BUTTON_SIZE - EDGE_PADDING
+                );
+                position.setValue({ x: releaseX, y: releaseY });
+                lastPosition.current = { x: releaseX, y: releaseY };
+
+                if (!hasMoved.current || distance < 10) {
+                    onPress();
+                }
+            },
+        })
+    ).current;
+
     return (
-        <TouchableOpacity
-            style={styles.container}
-            onPress={onPress}
-            activeOpacity={0.9}
+        <Animated.View
+            {...panResponder.panHandlers}
+            style={[
+                styles.container,
+                {
+                    transform: [{ scale: pulse }],
+                    left: position.x,
+                    top: position.y,
+                },
+            ]}
         >
             <LinearGradient
-                colors={[Colors.primary, '#1D4ED8']}
+                colors={['#2563EB', Colors.primary]}
                 style={styles.gradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <MessageCircle size={28} color="#FFFFFF" fill="#FFFFFF" />
+                <View style={styles.wave}>
+                    <Animated.View
+                        style={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: 30,
+                            borderWidth: 1,
+                            borderColor: 'rgba(255,255,255,0.2)',
+                        }}
+                    />
+                </View>
+                <MessageCircle size={26} color="#FFFFFF" fill="#FFFFFF" />
+                <Text style={styles.label}>Help</Text>
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>AI</Text>
                 </View>
             </LinearGradient>
-        </TouchableOpacity>
+        </Animated.View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        bottom: 30,
-        right: 20,
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        shadowColor: Colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
+        width: BUTTON_SIZE,
+        height: BUTTON_SIZE,
+        borderRadius: BUTTON_SIZE / 2,
+        shadowColor: '#1E40AF',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 12,
+        zIndex: 20,
     },
     gradient: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 32,
+        flex: 1,
+        borderRadius: BUTTON_SIZE / 2,
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    wave: {
+        position: 'absolute',
+        width: BUTTON_SIZE,
+        height: BUTTON_SIZE,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: 0.5,
+    },
+    label: {
+        color: '#F8FAFC',
+        fontSize: 11,
+        marginTop: 4,
+        fontWeight: '600',
+        letterSpacing: 0.4,
     },
     badge: {
         position: 'absolute',
-        top: -4,
-        right: -4,
+        top: -2,
+        right: -2,
         backgroundColor: '#10B981',
         width: 24,
         height: 24,
@@ -67,6 +187,6 @@ const styles = StyleSheet.create({
     badgeText: {
         color: '#FFFFFF',
         fontSize: 10,
-        fontWeight: '900',
+        fontWeight: '800',
     },
 });

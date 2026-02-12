@@ -10,7 +10,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Animated
 } from 'react-native';
 import { X, Send, MapPin } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
@@ -23,6 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import MapPickerModal from './MapPickerModal';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface ChatBotModalProps {
     visible: boolean;
@@ -38,6 +40,8 @@ export default function ChatBotModal({ visible, onClose }: ChatBotModalProps) {
     const [showMapPicker, setShowMapPicker] = useState(false);
     const [mapPickerTitle, setMapPickerTitle] = useState('');
     const scrollViewRef = useRef<ScrollView>(null);
+    const overlayOpacity = useRef(new Animated.Value(0)).current;
+    const cardTranslate = useRef(new Animated.Value(40)).current;
 
     useEffect(() => {
         if (visible && messages.length === 0) {
@@ -48,11 +52,57 @@ export default function ChatBotModal({ visible, onClose }: ChatBotModalProps) {
     }, [visible]);
 
     useEffect(() => {
+        if (visible) {
+            animateIn();
+        } else {
+            overlayOpacity.setValue(0);
+            cardTranslate.setValue(40);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visible]);
+
+    useEffect(() => {
         // Auto-scroll to bottom when new messages arrive
         setTimeout(() => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
     }, [messages]);
+
+    const animateIn = () => {
+        overlayOpacity.setValue(0);
+        cardTranslate.setValue(40);
+        Animated.parallel([
+            Animated.timing(overlayOpacity, {
+                toValue: 1,
+                duration: 220,
+                useNativeDriver: true,
+            }),
+            Animated.spring(cardTranslate, {
+                toValue: 0,
+                damping: 16,
+                stiffness: 120,
+                mass: 0.9,
+                useNativeDriver: true,
+            })
+        ]).start();
+    };
+
+    const animateOut = (callback?: () => void) => {
+        Animated.parallel([
+            Animated.timing(overlayOpacity, {
+                toValue: 0,
+                duration: 180,
+                useNativeDriver: true,
+            }),
+            Animated.timing(cardTranslate, {
+                toValue: 40,
+                duration: 180,
+                useNativeDriver: true,
+            })
+        ]).start(() => {
+            if (callback) callback();
+        });
+    };
 
     const addMessage = (message: ChatMessage) => {
         setMessages(prev => [...prev, message]);
@@ -208,87 +258,117 @@ export default function ChatBotModal({ visible, onClose }: ChatBotModalProps) {
     };
 
     const handleClose = () => {
-        chatBotService.resetConversation();
-        setMessages([]);
-        onClose();
+        animateOut(() => {
+            chatBotService.resetConversation();
+            setMessages([]);
+            setShowMapPicker(false);
+            onClose();
+        });
     };
 
     const lastMessage = messages[messages.length - 1];
 
     return (
-        <Modal
-            visible={visible}
-            animationType="slide"
-            transparent={false}
-            onRequestClose={handleClose}
-        >
-            <KeyboardAvoidingView
-                style={styles.container}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <>
+            <Modal
+                visible={visible}
+                transparent
+                animationType="none"
+                onRequestClose={handleClose}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <View style={[styles.headerContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                            <X size={24} color="#1F2937" />
-                        </TouchableOpacity>
-                        <View style={styles.headerTextContainer}>
-                            <Text style={styles.headerTitle}>مساعد الحجز الذكي 🤖</Text>
-                            <Text style={styles.headerSubtitle}>دعني أساعدك في حجز رحلتك</Text>
-                        </View>
-                    </View>
-                </View>
+                <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}> 
+                    <KeyboardAvoidingView
+                        style={styles.keyboardView}
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    >
+                        <Animated.View style={[styles.sheet, { transform: [{ translateY: cardTranslate }] }]}> 
+                            <View style={styles.handle} />
+                            <LinearGradient
+                                colors={['#DBEAFE', '#FFFFFF']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.hero}
+                            >
+                                <View style={[styles.heroHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}> 
+                                    <View style={styles.avatar}>
+                                        <Text style={styles.avatarEmoji}>🤖</Text>
+                                    </View>
+                                    <View style={styles.heroText}>
+                                        <Text style={styles.heroTitle}>مساعد الحجز الذكي</Text>
+                                        <Text style={styles.heroSubtitle}>خطوات بسيطة لحجز رحلتك</Text>
+                                        <View style={[styles.heroBadge, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <MapPin size={14} color="#0F172A" />
+                                            <Text style={styles.heroBadgeText}>اختر المواقع بسهولة</Text>
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                                        <X size={22} color="#0F172A" />
+                                    </TouchableOpacity>
+                                </View>
+                            </LinearGradient>
 
-                {/* Messages */}
-                <ScrollView
-                    ref={scrollViewRef}
-                    style={styles.messagesContainer}
-                    contentContainerStyle={styles.messagesContent}
-                >
-                    {messages.map((message) => (
-                        <MessageBubble
-                            key={message.id}
-                            role={message.role}
-                            text={message.text}
-                            timestamp={message.timestamp}
-                        />
-                    ))}
-                    {loading && (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator color={Colors.primary} />
-                            <Text style={styles.loadingText}>جاري المعالجة...</Text>
-                        </View>
-                    )}
-                </ScrollView>
+                            <View style={styles.messagesWrapper}>
+                                <ScrollView
+                                    ref={scrollViewRef}
+                                    style={styles.messagesContainer}
+                                    contentContainerStyle={styles.messagesContent}
+                                >
+                                    {messages.map((message) => (
+                                        <MessageBubble
+                                            key={message.id}
+                                            role={message.role}
+                                            text={message.text}
+                                            timestamp={message.timestamp}
+                                        />
+                                    ))}
+                                    {loading && (
+                                        <View style={styles.loadingContainer}>
+                                            <ActivityIndicator color={Colors.primary} />
+                                            <Text style={styles.loadingText}>جاري المعالجة...</Text>
+                                        </View>
+                                    )}
+                                </ScrollView>
+                            </View>
 
-                {/* Quick Actions */}
-                {lastMessage?.quickActions && (
-                    <QuickActions
-                        actions={lastMessage.quickActions}
-                        onActionPress={handleActionPress}
-                    />
-                )}
+                            {lastMessage?.quickActions && (
+                                <View style={styles.quickActionsWrapper}>
+                                    <QuickActions
+                                        actions={lastMessage.quickActions}
+                                        onActionPress={handleActionPress}
+                                    />
+                                </View>
+                            )}
 
-                {/* Input */}
-                {chatBotService.getCurrentStage() === 'destination' && (
-                    <View style={styles.inputContainer}>
-                        <TouchableOpacity
-                            style={styles.sendButton}
-                            onPress={handleSendMessage}
-                            disabled={!inputText.trim()}
-                        >
-                            <Send size={20} color={inputText.trim() ? Colors.primary : '#9CA3AF'} />
-                        </TouchableOpacity>
-                        <TextInput
-                            style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
-                            placeholder="اكتب عنوان الوجهة..."
-                            value={inputText}
-                            onChangeText={setInputText}
-                            onSubmitEditing={handleSendMessage}
-                        />
-                    </View>
-                )}
-            </KeyboardAvoidingView>
+                            {chatBotService.getCurrentStage() === 'destination' && (
+                                <View style={[styles.inputContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}> 
+                                    <TextInput
+                                        style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                                        placeholder="اكتب عنوان الوجهة..."
+                                        value={inputText}
+                                        onChangeText={setInputText}
+                                        onSubmitEditing={handleSendMessage}
+                                    />
+                                    <TouchableOpacity
+                                        style={styles.sendButton}
+                                        onPress={handleSendMessage}
+                                        disabled={!inputText.trim()}
+                                        activeOpacity={0.9}
+                                    >
+                                        <LinearGradient
+                                            colors={['#2563EB', Colors.primary]}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={[styles.sendGradient, { opacity: inputText.trim() ? 1 : 0.6 }]}
+                                        >
+                                            <Send size={20} color="#FFFFFF" />
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </Animated.View>
+                    </KeyboardAvoidingView>
+                </Animated.View>
+            </Modal>
 
             <MapPickerModal
                 visible={showMapPicker}
@@ -296,46 +376,103 @@ export default function ChatBotModal({ visible, onClose }: ChatBotModalProps) {
                 onLocationSelected={handleMapLocationSelected}
                 title={mapPickerTitle}
             />
-        </Modal>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    overlay: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: 'rgba(15, 23, 42, 0.7)',
+        justifyContent: 'flex-end',
     },
-    header: {
+    keyboardView: {
+        flex: 1,
+        justifyContent: 'flex-end',
+    },
+    sheet: {
         backgroundColor: '#FFFFFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-        paddingTop: 50,
-        paddingBottom: 16,
-        paddingHorizontal: 16,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        paddingBottom: 12,
+        overflow: 'hidden',
+        maxHeight: '95%',
     },
-    headerContent: {
-        flexDirection: 'row',
+    handle: {
+        width: 54,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(148, 163, 184, 0.6)',
+        alignSelf: 'center',
+        marginTop: 10,
+        marginBottom: 6,
+    },
+    hero: {
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: 16,
+    },
+    heroHeader: {
         alignItems: 'center',
     },
-    closeButton: {
-        width: 40,
-        height: 40,
+    avatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: '#FFFFFF',
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: '#0EA5E9',
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+        marginHorizontal: 8,
     },
-    headerTextContainer: {
+    avatarEmoji: {
+        fontSize: 28,
+    },
+    heroText: {
         flex: 1,
-        marginLeft: 12,
+        paddingHorizontal: 8,
     },
-    headerTitle: {
-        fontSize: 18,
+    heroTitle: {
+        fontSize: 20,
         fontWeight: '700',
-        color: '#1F2937',
+        color: '#0F172A',
     },
-    headerSubtitle: {
-        fontSize: 13,
-        color: '#6B7280',
-        marginTop: 2,
+    heroSubtitle: {
+        fontSize: 14,
+        color: '#1E293B',
+        marginTop: 4,
+    },
+    heroBadge: {
+        marginTop: 10,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        backgroundColor: 'rgba(248, 250, 252, 0.7)',
+        borderRadius: 999,
+        alignItems: 'center',
+        gap: 6,
+        alignSelf: 'flex-start',
+    },
+    heroBadgeText: {
+        color: '#0F172A',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    closeButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: 'rgba(248,250,252,0.9)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    messagesWrapper: {
+        flex: 1,
+        paddingHorizontal: 4,
     },
     messagesContainer: {
         flex: 1,
@@ -351,30 +488,36 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginLeft: 8,
-        color: '#6B7280',
+        color: '#64748B',
         fontSize: 14,
     },
-    inputContainer: {
-        flexDirection: 'row',
-        padding: 16,
+    quickActionsWrapper: {
+        paddingVertical: 4,
         backgroundColor: '#FFFFFF',
-        borderTopWidth: 1,
-        borderTopColor: '#E5E7EB',
+    },
+    inputContainer: {
+        padding: 16,
+        paddingBottom: 24,
+        alignItems: 'center',
+        gap: 12,
     },
     input: {
         flex: 1,
-        height: 44,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 22,
-        paddingHorizontal: 16,
-        fontSize: 15,
-        marginRight: 8,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 18,
+        fontSize: 16,
+        color: '#0F172A',
     },
     sendButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#EFF6FF',
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+    },
+    sendGradient: {
+        flex: 1,
+        borderRadius: 26,
         alignItems: 'center',
         justifyContent: 'center',
     },

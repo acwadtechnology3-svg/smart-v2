@@ -217,18 +217,24 @@ export const createTrip = async (req: Request, res: Response) => {
                 console.error("Error broadcasting Travel Request:", err);
             }
         } else {
-            // Standard Broadcast
-            // Augment payload with aliases for Driver App compatibility
+            // Standard Broadcast: Only to drivers within 5km
             const broadcastPayload = {
                 ...data,
-                // Aliases
                 pickup_location: data.pickup_address,
                 destination_location: data.dest_address,
-                // Ensure number types
                 distance: finalDistance,
                 duration: finalDuration
             };
-            broadcastToDrivers('INSERT', broadcastPayload);
+
+            const nearby = await locationCache.getNearbyDrivers(parseFloat(pickup_lat), parseFloat(pickup_lng), 5, 100);
+            const targetIds = nearby.map(d => d.driverId);
+
+            if (targetIds.length > 0) {
+                notifyDrivers(targetIds, 'INSERT', broadcastPayload);
+                console.log(`[Trip Broadcast] Sent request to ${targetIds.length} drivers within 5km.`);
+            } else {
+                console.log(`[Trip Broadcast] No online drivers found within 5km.`);
+            }
         }
 
         res.status(201).json({ trip: data });
@@ -604,19 +610,37 @@ export const getActiveTrip = async (req: Request, res: Response) => {
 
 export const getRequestedTrips = async (req: Request, res: Response) => {
     try {
-        // Simple fetch for all requested trips.
-        // In production, add geospatial filtering (PostGIS) or simple lat/lng box query.
-        // For now, fetch latest 10 requested trips.
-        const { data, error } = await supabase
+        const driverId = req.user?.id;
+
+        // 1. Fetch requested trips from DB
+        const { data: trips, error } = await supabase
             .from('trips')
             .select('*')
             .eq('status', 'requested')
+            .eq('is_travel_request', false) // City trips only
             .order('created_at', { ascending: false })
-            .limit(50);
+            .limit(100);
 
         if (error) throw error;
+        if (!trips || trips.length === 0) return res.json({ trips: [] });
 
-        res.json({ trips: data || [] });
+        // 2. If we have driver ID, filter by distance (5km limit)
+        if (driverId) {
+            const driverLoc = await locationCache.getDriverLocation(driverId);
+            if (driverLoc) {
+                const filtered = trips.filter(trip => {
+                    const dist = calculateDistance(
+                        driverLoc.lat, driverLoc.lng,
+                        parseFloat(trip.pickup_lat), parseFloat(trip.pickup_lng)
+                    );
+                    return dist <= 5; // 5km Limit
+                });
+                return res.json({ trips: filtered });
+            }
+        }
+
+        // Fallback: return all if location unknown (though app should provide it)
+        res.json({ trips: trips || [] });
 
     } catch (err: any) {
         res.status(500).json({ error: err.message });

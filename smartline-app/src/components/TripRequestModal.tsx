@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Colors } from '../constants/Colors';
-import { MapPin, Clock, CircleDollarSign, X, Check } from 'lucide-react-native';
+import { MapPin, Clock, CircleDollarSign, X, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
@@ -18,14 +18,16 @@ export default function TripRequestModal({ visible, trip, onAccept, onDecline, o
     const { t, isRTL } = useLanguage();
     const [bidAmount, setBidAmount] = useState('');
     const [showBidInput, setShowBidInput] = useState(false);
+    const [isMinimized, setIsMinimized] = useState(false);
 
     useEffect(() => {
         if (trip) {
             setBidAmount(trip.price?.toString() || '');
+            setIsMinimized(false); // Reset on new trip
         }
     }, [trip]);
 
-    if (!trip) return null;
+    if (!trip || !visible) return null;
 
     const handleBid = () => {
         const amount = parseFloat(bidAmount);
@@ -41,103 +43,136 @@ export default function TripRequestModal({ visible, trip, onAccept, onDecline, o
     const themeColor = isTravelRequest ? '#7C3AED' : Colors.primary; // Purple for Travel, Primary for City
 
     return (
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={onDecline}>
+        <View style={styles.overlay} pointerEvents="box-none">
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.overlay}
+                style={{ flex: 1, justifyContent: 'flex-end' }}
             >
-                <View style={[styles.card, isTravelRequest && { borderTopWidth: 4, borderColor: themeColor }]}>
-                    {/* Header */}
+                <View style={[
+                    styles.card,
+                    isTravelRequest && { borderTopWidth: 4, borderColor: themeColor },
+                    isMinimized && { paddingBottom: 20 }
+                ]}>
+                    {/* Header with Minimize Toggle */}
                     <View style={[styles.header, rowStyle]}>
-                        <Text style={[styles.title, isTravelRequest && { color: themeColor, fontWeight: '900' }]}>
-                            {isTravelRequest ? t('intercityTravel') || 'INTERCITY TRAVEL' : t('newRequest')}
-                        </Text>
+                        <TouchableOpacity
+                            style={[rowStyle, { alignItems: 'center', flex: 1 }]}
+                            onPress={() => setIsMinimized(!isMinimized)}
+                        >
+                            <View style={{ transform: [{ rotate: isMinimized ? '180deg' : '0deg' }], marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }}>
+                                <ChevronDown size={24} color={themeColor} />
+                            </View>
+                            <Text style={[styles.title, isTravelRequest && { color: themeColor, fontWeight: '900' }]}>
+                                {isTravelRequest ? t('intercityTravel') || 'INTERCITY TRAVEL' : t('newRequest')}
+                            </Text>
+                        </TouchableOpacity>
+
                         <View style={[styles.timerBadge, isTravelRequest && { backgroundColor: themeColor }]}>
                             <Clock size={14} color="#fff" />
                             <Text style={styles.timerText}>{isTravelRequest ? 'Expires in 60s' : '30s'}</Text>
                         </View>
                     </View>
 
-                    <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                        {/* Route Info */}
-                        <View style={styles.routeContainer}>
-                            <View style={[styles.routeRow, rowStyle]}>
-                                <View style={[styles.dot, { backgroundColor: themeColor, marginLeft: isRTL ? 12 : 0, marginRight: isRTL ? 0 : 12 }]} />
-                                <Text style={[styles.address, textAlign]} numberOfLines={2}>{trip.pickup_address || t('pickup')}</Text>
+                    {!isMinimized && (
+                        <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                            {/* Route Info */}
+                            <View style={styles.routeContainer}>
+                                <View style={[styles.routeRow, rowStyle]}>
+                                    <View style={[styles.dot, { backgroundColor: themeColor, marginLeft: isRTL ? 12 : 0, marginRight: isRTL ? 0 : 12 }]} />
+                                    <Text style={[styles.address, textAlign]} numberOfLines={2}>
+                                        {trip.pickup_address === 'Current Location' ? t('currentLocation') : (trip.pickup_address || t('pickup'))}
+                                    </Text>
+                                </View>
+                                <View style={[styles.connector, { marginLeft: isRTL ? 0 : 5, marginRight: isRTL ? 5 : 0 }]} />
+                                <View style={[styles.routeRow, rowStyle]}>
+                                    <View style={[styles.dot, { backgroundColor: Colors.danger, marginLeft: isRTL ? 12 : 0, marginRight: isRTL ? 0 : 12 }]} />
+                                    <Text style={[styles.address, textAlign]} numberOfLines={2}>{trip.dest_address || t('dropoff')}</Text>
+                                </View>
                             </View>
-                            <View style={[styles.connector, { marginLeft: isRTL ? 0 : 5, marginRight: isRTL ? 5 : 0 }]} />
-                            <View style={[styles.routeRow, rowStyle]}>
-                                <View style={[styles.dot, { backgroundColor: Colors.danger, marginLeft: isRTL ? 12 : 0, marginRight: isRTL ? 0 : 12 }]} />
-                                <Text style={[styles.address, textAlign]} numberOfLines={2}>{trip.dest_address || t('dropoff')}</Text>
-                            </View>
-                        </View>
 
-                        {/* Stats */}
-                        <View style={[styles.statsRow, rowStyle]}>
-                            <View style={styles.stat}>
-                                <Text style={styles.statLabel}>{t('distance')}</Text>
-                                <Text style={styles.statValue}>{trip.distance?.toFixed(1) || 0} km</Text>
+                            {/* Stats */}
+                            <View style={[styles.statsRow, rowStyle]}>
+                                <View style={styles.stat}>
+                                    <Text style={styles.statLabel}>{t('distance')}</Text>
+                                    <Text style={styles.statValue}>{trip.distance?.toFixed(1) || 0} km</Text>
+                                </View>
+                                <View style={styles.stat}>
+                                    <Text style={styles.statLabel}>{t('estEarnings')}</Text>
+                                    <Text style={styles.statValue}>{Math.ceil(trip.duration || 0)} min</Text>
+                                </View>
+                                <View style={styles.stat}>
+                                    <Text style={styles.statLabel}>{t('price')}</Text>
+                                    <Text style={styles.statValue}>EGP {trip.price}</Text>
+                                </View>
                             </View>
-                            <View style={styles.stat}>
-                                <Text style={styles.statLabel}>{t('estEarnings')}</Text>
-                                <Text style={styles.statValue}>{Math.ceil(trip.duration || 0)} min</Text>
-                            </View>
-                            <View style={styles.stat}>
-                                <Text style={styles.statLabel}>{t('price')}</Text>
-                                <Text style={styles.statValue}>EGP {trip.price}</Text>
-                            </View>
-                        </View>
 
-                        {/* Actions */}
-                        {!showBidInput ? (
-                            <View style={[styles.actions, rowStyle]}>
-                                <TouchableOpacity style={styles.declineBtn} onPress={onDecline}>
-                                    <X size={24} color={Colors.textSecondary} />
-                                    <Text style={styles.declineText}>{t('decline')}</Text>
-                                </TouchableOpacity>
+                            {/* Actions */}
+                            {!showBidInput ? (
+                                <View style={[styles.actions, rowStyle]}>
+                                    <TouchableOpacity style={styles.declineBtn} onPress={onDecline}>
+                                        <X size={24} color={Colors.textSecondary} />
+                                        <Text style={styles.declineText}>{t('decline')}</Text>
+                                    </TouchableOpacity>
 
-                                <TouchableOpacity style={styles.bidBtn} onPress={() => setShowBidInput(true)}>
-                                    <Text style={styles.bidText}>{t('bid')}</Text>
-                                </TouchableOpacity>
+                                    <TouchableOpacity style={styles.bidBtn} onPress={() => setShowBidInput(true)}>
+                                        <Text style={styles.bidText}>{t('bid')}</Text>
+                                    </TouchableOpacity>
 
-                                <TouchableOpacity
-                                    style={[styles.acceptBtn, isTravelRequest && { backgroundColor: themeColor }]}
-                                    onPress={() => onAccept(trip.id)}
-                                >
-                                    <Text style={styles.acceptText}>{t('accept')} {trip.price}</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View style={styles.bidContainer}>
-                                <Text style={styles.bidLabel}>{t('bid')} (EGP)</Text>
-                                <View style={[styles.bidInputRow, rowStyle]}>
-                                    <TextInput
-                                        style={styles.bidInput}
-                                        value={bidAmount}
-                                        onChangeText={setBidAmount}
-                                        keyboardType="decimal-pad"
-                                        autoFocus
-                                        placeholder="0.00"
-                                    />
-                                    <TouchableOpacity style={styles.confirmBidBtn} onPress={handleBid}>
-                                        <Check size={24} color="#fff" />
+                                    <TouchableOpacity
+                                        style={[styles.acceptBtn, isTravelRequest && { backgroundColor: themeColor }]}
+                                        onPress={() => onAccept(trip.id)}
+                                    >
+                                        <Text style={styles.acceptText}>{t('accept')} {trip.price}</Text>
                                     </TouchableOpacity>
                                 </View>
-                                <TouchableOpacity style={styles.cancelBidBtn} onPress={() => setShowBidInput(false)}>
-                                    <Text style={styles.cancelBidText}>{t('cancel')}</Text>
-                                </TouchableOpacity>
+                            ) : (
+                                <View style={styles.bidContainer}>
+                                    <Text style={styles.bidLabel}>{t('bid')} (EGP)</Text>
+                                    <View style={[styles.bidInputRow, rowStyle]}>
+                                        <TextInput
+                                            style={styles.bidInput}
+                                            value={bidAmount}
+                                            onChangeText={setBidAmount}
+                                            keyboardType="decimal-pad"
+                                            autoFocus
+                                            placeholder="0.00"
+                                        />
+                                        <TouchableOpacity style={styles.confirmBidBtn} onPress={handleBid}>
+                                            <Check size={24} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                    <TouchableOpacity style={styles.cancelBidBtn} onPress={() => setShowBidInput(false)}>
+                                        <Text style={styles.cancelBidText}>{t('cancel')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </ScrollView>
+                    )}
+
+                    {isMinimized && (
+                        <View style={[rowStyle, { justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }]}>
+                            <View style={rowStyle}>
+                                <Text style={{ fontWeight: 'bold', fontSize: 18, color: themeColor }}>EGP {trip.price}</Text>
+                                <Text style={{ color: '#6B7280', marginHorizontal: 8 }}>•</Text>
+                                <Text style={{ color: '#4B5563' }}>{trip.distance?.toFixed(1)} km</Text>
                             </View>
-                        )}
-                    </ScrollView>
+                            <TouchableOpacity
+                                style={[styles.acceptBtn, { flex: 0, paddingHorizontal: 30, paddingVertical: 12 }, isTravelRequest && { backgroundColor: themeColor }]}
+                                onPress={() => onAccept(trip.id)}
+                            >
+                                <Text style={styles.acceptText}>{t('accept')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             </KeyboardAvoidingView>
-        </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    card: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+    overlay: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, justifyContent: 'flex-end', zIndex: 1000 },
+    card: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 20 },
 
     header: { justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     title: { fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary },

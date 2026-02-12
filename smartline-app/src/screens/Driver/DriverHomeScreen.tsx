@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, Image, Dimensions, Animated, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MapView, { UrlTile, Marker } from 'react-native-maps';
+import MapView, { UrlTile, Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Colors } from '../../constants/Colors';
 import { apiRequest } from '../../services/backend';
@@ -200,7 +200,7 @@ export default function DriverHomeScreen() {
                                 location.coords.latitude, location.coords.longitude,
                                 trip.pickup_lat, trip.pickup_lng
                             );
-                            return dist <= 50;
+                            return dist <= 5;
                         });
 
                         if (validTrips.length > 0) {
@@ -384,7 +384,7 @@ export default function DriverHomeScreen() {
                         loc.coords.latitude, loc.coords.longitude,
                         newTrip.pickup_lat, newTrip.pickup_lng
                     );
-                    if (dist < 1000) {
+                    if (dist <= 5) {
                         setIncomingTrip(newTrip);
                     }
                 } else {
@@ -577,6 +577,25 @@ export default function DriverHomeScreen() {
         }
     };
 
+    // Auto-fit map to show route when a trip request arrives
+    useEffect(() => {
+        if (incomingTrip && location && mapRef.current) {
+            const coords = [
+                { latitude: location.coords.latitude, longitude: location.coords.longitude },
+                { latitude: incomingTrip.pickup_lat, longitude: incomingTrip.pickup_lng },
+                { latitude: incomingTrip.dest_lat, longitude: incomingTrip.dest_lng }
+            ];
+
+            // Use a small timeout to ensure the modal/UI doesn't conflict with animation
+            setTimeout(() => {
+                mapRef.current?.fitToCoordinates(coords, {
+                    edgePadding: { top: 100, right: 100, bottom: 400, left: 100 },
+                    animated: true,
+                });
+            }, 500);
+        }
+    }, [incomingTrip]);
+
     return (
         <View style={styles.container}>
             {/* --- MAP LAYER --- */}
@@ -599,6 +618,35 @@ export default function DriverHomeScreen() {
                     tileSize={256}
                 />
                 <SurgeMapLayer />
+
+                {incomingTrip && (
+                    <>
+                        {/* Pickup Marker */}
+                        <Marker
+                            coordinate={{ latitude: incomingTrip.pickup_lat, longitude: incomingTrip.pickup_lng }}
+                            title={t('pickup')}
+                            pinColor="#4F46E5"
+                        />
+                        {/* Destination Marker */}
+                        <Marker
+                            coordinate={{ latitude: incomingTrip.dest_lat, longitude: incomingTrip.dest_lng }}
+                            title={t('destination')}
+                            pinColor="#EF4444"
+                        />
+
+                        {/* Route: Driver -> Pickup -> Destination */}
+                        <Polyline
+                            coordinates={[
+                                { latitude: location?.coords.latitude || 0, longitude: location?.coords.longitude || 0 },
+                                { latitude: incomingTrip.pickup_lat, longitude: incomingTrip.pickup_lng },
+                                { latitude: incomingTrip.dest_lat, longitude: incomingTrip.dest_lng }
+                            ]}
+                            strokeColor={Colors.primary}
+                            strokeWidth={4}
+                            lineDashPattern={[5, 5]}
+                        />
+                    </>
+                )}
             </MapView>
 
             {/* --- UI OVERLAY --- */}

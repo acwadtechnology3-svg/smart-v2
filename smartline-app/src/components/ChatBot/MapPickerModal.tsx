@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
-import { X, MapPin, Locate } from 'lucide-react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions, ActivityIndicator, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { UrlTile, Region, Marker } from 'react-native-maps';
+import { X, MapPin, Locate, Navigation } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
 import { useLanguage } from '../../context/LanguageContext';
 import * as Location from 'expo-location';
+import axios from 'axios';
 
 interface MapPickerModalProps {
     visible: boolean;
@@ -14,62 +16,146 @@ interface MapPickerModalProps {
 }
 
 const { width, height } = Dimensions.get('window');
+const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
+const DEFAULT_REGION: Region = {
+    latitude: 30.0444,
+    longitude: 31.2357,
+    latitudeDelta: 0.015,
+    longitudeDelta: 0.015,
+};
 
 export default function MapPickerModal({ visible, onClose, onLocationSelected, title }: MapPickerModalProps) {
     const { t, isRTL } = useLanguage();
     const mapRef = useRef<MapView>(null);
-    const [selectedLocation, setSelectedLocation] = useState({
-        latitude: 31.2001,
-        longitude: 29.9187,
-    });
-    const [markerCoordinate, setMarkerCoordinate] = useState(selectedLocation);
+    const [region, setRegion] = useState<Region>(DEFAULT_REGION);
     const [loading, setLoading] = useState(false);
+    const [locating, setLocating] = useState(false);
+    const [addressPreview, setAddressPreview] = useState('');
+    const [isMapReady, setIsMapReady] = useState(false);
 
-    const handleMapPress = (event: any) => {
-        const coordinate = event.nativeEvent.coordinate;
-        setMarkerCoordinate(coordinate);
+    useEffect(() => {
+        if (!visible) {
+            setIsMapReady(false);
+            return;
+        }
+
+        let isMounted = true;
+        setAddressPreview('');
+
+        (async () => {
+            try {
+                setLocating(true);
+                const { status } = await Location.requestForegroundPermissionsAsync();
+
+                if (status !== 'granted') {
+                    if (isMounted) {
+                        setLocating(false);
+                        setAddressPreview(isRTL ? 'اسحب الخريطة لاختيار موقع' : 'Drag map to select location');
+                    }
+                    return;
+                }
+
+                const location = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Balanced
+                });
+
+                if (!isMounted) return;
+
+                const nextRegion: Region = {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    latitudeDelta: 0.008,
+                    longitudeDelta: 0.008,
+                };
+
+                setRegion(nextRegion);
+
+                // Wait for map to be ready before animating
+                if (isMapReady) {
+                    mapRef.current?.animateToRegion(nextRegion, 800);
+                }
+
+                fetchAddressPreview(nextRegion.latitude, nextRegion.longitude);
+            } catch (err) {
+                console.log('MapPicker location error:', err);
+                if (isMounted) {
+                    setAddressPreview(isRTL ? 'اسحب الخريطة لاختيار موقع' : 'Drag map to select location');
+                }
+            } finally {
+                if (isMounted) setLocating(false);
+            }
+        })();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [visible, isMapReady]);
+
+    const handleRegionChangeComplete = (nextRegion: Region) => {
+        setRegion(nextRegion);
+        fetchAddressPreview(nextRegion.latitude, nextRegion.longitude);
     };
 
     const handleCenterLocation = async () => {
+        if (locating) return;
+        setLocating(true);
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') return;
+            if (status !== 'granted') {
+                setLocating(false);
+                return;
+            }
 
-            const location = await Location.getCurrentPositionAsync({});
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High
+            });
             const { latitude, longitude } = location.coords;
 
-            mapRef.current?.animateCamera({
-                center: { latitude, longitude },
-                pitch: 45,
-                heading: 0,
-                altitude: 1000,
-                zoom: 17
-            });
-            setMarkerCoordinate({ latitude, longitude });
+            const nextRegion: Region = {
+                latitude,
+                longitude,
+                latitudeDelta: 0.008,
+                longitudeDelta: 0.008,
+            };
+
+            mapRef.current?.animateToRegion(nextRegion, 600);
+            setRegion(nextRegion);
+            fetchAddressPreview(latitude, longitude);
         } catch (error) {
-            console.log(error);
+            console.log('Center location error:', error);
+        } finally {
+            setLocating(false);
+        }
+    };
+
+    const fetchAddressPreview = async (lat: number, lng: number) => {
+        try {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_ACCESS_TOKEN}&language=${isRTL ? 'ar' : 'en'}`;
+            const response = await axios.get(url, { timeout: 5000 });
+            const place = response.data.features?.[0]?.place_name;
+            setAddressPreview(place || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        } catch (error) {
+            console.log('Geocoding error:', error);
+            setAddressPreview(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
         }
     };
 
     const handleConfirm = async () => {
+        if (loading) return;
         setLoading(true);
+
         try {
-            // Reverse geocode to get address
-            const geocode = await Location.reverseGeocodeAsync({
-                latitude: markerCoordinate.latitude,
-                longitude: markerCoordinate.longitude
-            });
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${region.longitude},${region.latitude}.json?access_token=${MAPBOX_ACCESS_TOKEN}&language=${isRTL ? 'ar' : 'en'}`;
+            const response = await axios.get(url, { timeout: 8000 });
+            const address = response.data.features?.[0]?.place_name || addressPreview || `${region.latitude.toFixed(5)}, ${region.longitude.toFixed(5)}`;
 
-            const address = geocode[0]
-                ? `${geocode[0].street || ''}, ${geocode[0].city || ''}`.trim()
-                : `${markerCoordinate.latitude.toFixed(4)}, ${markerCoordinate.longitude.toFixed(4)}`;
-
-            onLocationSelected(address, markerCoordinate.latitude, markerCoordinate.longitude);
+            onLocationSelected(address, region.latitude, region.longitude);
             onClose();
         } catch (error) {
-            // Fallback to coordinates
-            const address = `${markerCoordinate.latitude.toFixed(4)}, ${markerCoordinate.longitude.toFixed(4)}`;
-            onLocationSelected(address, markerCoordinate.latitude, markerCoordinate.longitude);
+            console.log('Confirm geocoding error:', error);
+            // Fallback to preview or coordinates
+            const address = addressPreview || `${region.latitude.toFixed(5)}, ${region.longitude.toFixed(5)}`;
+            onLocationSelected(address, region.latitude, region.longitude);
             onClose();
         } finally {
             setLoading(false);
@@ -82,14 +168,18 @@ export default function MapPickerModal({ visible, onClose, onLocationSelected, t
             animationType="slide"
             transparent={false}
             onRequestClose={onClose}
+            statusBarTranslucent
         >
-            <View style={styles.container}>
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
                 {/* Header */}
                 <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <X size={24} color="#1F2937" />
+                    <TouchableOpacity onPress={onClose} style={styles.closeButton} activeOpacity={0.7}>
+                        <X size={22} color="#1F2937" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{title}</Text>
+                    <View style={styles.headerCenter}>
+                        <Navigation size={18} color={Colors.primary} style={{ marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }} />
+                        <Text style={styles.headerTitle}>{title}</Text>
+                    </View>
                     <View style={{ width: 40 }} />
                 </View>
 
@@ -97,64 +187,80 @@ export default function MapPickerModal({ visible, onClose, onLocationSelected, t
                 <MapView
                     ref={mapRef}
                     style={styles.map}
-                    initialRegion={{
-                        latitude: selectedLocation.latitude,
-                        longitude: selectedLocation.longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                    }}
-                    initialCamera={{
-                        center: {
-                            latitude: selectedLocation.latitude,
-                            longitude: selectedLocation.longitude,
-                        },
-                        pitch: 45,
-                        heading: 0,
-                        altitude: 1000,
-                        zoom: 17
-                    }}
-                    pitchEnabled={true}
-                    onPress={handleMapPress}
+                    initialRegion={region}
+                    onRegionChangeComplete={handleRegionChangeComplete}
+                    onMapReady={() => setIsMapReady(true)}
                     showsUserLocation
-                    showsMyLocationButton={false} // Custom button used below
+                    showsMyLocationButton={false}
+                    showsCompass={false}
+                    rotateEnabled={false}
+                    pitchEnabled={false}
+                    toolbarEnabled={false}
                 >
                     <UrlTile
-                        urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        urlTemplate={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_ACCESS_TOKEN}`}
                         maximumZ={19}
                         flipY={false}
+                        tileSize={256}
                     />
-                    <Marker coordinate={markerCoordinate}>
-                        <View style={styles.markerContainer}>
-                            <MapPin size={48} color={Colors.primary} fill={Colors.primary} />
-                            <View style={styles.markerShadow} />
-                        </View>
-                    </Marker>
                 </MapView>
 
-                {/* Floating Controls */}
-                <View style={styles.floatingControls}>
-                    {/* My Location FAB */}
-                    <TouchableOpacity
-                        style={styles.locationFab}
-                        onPress={handleCenterLocation}
-                        activeOpacity={0.8}
-                    >
-                        <Locate size={24} color={Colors.primary} />
-                    </TouchableOpacity>
-
-                    {/* Confirm Button */}
-                    <TouchableOpacity
-                        style={styles.confirmButton}
-                        onPress={handleConfirm}
-                        activeOpacity={0.8}
-                        disabled={loading}
-                    >
-                        <Text style={styles.confirmButtonText}>
-                            {loading ? (isRTL ? 'جاري التأكيد...' : 'Confirming...') : (isRTL ? 'تأكيد الموقع' : 'Confirm Location')}
-                        </Text>
-                    </TouchableOpacity>
+                {/* Center Pin */}
+                <View pointerEvents="none" style={styles.centerMarkerContainer}>
+                    <View style={styles.pinWrapper}>
+                        <MapPin size={44} color={Colors.primary} fill={Colors.primary} strokeWidth={2.5} />
+                        <View style={styles.pinPulse} />
+                    </View>
+                    <View style={styles.markerShadow} />
                 </View>
-            </View>
+
+                {/* Bottom Controls */}
+                <View style={styles.bottomSheet}>
+                    <View style={styles.dragHandle} />
+
+                    <View style={styles.addressCard}>
+                        <View style={[styles.addressHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <MapPin size={16} color="#64748B" />
+                            <Text style={styles.addressLabel}>
+                                {isRTL ? 'الموقع المحدد' : 'Selected Location'}
+                            </Text>
+                        </View>
+                        <Text style={[styles.addressValue, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={3}>
+                            {addressPreview || (isRTL ? 'جاري التحميل...' : 'Loading...')}
+                        </Text>
+                    </View>
+
+                    <View style={[styles.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <TouchableOpacity
+                            style={styles.locationButton}
+                            onPress={handleCenterLocation}
+                            activeOpacity={0.7}
+                            disabled={locating}
+                        >
+                            {locating ? (
+                                <ActivityIndicator size="small" color={Colors.primary} />
+                            ) : (
+                                <Locate size={22} color={Colors.primary} strokeWidth={2.5} />
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.confirmButton, loading && styles.disabledButton]}
+                            onPress={handleConfirm}
+                            activeOpacity={0.85}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.confirmButtonText}>
+                                    {isRTL ? 'تأكيد الموقع' : 'Confirm Location'}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </SafeAreaView>
         </Modal>
     );
 }
@@ -162,22 +268,17 @@ export default function MapPickerModal({ visible, onClose, onLocationSelected, t
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#F8FAFC',
     },
     header: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 50,
-        paddingBottom: 16,
+        paddingVertical: 12,
         paddingHorizontal: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
+        borderBottomColor: '#E2E8F0',
+        zIndex: 10,
     },
     closeButton: {
         width: 40,
@@ -185,65 +286,142 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 20,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#F1F5F9',
+    },
+    headerCenter: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '700',
-        color: '#1F2937',
+        color: '#0F172A',
     },
     map: {
         flex: 1,
     },
-    markerContainer: {
+    centerMarkerContainer: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginLeft: -22,
+        marginTop: -56,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 5,
+    },
+    pinWrapper: {
+        position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
     },
+    pinPulse: {
+        position: 'absolute',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: Colors.primary,
+        opacity: 0.2,
+        top: 8,
+    },
     markerShadow: {
-        width: 10,
+        width: 12,
+        height: 5,
+        borderRadius: 6,
+        backgroundColor: 'rgba(0,0,0,0.25)',
+        marginTop: -4,
+    },
+    bottomSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 20,
+    },
+    dragHandle: {
+        width: 40,
         height: 4,
         borderRadius: 2,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        marginTop: -2,
+        backgroundColor: '#CBD5E1',
+        alignSelf: 'center',
+        marginBottom: 16,
     },
-    floatingControls: {
-        position: 'absolute',
-        bottom: 40,
-        left: 20,
-        right: 20,
+    addressCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    addressHeader: {
         alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
     },
-    locationFab: {
-        alignSelf: 'flex-end',
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+    addressLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#64748B',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    addressValue: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#0F172A',
+        lineHeight: 22,
+    },
+    actionsRow: {
+        alignItems: 'center',
+        gap: 12,
+    },
+    locationButton: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         backgroundColor: '#FFFFFF',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 20,
+        borderWidth: 2,
+        borderColor: '#E2E8F0',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 3,
     },
     confirmButton: {
-        width: '100%',
+        flex: 1,
         backgroundColor: Colors.primary,
-        paddingVertical: 18,
-        borderRadius: 16,
+        paddingVertical: 16,
+        borderRadius: 28,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: Colors.primary,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
         shadowRadius: 8,
-        elevation: 10,
+        elevation: 8,
+        minHeight: 56,
+    },
+    disabledButton: {
+        opacity: 0.5,
     },
     confirmButtonText: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '700',
+        letterSpacing: 0.3,
     },
 });
